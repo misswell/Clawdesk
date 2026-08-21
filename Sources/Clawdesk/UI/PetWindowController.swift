@@ -9,12 +9,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var animationTimer: Timer?
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
+    private var roamTimer: Timer?
     private var animationTarget: MainTimerTarget?
     private var pointerTarget: MainTimerTarget?
     private var sleepTarget: MainTimerTarget?
+    private var roamTarget: MainTimerTarget?
     private var cancellables = Set<AnyCancellable>()
     private var isDragging = false
+    private var isRoaming = false
     private var hoverRestoreTask: Task<Void, Never>?
+    private var nextRoamDate = Date.distantPast
+    private let roamFence = RoamFenceCoordinator()
 
     public var onSettings: (() -> Void)?
     public var onDashboard: (() -> Void)?
@@ -98,23 +103,30 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         sleepTarget = MainTimerTarget { [weak self] in
             self?.model.tickForMaintenance()
         }
+        roamTarget = MainTimerTarget { [weak self] in
+            self?.checkRoam()
+        }
         let animationFrequency = model.preferences.lowPowerAnimations ? 8.0 : 18.0
         let pointerFrequency = model.preferences.lowPowerAnimations ? 12.0 : 24.0
         animationTimer = Timer.scheduledTimer(timeInterval: 1.0 / animationFrequency, target: animationTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
         pointerTimer = Timer.scheduledTimer(timeInterval: 1.0 / pointerFrequency, target: pointerTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
         sleepTimer = Timer.scheduledTimer(timeInterval: 5, target: sleepTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
+        roamTimer = Timer.scheduledTimer(timeInterval: 5, target: roamTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
     }
 
     public func stop() {
         animationTimer?.invalidate()
         pointerTimer?.invalidate()
         sleepTimer?.invalidate()
+        roamTimer?.invalidate()
         animationTimer = nil
         pointerTimer = nil
         sleepTimer = nil
+        roamTimer = nil
         animationTarget = nil
         pointerTarget = nil
         sleepTarget = nil
+        roamTarget = nil
         hoverRestoreTask?.cancel()
         close()
     }
@@ -235,6 +247,51 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         model.preferences.windowOrigin = target
     }
 
+    private func checkRoam() {
+        guard model.preferences.freeRoamEnabled,
+              !model.preferences.isMiniMode,
+              !model.preferences.doNotDisturb,
+              !isDragging,
+              let window,
+              !model.petState.isTransient,
+              model.petState == .idle || model.petState == .typing else { return }
+        let now = Date.now
+        guard now >= nextRoamDate else { return }
+        roamFence.refresh(from: model.preferences.roamAreaFileURL)
+        guard roamFence.confirmed else {
+            nextRoamDate = now.addingTimeInterval(5)
+            return
+        }
+        guard let screen = screenForWindow(window) else { return }
+        guard let target = RoamPlanner.nextTarget(
+            currentOrigin: window.frame.origin,
+            windowSize: window.frame.size,
+            workArea: screen.visibleFrame,
+            fence: roamFence.current,
+            random: { CGFloat.random(in: $0) }
+        ) else {
+            // The window cannot fit inside the fence; hold and retry later.
+            nextRoamDate = now.addingTimeInterval(10)
+            return
+        }
+        let newOrigin = NSPoint(x: target.x, y: target.y)
+        guard abs(newOrigin.x - window.frame.origin.x) + abs(newOrigin.y - window.frame.origin.y) > 8 else {
+            nextRoamDate = now.addingTimeInterval(8)
+            return
+        }
+        nextRoamDate = now.addingTimeInterval(TimeInterval.random(in: 10...20))
+        isRoaming = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 1.6
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrameOrigin(newOrigin)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.isRoaming = false
+            }
+        }
+    }
+
     /// Continuously resizes the pet window from the 240-point logical canvas.
     /// The bottom-center of the pet stays anchored so enlarging or shrinking
     /// feels like the pet itself is scaling in place.
@@ -300,7 +357,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     @objc private func quit() { onQuit?() ?? NSApp.terminate(nil) }
 
     public func windowDidMove(_ notification: Notification) {
-        guard !model.preferences.isMiniMode else { return }
+        guard !model.preferences.isMiniMode, !isRoaming else { return }
         model.preferences.windowOrigin = window?.frame.origin
     }
 }

@@ -26,6 +26,7 @@ public enum ThemeImportError: LocalizedError {
 @MainActor
 public final class AppPreferences: ObservableObject {
     private let defaults: UserDefaults
+    private let homeDirectory: URL
     private var isLoading = true
 
     @Published public var selectedThemeID: String { didSet { persist() } }
@@ -41,17 +42,24 @@ public final class AppPreferences: ObservableObject {
     @Published public var mobileEnabled: Bool { didSet { persist() } }
     @Published public var mobilePort: UInt16 { didSet { persist() } }
     @Published public var petScale: Double { didSet { persist() } }
+    @Published public var freeRoamEnabled: Bool { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
 
     public let customThemesDirectory: URL
 
+    /// Upstream-compatible roam fence file (`~/.clawd/roam-area.json`).
+    public var roamAreaFileURL: URL {
+        homeDirectory.appendingPathComponent(".clawd/roam-area.json")
+    }
+
     public init(
         defaults: UserDefaults = .standard,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) {
         self.defaults = defaults
+        self.homeDirectory = homeDirectory
         customThemesDirectory = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk/themes", isDirectory: true)
         selectedThemeID = defaults.string(forKey: "theme") ?? "pinch"
         isMiniMode = defaults.bool(forKey: "miniMode")
@@ -66,6 +74,7 @@ public final class AppPreferences: ObservableObject {
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
         petScale = min(2.0, max(0.4, defaults.object(forKey: "petScale") as? Double ?? 1.0))
+        freeRoamEnabled = defaults.bool(forKey: "freeRoam")
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
@@ -175,6 +184,7 @@ public final class AppPreferences: ObservableObject {
         defaults.set(mobileEnabled, forKey: "mobileEnabled")
         defaults.set(Int(mobilePort), forKey: "mobilePort")
         defaults.set(petScale, forKey: "petScale")
+        defaults.set(freeRoamEnabled, forKey: "freeRoam")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")

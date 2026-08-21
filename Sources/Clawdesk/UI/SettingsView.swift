@@ -41,6 +41,7 @@ public struct SettingsView: View {
 private struct GeneralSettingsView: View {
     @ObservedObject var model: ClawdeskModel
     @State private var themeStatus = ""
+    @State private var roamStatus = ""
 
     var body: some View {
         Form {
@@ -111,6 +112,17 @@ private struct GeneralSettingsView: View {
                 Toggle(model.preferences.text("Sound effects"), isOn: $model.preferences.soundEnabled)
                 Toggle(model.preferences.text("Launch at login"), isOn: $model.preferences.autoStart)
                 Toggle(model.preferences.text("Do Not Disturb"), isOn: $model.preferences.doNotDisturb)
+                Toggle(model.preferences.text("Free roam"), isOn: $model.preferences.freeRoamEnabled)
+                HStack {
+                    Button(model.preferences.text("Choose area…")) { chooseRoamArea() }
+                    Button(model.preferences.text("Remove custom area")) { removeRoamArea() }
+                    if !roamStatus.isEmpty {
+                        Text(roamStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
             } header: {
                 Text(model.preferences.text("Desktop pet"))
             } footer: {
@@ -138,6 +150,31 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func chooseRoamArea() {
+        let coordinator = RoamFenceCoordinator()
+        coordinator.refresh(from: model.preferences.roamAreaFileURL)
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        let picker = RoamAreaPickerController { [weak model] area in
+            guard let model, let area else { return }
+            do {
+                try RoamFenceCoordinator().apply(area, to: model.preferences.roamAreaFileURL)
+                self.roamStatus = area.enabled ? "Roam area saved." : "Custom area removed."
+            } catch {
+                self.roamStatus = error.localizedDescription
+            }
+        }
+        picker.present(on: screen, initial: coordinator.current)
+    }
+
+    private func removeRoamArea() {
+        do {
+            try RoamFenceCoordinator().disable(model.preferences.roamAreaFileURL)
+            roamStatus = "Custom area removed."
+        } catch {
+            roamStatus = error.localizedDescription
+        }
     }
 }
 

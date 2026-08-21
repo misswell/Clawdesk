@@ -18,6 +18,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Idle eye tracking, drag, mini mode, hover peek | `PetCanvasView` / `PetWindowController` | Implemented |
 | Double tap / rapid four-tap reactions | `PetCanvasView` | Implemented |
 | DND, sound cue, position memory, launch at login, continuously adjustable pet size | preferences + AppKit | Implemented: a 40%–200% scale slider resizes the pet window in place, anchored to its bottom center |
+| Free Roam with roam fence | `RoamPlanner` + `RoamFenceCoordinator` + Settings overlay | Implemented: the pet periodically walks to a whole-window target inside a user-selected work-area rectangle stored in `~/.clawd/roam-area.json`; malformed input keeps the previous fence and deletion only counts after two consecutive checks |
 | Interface language (en / zh-Hans / zh-Hant / ja / ko / es) | `Localization` table + `AppPreferences.language` | Implemented: settings, menus, dashboard, and window titles switch immediately; untranslated keys fall back to English |
 | Settings, Dashboard, permission bubble | SwiftUI windows | Implemented |
 | Global allow/deny shortcuts | `GlobalShortcutManager` | Implemented |

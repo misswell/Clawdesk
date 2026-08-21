@@ -74,4 +74,6 @@ themes remain an isolated renderer seam.
 Settings → General includes a continuous pet-size slider (40%–200%) that
 resizes the floating pet in place, and an interface-language picker that
 switches the UI immediately (English, 简体中文, 繁體中文, 日本語, 한국어,
-Español, or system default).
+Español, or system default). Free Roam can be enabled so the pet periodically
+walks to a random spot, optionally confined to an activity area you drag out
+in Settings (stored in `~/.clawd/roam-area.json`).
