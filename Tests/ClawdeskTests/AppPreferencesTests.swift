@@ -49,4 +49,15 @@ final class AppPreferencesTests: XCTestCase {
         let low = makePreferences(suite: "clawdesk-scale-low-\(UUID().uuidString)", petScale: 0.05)
         XCTAssertEqual(low.petScale, 0.4)
     }
+
+    func testPermissionAutomationDefaultsOffAndPersists() {
+        let suite = "clawdesk-automation-\(UUID().uuidString)"
+        let prefs = makePreferences(suite: suite)
+        XCTAssertEqual(prefs.permissionAutomation, .off)
+        prefs.permissionAutomation = .autoTools
+
+        let defaults = UserDefaults(suiteName: suite)!
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertEqual(reloaded.permissionAutomation, .autoTools)
+    }
 }

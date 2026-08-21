@@ -150,6 +150,11 @@ public final class ClawdeskModel: ObservableObject {
                 resolvePermission(id: request.id, decision: .allow)
                 return
             }
+            if preferences.permissionAutomation != .off,
+               let decision = PermissionPolicy.decide(request: request, automation: preferences.permissionAutomation) {
+                resolvePermission(id: request.id, decision: decision)
+                return
+            }
             if preferences.permissionMode == .toolsOnly,
                request.action == nil, request.command == nil, request.input == nil {
                 // Question/elicitation-shaped requests stay in the agent's

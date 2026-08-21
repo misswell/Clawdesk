@@ -37,6 +37,7 @@ public final class AppPreferences: ObservableObject {
     @Published public var autoStart: Bool { didSet { persist() } }
     @Published public var language: String { didSet { persist() } }
     @Published public var permissionMode: PermissionMode { didSet { persist() } }
+    @Published public var permissionAutomation: PermissionAutomation { didSet { persist() } }
     @Published public var showPermissionBubbles: Bool { didSet { persist() } }
     @Published public var serverPort: UInt16 { didSet { persist() } }
     @Published public var mobileEnabled: Bool { didSet { persist() } }
@@ -70,6 +71,7 @@ public final class AppPreferences: ObservableObject {
         autoStart = defaults.bool(forKey: "autoStart")
         language = defaults.string(forKey: "language") ?? "system"
         permissionMode = PermissionMode(rawValue: defaults.string(forKey: "permissionMode") ?? "ask-every-time") ?? .askEveryTime
+        permissionAutomation = PermissionAutomation(rawValue: defaults.string(forKey: "permissionAutomation") ?? "") ?? .off
         showPermissionBubbles = defaults.object(forKey: "showPermissionBubbles") as? Bool ?? true
         serverPort = UInt16(defaults.integer(forKey: "serverPort")) == 0 ? 37777 : UInt16(defaults.integer(forKey: "serverPort"))
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
@@ -181,6 +183,7 @@ public final class AppPreferences: ObservableObject {
         defaults.set(autoStart, forKey: "autoStart")
         defaults.set(language, forKey: "language")
         defaults.set(permissionMode.rawValue, forKey: "permissionMode")
+        defaults.set(permissionAutomation.rawValue, forKey: "permissionAutomation")
         defaults.set(showPermissionBubbles, forKey: "showPermissionBubbles")
         defaults.set(Int(serverPort), forKey: "serverPort")
         defaults.set(mobileEnabled, forKey: "mobileEnabled")

@@ -260,11 +260,16 @@ private struct PermissionSettingsView: View {
                         Text(mode.displayName).tag(mode)
                     }
                 }
+                Picker(model.preferences.text("Permission automation"), selection: $model.preferences.permissionAutomation) {
+                    ForEach(PermissionAutomation.allCases, id: \.self) { automation in
+                        Text(model.preferences.text(automation.displayName)).tag(automation)
+                    }
+                }
                 Toggle(model.preferences.text("Show pop-up bubbles"), isOn: $model.preferences.showPermissionBubbles)
             } header: {
                 Text(model.preferences.text("Local approval"))
             } footer: {
-                Text("Auto-approve is intentionally opt-in and applies only to requests received through Clawdesk's local event server.")
+                Text("Automation applies only to requests received through Clawdesk's local event server. Unknown tools are never auto-approved.")
             }
 
             Section(model.preferences.text("Keyboard shortcuts")) {
