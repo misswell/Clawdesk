@@ -7,6 +7,7 @@ public final class ClawdeskModel: ObservableObject {
     public let sessionStore = SessionStore()
     public let eventServer: LocalEventServer
     public let hookInstaller: HookInstaller
+    public let doctor: AgentDoctor
     public let remoteNotifier: RemoteNotifier
     public let remoteSSHManager: RemoteSSHManager
     public let mobileBridge: MobileBridge
@@ -21,6 +22,7 @@ public final class ClawdeskModel: ObservableObject {
     @Published public private(set) var eventLog: [String] = []
     @Published public private(set) var quotaReports: [QuotaReport] = []
     @Published public private(set) var agentInstallStatus: [String: String] = [:]
+    @Published public private(set) var doctorReports: [AgentDiagnostic] = []
     @Published public private(set) var serverPort: UInt16
 
     public var onPermission: ((PermissionRequest) -> Void)?
@@ -41,6 +43,7 @@ public final class ClawdeskModel: ObservableObject {
         eventServer = server
         remoteSSHManager = RemoteSSHManager(eventServer: server)
         hookInstaller = HookInstaller()
+        doctor = AgentDoctor(installer: hookInstaller)
         remoteNotifier = RemoteNotifier()
         mobileBridge = MobileBridge(preferredPort: preferences.mobilePort)
         codexLogMonitor = CodexLogMonitor()
@@ -223,6 +226,15 @@ public final class ClawdeskModel: ObservableObject {
             agentInstallStatus[agentID] = error.localizedDescription
             eventLog.insert("system · hook removal failed: \(error.localizedDescription)", at: 0)
         }
+    }
+
+    public func refreshDoctor() {
+        doctorReports = doctor.diagnose()
+    }
+
+    public func fixAgent(_ agentID: String) {
+        installAgent(agentID)
+        refreshDoctor()
     }
 
     public func tickForSleep() -> Bool {

@@ -29,6 +29,9 @@ public struct SettingsView: View {
             RemoteSSHSettingsView(model: model)
                 .tabItem { Label(prefs.text("Remote SSH"), systemImage: "network") }
                 .tag("remote-ssh")
+            DoctorSettingsView(model: model)
+                .tabItem { Label(prefs.text("Doctor"), systemImage: "stethoscope") }
+                .tag("doctor")
             AboutSettingsView(model: model)
                 .tabItem { Label(prefs.text("About"), systemImage: "info.circle") }
                 .tag("about")
@@ -615,6 +618,72 @@ private struct RemoteSSHSettingsView: View {
         }
         .padding(12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct DoctorSettingsView: View {
+    @ObservedObject var model: ClawdeskModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(model.preferences.text("Doctor"))
+                    .font(.title2.weight(.semibold))
+                Spacer()
+                Button(model.preferences.text("Run checks")) { model.refreshDoctor() }
+                    .buttonStyle(.borderedProminent)
+            }
+            if model.doctorReports.isEmpty {
+                Text("Run checks to inspect local agent integrations.")
+                    .foregroundStyle(.secondary)
+            } else {
+                List(model.doctorReports, id: \.agentID) { report in
+                    HStack(spacing: 10) {
+                        Image(systemName: icon(for: report.state))
+                            .foregroundStyle(color(for: report.state))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.displayName).font(.headline)
+                            Text(report.message).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(label(for: report.state))
+                            .font(.caption.weight(.semibold))
+                        if report.state == .fixable {
+                            Button(model.preferences.text("Fix")) { model.fixAgent(report.agentID) }
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
+        .padding(8)
+    }
+
+    private func icon(for state: AgentDiagnostic.State) -> String {
+        switch state {
+        case .ok: return "checkmark.circle"
+        case .notInstalled: return "circle.dashed"
+        case .fixable: return "exclamationmark.triangle"
+        case .notChecked: return "questionmark.circle"
+        }
+    }
+
+    private func color(for state: AgentDiagnostic.State) -> Color {
+        switch state {
+        case .ok: return .green
+        case .fixable: return .orange
+        case .notInstalled, .notChecked: return .secondary
+        }
+    }
+
+    private func label(for state: AgentDiagnostic.State) -> String {
+        switch state {
+        case .ok: return model.preferences.text("OK")
+        case .notInstalled: return model.preferences.text("Not installed")
+        case .fixable: return model.preferences.text("Needs repair")
+        case .notChecked: return model.preferences.text("Not checked")
+        }
     }
 }
 
