@@ -194,7 +194,7 @@ private struct AgentSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Agent integrations")
+            Text(model.preferences.text("Agent integrations"))
                 .font(.title2.weight(.semibold))
             Text("All integrations use the same small local event interface. The native app keeps adapters separate so upstream agent changes stay localized.")
                 .foregroundStyle(.secondary)
@@ -211,17 +211,17 @@ private struct AgentSettingsView: View {
                         Spacer()
                         if HookInstaller.supportedAgentIDs.contains(agent.id) {
                             HStack(spacing: 6) {
-                                Button(model.agentInstallStatus[agent.id] == nil ? "Install" : "Re-sync") {
+                                Button(model.agentInstallStatus[agent.id] == nil ? model.preferences.text("Install") : model.preferences.text("Re-sync")) {
                                     model.installAgent(agent.id)
                                 }
                                 .buttonStyle(.bordered)
-                                Button("Remove") {
+                                Button(model.preferences.text("Remove")) {
                                     model.uninstallAgent(agent.id)
                                 }
                                 .buttonStyle(.bordered)
                             }
                         } else {
-                            Text(agent.stateOnly ? "State-only" : "Ready")
+                            Text(agent.stateOnly ? model.preferences.text("State-only") : model.preferences.text("Ready"))
                                 .font(.caption)
                                 .foregroundStyle(Color.secondary)
                         }
@@ -255,21 +255,21 @@ private struct PermissionSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Permission handling", selection: $model.preferences.permissionMode) {
+                Picker(model.preferences.text("Permission handling"), selection: $model.preferences.permissionMode) {
                     ForEach(PermissionMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
-                Toggle("Show pop-up bubbles", isOn: $model.preferences.showPermissionBubbles)
+                Toggle(model.preferences.text("Show pop-up bubbles"), isOn: $model.preferences.showPermissionBubbles)
             } header: {
-                Text("Local approval")
+                Text(model.preferences.text("Local approval"))
             } footer: {
                 Text("Auto-approve is intentionally opt-in and applies only to requests received through Clawdesk's local event server.")
             }
 
-            Section("Keyboard shortcuts") {
-                LabeledContent("Allow latest request", value: "⌃⇧Y")
-                LabeledContent("Deny latest request", value: "⌃⇧N")
+            Section(model.preferences.text("Keyboard shortcuts")) {
+                LabeledContent(model.preferences.text("Allow latest request"), value: "⌃⇧Y")
+                LabeledContent(model.preferences.text("Deny latest request"), value: "⌃⇧N")
             }
         }
         .formStyle(.grouped)
