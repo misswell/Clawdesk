@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 
 @main
@@ -12,6 +13,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var shortcuts: GlobalShortcutManager!
     private let instanceGuard = SingleInstanceGuard()
+    private var cancellables = Set<AnyCancellable>()
 
     public static func main() {
         let application = NSApplication.shared
@@ -48,6 +50,12 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         }
 
         installStatusItem()
+        model.preferences.$language.sink { [weak self] _ in
+            guard let self else { return }
+            self.statusItem?.menu = self.makeStatusMenu()
+            self.settingsWindow.window?.title = self.model.preferences.text("Clawdesk Settings")
+            self.dashboardWindow.window?.title = self.model.preferences.text("Clawdesk Dashboard")
+        }.store(in: &cancellables)
         model.start()
         shortcuts.start()
         petWindow.start()
@@ -73,14 +81,14 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
 
     private func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
-        addMenuItem(to: menu, title: "Open Dashboard", action: #selector(showDashboard))
-        addMenuItem(to: menu, title: "Settings…", action: #selector(showSettings))
+        addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(showDashboard))
+        addMenuItem(to: menu, title: model.preferences.text("Settings…"), action: #selector(showSettings))
         menu.addItem(.separator())
-        addMenuItem(to: menu, title: "Mini Mode", action: #selector(toggleMini))
-        addMenuItem(to: menu, title: "Do Not Disturb", action: #selector(toggleDND))
-        addMenuItem(to: menu, title: "Sound effects", action: #selector(toggleSound))
+        addMenuItem(to: menu, title: model.preferences.text("Mini Mode"), action: #selector(toggleMini))
+        addMenuItem(to: menu, title: model.preferences.text("Do Not Disturb"), action: #selector(toggleDND))
+        addMenuItem(to: menu, title: model.preferences.text("Sound effects"), action: #selector(toggleSound))
         menu.addItem(.separator())
-        addMenuItem(to: menu, title: "Quit Clawdesk", action: #selector(terminate))
+        addMenuItem(to: menu, title: model.preferences.text("Quit Clawdesk"), action: #selector(terminate))
         return menu
     }
 

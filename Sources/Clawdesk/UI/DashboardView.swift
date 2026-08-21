@@ -2,9 +2,11 @@ import SwiftUI
 
 public struct DashboardView: View {
     @ObservedObject private var model: ClawdeskModel
+    @ObservedObject private var prefs: AppPreferences
 
     public init(model: ClawdeskModel) {
         self.model = model
+        _prefs = ObservedObject(wrappedValue: model.preferences)
     }
 
     public var body: some View {
@@ -58,9 +60,9 @@ public struct DashboardView: View {
             Image(systemName: "pawprint.fill")
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Clawdesk Dashboard")
+                Text(prefs.text("Clawdesk Dashboard"))
                     .font(.title2.weight(.semibold))
-                Text("\(model.sessions.count) live session\(model.sessions.count == 1 ? "" : "s") · \(model.petState.displayName)")
+                Text("\(model.sessions.count) \(model.sessions.count == 1 ? prefs.text("live session") : prefs.text("live sessions")) · \(model.petState.displayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -77,16 +79,16 @@ public struct DashboardView: View {
 
     private var sessionsPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Live sessions")
+            Text(prefs.text("Live sessions"))
                 .font(.headline)
             if model.sessions.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "moon.zzz")
                         .font(.title2)
                         .foregroundStyle(.secondary)
-                    Text("No active sessions")
+                    Text(prefs.text("No active sessions"))
                         .font(.headline)
-                    Text("Start a supported coding agent to see it here.")
+                    Text(prefs.text("Start a supported coding agent to see it here."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -110,10 +112,10 @@ public struct DashboardView: View {
                         HStack {
                             Text(session.lastEvent)
                             if session.subagentCount > 0 {
-                                Text("· \(session.subagentCount) subagent\(session.subagentCount == 1 ? "" : "s")")
+                            Text("· \(session.subagentCount) \(session.subagentCount == 1 ? prefs.text("subagent") : prefs.text("subagents"))")
                             }
                             Spacer()
-                            Button("Focus") {
+                            Button(prefs.text("Focus")) {
                                 _ = TerminalFocusService.focus(session)
                             }
                             .buttonStyle(.borderless)
@@ -132,10 +134,10 @@ public struct DashboardView: View {
 
     private var eventPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Recent events")
+            Text(prefs.text("Recent events"))
                 .font(.headline)
             if model.eventLog.isEmpty {
-                Text("Waiting for local agent events…")
+                Text(prefs.text("Waiting for local agent events…"))
                     .foregroundStyle(.secondary)
                     .padding(.top, 10)
             } else {
@@ -147,7 +149,7 @@ public struct DashboardView: View {
             }
             if !model.pendingPermissions.isEmpty {
                 Divider()
-                Label("\(model.pendingPermissions.count) permission request pending", systemImage: "exclamationmark.shield.fill")
+                Label("\(model.pendingPermissions.count) \(prefs.text("permission request pending"))", systemImage: "exclamationmark.shield.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }

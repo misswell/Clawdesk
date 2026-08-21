@@ -68,3 +68,8 @@ raster frames are cached and capped to keep idle memory use low. Themes with
 multiple idle visuals can select and persist one per theme. Full upstream Codex
 Pet atlas conversion is intentionally not claimed, and custom themes remain an
 isolated renderer seam.
+
+Settings → General includes a continuous pet-size slider (40%–200%) that
+resizes the floating pet in place, and an interface-language picker that
+switches the UI immediately (English, 简体中文, 繁體中文, 日本語, 한국어,
+Español, or system default).

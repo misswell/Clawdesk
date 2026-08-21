@@ -6,7 +6,7 @@ public final class SettingsWindowController: NSWindowController {
     public init(model: ClawdeskModel) {
         let hosting = NSHostingController(rootView: SettingsView(model: model))
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Clawdesk Settings"
+        window.title = model.preferences.text("Clawdesk Settings")
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.setContentSize(NSSize(width: 700, height: 500))
         window.isReleasedWhenClosed = false
@@ -29,7 +29,7 @@ public final class DashboardWindowController: NSWindowController {
     public init(model: ClawdeskModel) {
         let hosting = NSHostingController(rootView: DashboardView(model: model))
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Clawdesk Dashboard"
+        window.title = model.preferences.text("Clawdesk Dashboard")
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.setContentSize(NSSize(width: 900, height: 600))
         window.isReleasedWhenClosed = false

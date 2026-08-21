@@ -4,31 +4,33 @@ import UniformTypeIdentifiers
 
 public struct SettingsView: View {
     @ObservedObject private var model: ClawdeskModel
+    @ObservedObject private var prefs: AppPreferences
     @State private var selectedTab = "general"
 
     public init(model: ClawdeskModel) {
         self.model = model
+        _prefs = ObservedObject(wrappedValue: model.preferences)
     }
 
     public var body: some View {
         TabView(selection: $selectedTab) {
             GeneralSettingsView(model: model)
-                .tabItem { Label("General", systemImage: "slider.horizontal.3") }
+                .tabItem { Label(prefs.text("General"), systemImage: "slider.horizontal.3") }
                 .tag("general")
             AgentSettingsView(model: model)
-                .tabItem { Label("Agents", systemImage: "terminal") }
+                .tabItem { Label(prefs.text("Agents"), systemImage: "terminal") }
                 .tag("agents")
             PermissionSettingsView(model: model)
-                .tabItem { Label("Permissions", systemImage: "checkmark.shield") }
+                .tabItem { Label(prefs.text("Permissions"), systemImage: "checkmark.shield") }
                 .tag("permissions")
             RemoteSettingsView(model: model)
-                .tabItem { Label("Remote", systemImage: "antenna.radiowaves.left.and.right") }
+                .tabItem { Label(prefs.text("Remote"), systemImage: "antenna.radiowaves.left.and.right") }
                 .tag("remote")
             RemoteSSHSettingsView(model: model)
-                .tabItem { Label("Remote SSH", systemImage: "network") }
+                .tabItem { Label(prefs.text("Remote SSH"), systemImage: "network") }
                 .tag("remote-ssh")
             AboutSettingsView()
-                .tabItem { Label("About", systemImage: "info.circle") }
+                .tabItem { Label(prefs.text("About"), systemImage: "info.circle") }
                 .tag("about")
         }
         .frame(minWidth: 650, minHeight: 430)
@@ -43,7 +45,7 @@ private struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Theme", selection: Binding(
+                Picker(model.preferences.text("Theme"), selection: Binding(
                     get: { model.preferences.selectedThemeID },
                     set: { model.setTheme($0) }
                 )) {
@@ -52,7 +54,7 @@ private struct GeneralSettingsView: View {
                     }
                 }
                 if model.preferences.theme.supportsIdleVisualSelection {
-                    Picker("Idle visual", selection: Binding(
+                    Picker(model.preferences.text("Idle visual"), selection: Binding(
                         get: {
                             model.preferences.selectedIdleVisual(for: model.preferences.theme)
                                 ?? model.preferences.theme.idleVisualFiles[0]
@@ -66,7 +68,14 @@ private struct GeneralSettingsView: View {
                     }
                 }
                 HStack {
-                    Button("Import theme…") {
+                    Text(model.preferences.text("Pet size"))
+                    Slider(value: $model.preferences.petScale, in: 0.4...2.0)
+                    Text("\(Int((model.preferences.petScale * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .frame(width: 46, alignment: .trailing)
+                }
+                HStack {
+                    Button(model.preferences.text("Import theme…")) {
                         let panel = NSOpenPanel()
                         panel.canChooseFiles = true
                         panel.canChooseDirectories = true
@@ -81,7 +90,7 @@ private struct GeneralSettingsView: View {
                         }
                     }
                     if model.preferences.theme.assetDirectory != nil {
-                        Button("Remove custom theme") {
+                        Button(model.preferences.text("Remove custom theme")) {
                             do {
                                 try model.preferences.removeCustomTheme(id: model.preferences.theme.id)
                                 themeStatus = "Custom theme removed."
@@ -97,20 +106,20 @@ private struct GeneralSettingsView: View {
                             .lineLimit(2)
                     }
                 }
-                Toggle("Mini mode", isOn: $model.preferences.isMiniMode)
-                Toggle("Low-power animations", isOn: $model.preferences.lowPowerAnimations)
-                Toggle("Sound effects", isOn: $model.preferences.soundEnabled)
-                Toggle("Launch at login", isOn: $model.preferences.autoStart)
-                Toggle("Do Not Disturb", isOn: $model.preferences.doNotDisturb)
+                Toggle(model.preferences.text("Mini mode"), isOn: $model.preferences.isMiniMode)
+                Toggle(model.preferences.text("Low-power animations"), isOn: $model.preferences.lowPowerAnimations)
+                Toggle(model.preferences.text("Sound effects"), isOn: $model.preferences.soundEnabled)
+                Toggle(model.preferences.text("Launch at login"), isOn: $model.preferences.autoStart)
+                Toggle(model.preferences.text("Do Not Disturb"), isOn: $model.preferences.doNotDisturb)
             } header: {
-                Text("Desktop pet")
+                Text(model.preferences.text("Desktop pet"))
             } footer: {
                 Text("Low-power mode keeps idle animation on a low-frequency timer and pauses passive effects when Clawdesk is inactive.")
             }
 
-            Section("Language") {
-                Picker("Interface language", selection: $model.preferences.language) {
-                    Text("System default").tag("system")
+            Section(model.preferences.text("Interface language")) {
+                Picker(model.preferences.text("Interface language"), selection: $model.preferences.language) {
+                    Text(model.preferences.text("System default")).tag("system")
                     Text("English").tag("en")
                     Text("简体中文").tag("zh-Hans")
                     Text("繁體中文").tag("zh-Hant")
@@ -121,7 +130,7 @@ private struct GeneralSettingsView: View {
             }
 
             HStack {
-                Button("Reset position") { model.preferences.resetPosition() }
+                Button(model.preferences.text("Reset position")) { model.preferences.resetPosition() }
                 Spacer()
                 Text("State server: 127.0.0.1:\(model.serverPort)")
                     .font(.caption.monospaced())

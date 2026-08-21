@@ -22,9 +22,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     public init(model: ClawdeskModel) {
         self.model = model
-        petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        let base = 240.0 * model.preferences.petScale
+        petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: base, height: base))
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 240),
+            contentRect: NSRect(x: 0, y: 0, width: base, height: base),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -66,6 +67,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$isMiniMode.sink { [weak self] enabled in
             self?.setMiniMode(enabled, animate: true)
+        }.store(in: &cancellables)
+        model.preferences.$petScale.sink { [weak self] scale in
+            self?.applyScale(scale, animate: true)
         }.store(in: &cancellables)
     }
 
@@ -231,23 +235,52 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         model.preferences.windowOrigin = target
     }
 
+    /// Continuously resizes the pet window from the 240-point logical canvas.
+    /// The bottom-center of the pet stays anchored so enlarging or shrinking
+    /// feels like the pet itself is scaling in place.
+    private func applyScale(_ scale: Double, animate: Bool) {
+        guard let window else { return }
+        let clamped = min(2.0, max(0.4, scale))
+        let size = NSSize(width: 240 * clamped, height: 240 * clamped)
+        let current = window.frame
+        let target = NSRect(
+            x: current.midX - size.width / 2,
+            y: current.minY,
+            width: size.width,
+            height: size.height
+        )
+        if animate {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                window.animator().setFrame(target, display: true)
+            }
+        } else {
+            window.setFrame(target, display: true)
+        }
+        if model.preferences.isMiniMode {
+            moveToMiniEdge(animated: animate)
+        } else if !isDragging {
+            model.preferences.windowOrigin = target.origin
+        }
+    }
+
     private func screenForWindow(_ window: NSWindow) -> NSScreen? {
         NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main
     }
 
     private func makeContextMenu() -> NSMenu {
         let menu = NSMenu()
-        addMenuItem(to: menu, title: "Open Dashboard", action: #selector(openDashboard))
-        addMenuItem(to: menu, title: "Settings…", action: #selector(openSettings))
+        addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(openDashboard))
+        addMenuItem(to: menu, title: model.preferences.text("Settings…"), action: #selector(openSettings))
         menu.addItem(.separator())
-        let mini = addMenuItem(to: menu, title: model.preferences.isMiniMode ? "Exit Mini Mode" : "Mini Mode", action: #selector(toggleMini))
+        let mini = addMenuItem(to: menu, title: model.preferences.text(model.preferences.isMiniMode ? "Exit Mini Mode" : "Mini Mode"), action: #selector(toggleMini))
         mini.state = model.preferences.isMiniMode ? .on : .off
-        let dnd = addMenuItem(to: menu, title: model.preferences.doNotDisturb ? "Wake Clawdesk" : "Do Not Disturb", action: #selector(toggleDND))
+        let dnd = addMenuItem(to: menu, title: model.preferences.text(model.preferences.doNotDisturb ? "Wake Clawdesk" : "Do Not Disturb"), action: #selector(toggleDND))
         dnd.state = model.preferences.doNotDisturb ? .on : .off
-        let sound = addMenuItem(to: menu, title: "Sound effects", action: #selector(toggleSound))
+        let sound = addMenuItem(to: menu, title: model.preferences.text("Sound effects"), action: #selector(toggleSound))
         sound.state = model.preferences.soundEnabled ? .on : .off
         menu.addItem(.separator())
-        addMenuItem(to: menu, title: "Quit Clawdesk", action: #selector(quit))
+        addMenuItem(to: menu, title: model.preferences.text("Quit Clawdesk"), action: #selector(quit))
         return menu
     }
 

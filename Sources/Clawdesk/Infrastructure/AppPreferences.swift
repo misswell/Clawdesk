@@ -40,6 +40,7 @@ public final class AppPreferences: ObservableObject {
     @Published public var serverPort: UInt16 { didSet { persist() } }
     @Published public var mobileEnabled: Bool { didSet { persist() } }
     @Published public var mobilePort: UInt16 { didSet { persist() } }
+    @Published public var petScale: Double { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
@@ -64,6 +65,7 @@ public final class AppPreferences: ObservableObject {
         serverPort = UInt16(defaults.integer(forKey: "serverPort")) == 0 ? 37777 : UInt16(defaults.integer(forKey: "serverPort"))
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
+        petScale = min(2.0, max(0.4, defaults.object(forKey: "petScale") as? Double ?? 1.0))
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
@@ -80,6 +82,24 @@ public final class AppPreferences: ObservableObject {
 
     public var availableThemes: [ThemeDefinition] {
         customThemes + ThemeCatalog.builtIn
+    }
+
+    /// Resolves the picker value ("system" or a locale tag) to a concrete
+    /// language used by the localization table.
+    public var resolvedLanguage: String {
+        guard language == "system" else { return language }
+        let preferred = Locale.preferredLanguages.first ?? "en"
+        if preferred.hasPrefix("zh-Hant") || preferred.hasPrefix("zh-HK") || preferred.hasPrefix("zh-TW") {
+            return "zh-Hant"
+        }
+        if preferred.hasPrefix("zh") { return "zh-Hans" }
+        return "en"
+    }
+
+    /// Localized UI string for the current language, falling back to the
+    /// English key when no translation exists.
+    public func text(_ key: String) -> String {
+        Localization.string(key, language: resolvedLanguage) ?? key
     }
 
     public func selectedIdleVisual(for theme: ThemeDefinition) -> String? {
@@ -154,6 +174,7 @@ public final class AppPreferences: ObservableObject {
         defaults.set(Int(serverPort), forKey: "serverPort")
         defaults.set(mobileEnabled, forKey: "mobileEnabled")
         defaults.set(Int(mobilePort), forKey: "mobilePort")
+        defaults.set(petScale, forKey: "petScale")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")
