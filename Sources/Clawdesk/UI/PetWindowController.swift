@@ -23,6 +23,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     public var onSettings: (() -> Void)?
     public var onDashboard: (() -> Void)?
+    public var onCheckForUpdates: (() -> Void)?
     public var onQuit: (() -> Void)?
 
     public init(model: ClawdeskModel) {
@@ -329,6 +330,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(openDashboard))
         addMenuItem(to: menu, title: model.preferences.text("Settings…"), action: #selector(openSettings))
+        addMenuItem(to: menu, title: model.preferences.text("Check for Updates…"), action: #selector(checkForUpdates))
         let sessions = NSMenuItem(title: model.preferences.text("Sessions"), action: nil, keyEquivalent: "")
         sessions.submenu = makeSessionsMenu()
         menu.addItem(sessions)
@@ -379,6 +381,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func openDashboard() { onDashboard?() }
     @objc private func openSettings() { onSettings?() }
+    @objc private func checkForUpdates() { onCheckForUpdates?() }
     @objc private func toggleMini() { model.preferences.isMiniMode.toggle() }
     @objc private func toggleDND() { model.preferences.doNotDisturb.toggle() }
     @objc private func toggleSound() { model.preferences.soundEnabled.toggle() }

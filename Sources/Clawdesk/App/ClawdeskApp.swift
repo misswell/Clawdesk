@@ -38,6 +38,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         shortcuts = GlobalShortcutManager(model: model)
         petWindow.onSettings = { [weak self] in self?.showSettings() }
         petWindow.onDashboard = { [weak self] in self?.showDashboard() }
+        petWindow.onCheckForUpdates = { [weak self] in self?.checkForUpdates() }
         petWindow.onQuit = { NSApp.terminate(nil) }
 
         model.onPermission = { [weak self] _ in
@@ -87,6 +88,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(showDashboard))
         addMenuItem(to: menu, title: model.preferences.text("Settings…"), action: #selector(showSettings))
+        addMenuItem(to: menu, title: model.preferences.text("Check for Updates…"), action: #selector(checkForUpdates))
         let sessions = NSMenuItem(title: model.preferences.text("Sessions"), action: nil, keyEquivalent: "")
         sessions.submenu = makeStatusSessionsMenu()
         menu.addItem(sessions)
@@ -149,4 +151,23 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     @objc private func toggleDND() { model.preferences.doNotDisturb.toggle() }
     @objc private func toggleSound() { model.preferences.soundEnabled.toggle() }
     @objc private func terminate() { NSApp.terminate(nil) }
+
+    @objc private func checkForUpdates() {
+        Task {
+            do {
+                let service = UpdateService()
+                let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                    ?? FileManager.default.temporaryDirectory
+                let url = try await service.downloadLatestCompatibleAsset(to: downloads)
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "Clawdesk"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: model.preferences.text("OK"))
+                alert.runModal()
+            }
+        }
+    }
 }

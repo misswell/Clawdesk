@@ -34,7 +34,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Codex JSONL fallback and quota rings | session/telemetry adapters | Implemented: bounded JSONL fallback, Claude statusline quota, Codex/Codex Spark windows, dashboard rings |
 | SSH / WSL deployment | transport adapters | Implemented for native macOS Remote SSH: profile-bound loopback ingress, nonce validation, atomic remote hook repair, Copilot registration, optional Codex fallback monitor, automatic/single-session transport mode, and reverse tunnel. WSL is outside the macOS product boundary |
 | Custom animated asset packs | theme importer seam | Implemented for validated folder/ZIP themes with ImageIO animation plus static SVG fallback, per-theme idle visual selection, and bounded frame caching (downsampled frames, per-animation and total cache byte budgets); upstream Codex Pet atlas/capability schema is not bundled. Built-in pets are original characters (Pinch, Patches, Cumulus) drawn natively — no upstream character names or artwork are reused |
-| GitHub release updater | update service seam | Implemented: compatible macOS asset selection, download, safe filename, SHA-256 verification, and Finder reveal; installation remains a deliberate manual step. The default repository is the Clawdesk project itself, never the upstream release feed |
+| GitHub release updater | update service seam | Implemented: compatible macOS asset selection, download, safe filename, SHA-256 verification, and Finder reveal; installation remains a deliberate manual step. Reachable from Settings → Remote and from the tray and pet "Check for Updates…" menus. The default repository is the Clawdesk project itself, never the upstream release feed |
 
 ## Current integration boundary
 
