@@ -16,6 +16,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Transparent floating pet window | `PetWindowController` | Implemented |
 | Low-power native animation loop | `PetCanvasView` | Implemented |
 | Idle eye tracking, drag, mini mode, hover peek | `PetCanvasView` / `PetWindowController` | Implemented |
+| Sleep sequence (doze → sleep → wake) | `ClawdeskModel` | Implemented: 60s of mouse idle enters dozing, then sleeping after another 25s; mouse activity wakes through a waking transition |
 | Double tap / rapid four-tap reactions | `PetCanvasView` | Implemented |
 | DND, sound cue, position memory, launch at login, continuously adjustable pet size | preferences + AppKit | Implemented: a 40%–200% scale slider resizes the pet window in place, anchored to its bottom center |
 | Free Roam with roam fence | `RoamPlanner` + `RoamFenceCoordinator` + Settings overlay | Implemented: the pet periodically walks to a whole-window target inside a user-selected work-area rectangle stored in `~/.clawd/roam-area.json`; malformed input keeps the previous fence and deletion only counts after two consecutive checks |

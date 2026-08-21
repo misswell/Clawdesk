@@ -32,7 +32,8 @@ public final class ClawdeskModel: ObservableObject {
     private var completionTask: Task<Void, Never>?
     private var kimiSuspectTasks: [String: Task<Void, Never>] = [:]
     private var kimiGateOrder: [String: [String]] = [:]
-    private var lastPointerActivity = Date.now
+    var lastPointerActivity = Date.now
+    var dozingSince: Date?
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
     private var healthTimer: Timer?
@@ -183,8 +184,10 @@ public final class ClawdeskModel: ObservableObject {
         }
         lastPointerLocation = point
         lastPointerActivity = .now
-        guard !preferences.doNotDisturb, petState == .sleeping else { return }
-        petState = preferences.isMiniMode ? .miniIdle : fallbackState
+        guard !preferences.doNotDisturb, petState == .sleeping || petState == .dozing else { return }
+        dozingSince = nil
+        petState = .waking
+        scheduleReturn(to: preferences.isMiniMode ? .miniIdle : fallbackState, after: 0.9)
     }
 
     public func resolvePermission(id: String, decision: PermissionDecision) {
@@ -237,10 +240,20 @@ public final class ClawdeskModel: ObservableObject {
         refreshDoctor()
     }
 
-    public func tickForSleep() -> Bool {
-        guard !preferences.doNotDisturb, Date.now.timeIntervalSince(lastPointerActivity) >= 60 else { return false }
-        guard petState == .idle || petState == .typing else { return false }
-        petState = .sleeping
+    public func tickForSleep(now: Date = .now) -> Bool {
+        guard !preferences.doNotDisturb, now.timeIntervalSince(lastPointerActivity) >= 60 else { return false }
+        guard petState == .idle || petState == .typing || petState == .dozing else {
+            dozingSince = nil
+            return false
+        }
+        if let since = dozingSince {
+            guard now.timeIntervalSince(since) >= 25 else { return false }
+            dozingSince = nil
+            petState = .sleeping
+            return true
+        }
+        dozingSince = now
+        petState = .dozing
         return true
     }
 
@@ -254,6 +267,7 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     private func apply(_ event: AgentEvent) {
+        dozingSince = nil
         if let question = event.question {
             pendingQuestions.removeAll { $0.id == question.id }
             pendingQuestions.append(question)
@@ -312,7 +326,8 @@ public final class ClawdeskModel: ObservableObject {
         completionTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard let self, !Task.isCancelled else { return }
-            if self.petState == .attention || self.petState == .error || self.petState == .notification {
+            if self.petState == .attention || self.petState == .error || self.petState == .notification
+                || self.petState == .waking || self.petState == .dozing || self.petState == .sleeping {
                 self.petState = self.preferences.isMiniMode ? .miniIdle : state
             }
         }
