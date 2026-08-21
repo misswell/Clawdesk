@@ -329,6 +329,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(openDashboard))
         addMenuItem(to: menu, title: model.preferences.text("Settings…"), action: #selector(openSettings))
+        let sessions = NSMenuItem(title: model.preferences.text("Sessions"), action: nil, keyEquivalent: "")
+        sessions.submenu = makeSessionsMenu()
+        menu.addItem(sessions)
         menu.addItem(.separator())
         let mini = addMenuItem(to: menu, title: model.preferences.text(model.preferences.isMiniMode ? "Exit Mini Mode" : "Mini Mode"), action: #selector(toggleMini))
         mini.state = model.preferences.isMiniMode ? .on : .off
@@ -339,6 +342,31 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(.separator())
         addMenuItem(to: menu, title: model.preferences.text("Quit Clawdesk"), action: #selector(quit))
         return menu
+    }
+
+    private func makeSessionsMenu() -> NSMenu {
+        let menu = NSMenu()
+        let sessions = model.sessions
+        if sessions.isEmpty {
+            let item = NSMenuItem(title: model.preferences.text("No active sessions"), action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        } else {
+            for session in sessions {
+                let title = session.title.isEmpty ? session.agentID : session.title
+                let item = NSMenuItem(title: title, action: #selector(focusSession(_:)), keyEquivalent: "")
+                item.representedObject = session.id
+                item.target = self
+                menu.addItem(item)
+            }
+        }
+        return menu
+    }
+
+    @objc private func focusSession(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let session = model.sessions.first(where: { $0.id == id }) else { return }
+        _ = TerminalFocusService.focus(session)
     }
 
     @discardableResult

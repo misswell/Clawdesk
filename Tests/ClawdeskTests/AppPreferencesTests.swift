@@ -17,6 +17,7 @@ final class AppPreferencesTests: XCTestCase {
         prefs.language = "zh-Hans"
         XCTAssertEqual(prefs.text("Theme"), "主题")
         XCTAssertEqual(prefs.text("General"), "通用")
+        XCTAssertEqual(prefs.text("Sessions"), "会话")
         prefs.language = "ja"
         XCTAssertEqual(prefs.text("Settings…"), "設定…")
         prefs.language = "es"

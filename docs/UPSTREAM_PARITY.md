@@ -22,6 +22,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Interface language (en / zh-Hans / zh-Hant / ja / ko / es) | `Localization` table + `AppPreferences.language` | Implemented: settings, menus, dashboard, window titles, permission bubble, and About page switch immediately; untranslated keys fall back to English |
 | Settings, Dashboard, permission bubble | SwiftUI windows | Implemented |
 | Global allow/deny shortcuts | `GlobalShortcutManager` | Implemented |
+| Sessions menu with terminal focus | pet/status menu + `TerminalFocusService` | Implemented: right-click and tray Sessions submenus list live sessions (debounced tray rebuild) and focus the owning terminal window |
 | Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for the registered Claude-compatible, JSON/TOML, and plugin adapters. Plugin identities, extension directories, and the Kiro managed agent use Clawdesk's own names (never the upstream product id), so the two integrations cannot collide or impersonate each other |
 | Codex `request_user_input` | `DefaultAgentEventAdapter` + `CodexLogMonitor` + read-only card | Implemented: bounded question/options preview parsed in the adapter; answers stay in Codex and the matching output clears the card |
 | Gemini `AfterAgent` / `PreCompress` semantics | `EventStateMapper` | Implemented: AfterAgent returns idle; PreCompress is recorded without forcing sweeping |
