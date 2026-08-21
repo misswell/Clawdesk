@@ -20,6 +20,9 @@ public final class PermissionBubbleController: NSObject {
         model.preferences.$doNotDisturb.sink { [weak self] _ in
             self?.refresh()
         }.store(in: &cancellables)
+        model.preferences.$language.sink { [weak self] _ in
+            self?.refresh()
+        }.store(in: &cancellables)
     }
 
     public func refresh() {
@@ -68,7 +71,7 @@ private struct PermissionBubbleView: View {
             HStack {
                 Image(systemName: "exclamationmark.shield.fill")
                     .foregroundStyle(.orange)
-                Text("Permission review")
+                Text(model.preferences.text("Permission review"))
                     .font(.headline)
                 Spacer()
                 Text("⌃⇧Y / ⌃⇧N")
@@ -83,7 +86,7 @@ private struct PermissionBubbleView: View {
                         Text(prompt.title)
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text("Answer in Codex")
+                        Text(model.preferences.text("Answer in Codex"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -130,9 +133,9 @@ private struct PermissionBubbleView: View {
                             .lineLimit(2)
                     }
                     HStack {
-                        Button("Deny") { model.resolvePermission(id: request.id, decision: .deny) }
+                        Button(model.preferences.text("Deny")) { model.resolvePermission(id: request.id, decision: .deny) }
                             .keyboardShortcut(.init("n"), modifiers: [.control, .shift])
-                        Button("Allow") { model.resolvePermission(id: request.id, decision: .allow) }
+                        Button(model.preferences.text("Allow")) { model.resolvePermission(id: request.id, decision: .allow) }
                             .keyboardShortcut(.init("y"), modifiers: [.control, .shift])
                             .buttonStyle(.borderedProminent)
                         Spacer()

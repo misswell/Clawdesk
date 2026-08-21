@@ -57,7 +57,13 @@ public enum Localization {
             "subagent": "个子代理",
             "subagents": "个子代理",
             "permission request pending": "个权限请求待处理",
-            "Clawdesk Settings": "Clawdesk 设置"
+            "Clawdesk Settings": "Clawdesk 设置",
+            "Permission review": "权限审核",
+            "Answer in Codex": "在 Codex 中回答",
+            "Allow": "允许",
+            "Deny": "拒绝",
+            "A native macOS desktop companion for coding agents.": "原生 macOS 编码代理桌面伴侣。",
+            "Built in Swift + AppKit/SwiftUI · no embedded browser runtime": "Swift + AppKit/SwiftUI 构建 · 无内嵌浏览器运行时"
         ],
         "zh-Hant": [
             "General": "一般",
@@ -103,7 +109,13 @@ public enum Localization {
             "subagent": "個子代理",
             "subagents": "個子代理",
             "permission request pending": "個權限請求待處理",
-            "Clawdesk Settings": "Clawdesk 設定"
+            "Clawdesk Settings": "Clawdesk 設定",
+            "Permission review": "權限審核",
+            "Answer in Codex": "在 Codex 中回答",
+            "Allow": "允許",
+            "Deny": "拒絕",
+            "A native macOS desktop companion for coding agents.": "原生 macOS 編碼代理桌面伴侶。",
+            "Built in Swift + AppKit/SwiftUI · no embedded browser runtime": "Swift + AppKit/SwiftUI 建置 · 無內嵌瀏覽器運行時"
         ],
         "ja": [
             "General": "一般",
@@ -149,7 +161,13 @@ public enum Localization {
             "subagent": "件のサブエージェント",
             "subagents": "件のサブエージェント",
             "permission request pending": "件の権限リクエスト待ち",
-            "Clawdesk Settings": "Clawdesk 設定"
+            "Clawdesk Settings": "Clawdesk 設定",
+            "Permission review": "権限の確認",
+            "Answer in Codex": "Codex で回答",
+            "Allow": "許可",
+            "Deny": "拒否",
+            "A native macOS desktop companion for coding agents.": "ネイティブ macOS のコーディングエージェント用デスクトップコンパニオン。",
+            "Built in Swift + AppKit/SwiftUI · no embedded browser runtime": "Swift + AppKit/SwiftUI 製 · ブラウザランタイム非内蔵"
         ],
         "ko": [
             "General": "일반",
@@ -195,7 +213,13 @@ public enum Localization {
             "subagent": "개 하위 에이전트",
             "subagents": "개 하위 에이전트",
             "permission request pending": "건의 권한 요청 대기 중",
-            "Clawdesk Settings": "Clawdesk 설정"
+            "Clawdesk Settings": "Clawdesk 설정",
+            "Permission review": "권한 검토",
+            "Answer in Codex": "Codex에서 답변",
+            "Allow": "허용",
+            "Deny": "거부",
+            "A native macOS desktop companion for coding agents.": "코딩 에이전트용 네이티브 macOS 데스크톱 컴패니언.",
+            "Built in Swift + AppKit/SwiftUI · no embedded browser runtime": "Swift + AppKit/SwiftUI 기반 · 브라우저 런타임 미내장"
         ],
         "es": [
             "General": "General",
@@ -241,7 +265,13 @@ public enum Localization {
             "subagent": "subagente",
             "subagents": "subagentes",
             "permission request pending": "solicitud de permiso pendiente",
-            "Clawdesk Settings": "Ajustes de Clawdesk"
+            "Clawdesk Settings": "Ajustes de Clawdesk",
+            "Permission review": "Revisión de permisos",
+            "Answer in Codex": "Responder en Codex",
+            "Allow": "Permitir",
+            "Deny": "Denegar",
+            "A native macOS desktop companion for coding agents.": "Un compañero de escritorio nativo de macOS para agentes de codificación.",
+            "Built in Swift + AppKit/SwiftUI · no embedded browser runtime": "Hecho con Swift + AppKit/SwiftUI · sin navegador integrado"
         ]
     ]
 }

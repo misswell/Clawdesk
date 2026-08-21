@@ -29,7 +29,7 @@ public struct SettingsView: View {
             RemoteSSHSettingsView(model: model)
                 .tabItem { Label(prefs.text("Remote SSH"), systemImage: "network") }
                 .tag("remote-ssh")
-            AboutSettingsView()
+            AboutSettingsView(model: model)
                 .tabItem { Label(prefs.text("About"), systemImage: "info.circle") }
                 .tag("about")
         }
@@ -619,6 +619,8 @@ private struct RemoteSSHSettingsView: View {
 }
 
 private struct AboutSettingsView: View {
+    @ObservedObject var model: ClawdeskModel
+
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "pawprint.fill")
@@ -626,9 +628,9 @@ private struct AboutSettingsView: View {
                 .foregroundStyle(.orange)
             Text("Clawdesk")
                 .font(.largeTitle.weight(.bold))
-            Text("A native macOS desktop companion for coding agents.")
+            Text(model.preferences.text("A native macOS desktop companion for coding agents."))
                 .foregroundStyle(.secondary)
-            Text("Built in Swift + AppKit/SwiftUI · no embedded browser runtime")
+            Text(model.preferences.text("Built in Swift + AppKit/SwiftUI · no embedded browser runtime"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
