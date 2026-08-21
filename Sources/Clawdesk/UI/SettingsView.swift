@@ -516,7 +516,7 @@ private struct RemoteSSHSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Remote SSH")
+                    Text(model.preferences.text("Remote SSH"))
                         .font(.title2.weight(.semibold))
                     Text("Deploy native lifecycle hooks to remote Claude Code, Codex, or Copilot installations and carry events back through an SSH reverse tunnel. Passwords and passphrases stay with the system ssh client.")
                         .foregroundStyle(.secondary)
@@ -528,29 +528,29 @@ private struct RemoteSSHSettingsView: View {
                         profileCard(profile)
                     }
                 } else {
-                    Text("No remote profiles yet.")
+                    Text(model.preferences.text("No remote profiles yet."))
                         .foregroundStyle(.secondary)
                 }
 
                 Divider()
                 Form {
-                    Section("Add profile") {
-                        TextField("Label", text: $label)
-                        TextField("Host or SSH alias", text: $host)
+                    Section(model.preferences.text("Add profile")) {
+                        TextField(model.preferences.text("Label"), text: $label)
+                        TextField(model.preferences.text("Host or SSH alias"), text: $host)
                         HStack {
-                            TextField("SSH port", value: $port, format: .number)
-                            TextField("Remote forward port", value: $remoteForwardPort, format: .number)
+                            TextField(model.preferences.text("SSH port"), value: $port, format: .number)
+                            TextField(model.preferences.text("Remote forward port"), value: $remoteForwardPort, format: .number)
                         }
-                        TextField("Private key path (optional)", text: $identityFile)
-                        TextField("Session prefix (optional)", text: $hostPrefix)
-                        Picker("SSH transport", selection: $transportMode) {
+                        TextField(model.preferences.text("Private key path (optional)"), text: $identityFile)
+                        TextField(model.preferences.text("Session prefix (optional)"), text: $hostPrefix)
+                        Picker(model.preferences.text("SSH transport"), selection: $transportMode) {
                             ForEach(RemoteSSHTransportMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
+                                Text(model.preferences.text(mode.displayName)).tag(mode)
                             }
                         }
-                        Toggle("Auto-start Codex fallback monitor", isOn: $autoStartCodexFallback)
+                        Toggle(model.preferences.text("Auto-start Codex fallback monitor"), isOn: $autoStartCodexFallback)
                         HStack {
-                            Button("Add remote profile") {
+                            Button(model.preferences.text("Add remote profile")) {
                                 do {
                                     try model.remoteSSHManager.add(RemoteSSHProfile(
                                         label: label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Remote host" : label,
@@ -592,12 +592,12 @@ private struct RemoteSSHSettingsView: View {
                     .foregroundStyle(profileStatus == .connected ? .green : .orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(profile.label).font(.headline)
-                    Text("\(profile.host):\(profile.port) · reverse \(profile.remoteForwardPort) · \(profile.transportMode.displayName)")
+                    Text("\(profile.host):\(profile.port) · reverse \(profile.remoteForwardPort) · \(model.preferences.text(profile.transportMode.displayName))")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(profileStatus.displayName)
+                Text(model.preferences.text(profileStatus.displayName))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(profileStatus == .failed ? .red : .secondary)
             }
@@ -610,22 +610,22 @@ private struct RemoteSSHSettingsView: View {
             HStack(spacing: 8) {
                 Label("Claude / Codex / Copilot", systemImage: "terminal")
                 if profile.autoStartCodexFallback {
-                    Label("Codex fallback", systemImage: "arrow.triangle.2.circlepath")
+                    Label(model.preferences.text("Codex fallback"), systemImage: "arrow.triangle.2.circlepath")
                 }
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
             HStack {
-                Button("Authenticate") { model.remoteSSHManager.authenticate(id: profile.id) }
-                Button("Deploy / Repair Hooks") { model.remoteSSHManager.deploy(id: profile.id) }
+                Button(model.preferences.text("Authenticate")) { model.remoteSSHManager.authenticate(id: profile.id) }
+                Button(model.preferences.text("Deploy / Repair Hooks")) { model.remoteSSHManager.deploy(id: profile.id) }
                     .buttonStyle(.borderedProminent)
                 if profileStatus == .connected || profileStatus == .connecting {
-                    Button("Disconnect") { model.remoteSSHManager.disconnect(id: profile.id) }
+                    Button(model.preferences.text("Disconnect")) { model.remoteSSHManager.disconnect(id: profile.id) }
                 } else {
-                    Button("Connect") { model.remoteSSHManager.connect(id: profile.id) }
+                    Button(model.preferences.text("Connect")) { model.remoteSSHManager.connect(id: profile.id) }
                         .disabled(profile.deployedAt == nil)
                 }
-                Button("Delete") { try? model.remoteSSHManager.remove(id: profile.id) }
+                Button(model.preferences.text("Delete")) { try? model.remoteSSHManager.remove(id: profile.id) }
                     .foregroundStyle(.red)
             }
         }
