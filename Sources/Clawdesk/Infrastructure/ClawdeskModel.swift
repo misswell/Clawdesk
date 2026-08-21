@@ -13,6 +13,7 @@ public final class ClawdeskModel: ObservableObject {
     public let mobileBridge: MobileBridge
     public let codexLogMonitor: CodexLogMonitor
     public let claudeHookHealth: ClaudeHookHealthMonitor
+    let softwareUpdater: ClawdeskSoftwareUpdater
     public let quotaStore = QuotaStore()
 
     @Published public private(set) var petState: PetState = .idle
@@ -50,6 +51,7 @@ public final class ClawdeskModel: ObservableObject {
         mobileBridge = MobileBridge(preferredPort: preferences.mobilePort)
         codexLogMonitor = CodexLogMonitor()
         claudeHookHealth = ClaudeHookHealthMonitor(installer: hookInstaller)
+        softwareUpdater = ClawdeskSoftwareUpdater()
         serverPort = preferences.serverPort
         eventServer.onMessage = { [weak self] message in
             Task { @MainActor [weak self] in

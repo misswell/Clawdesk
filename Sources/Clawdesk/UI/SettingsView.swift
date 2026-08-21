@@ -32,6 +32,9 @@ public struct SettingsView: View {
             DoctorSettingsView(model: model)
                 .tabItem { Label(prefs.text("Doctor"), systemImage: "stethoscope") }
                 .tag("doctor")
+            SoftwareUpdateSettingsView(model: model)
+                .tabItem { Label(prefs.text("Software Update"), systemImage: "arrow.down.circle") }
+                .tag("update")
             AboutSettingsView(model: model)
                 .tabItem { Label(prefs.text("About"), systemImage: "info.circle") }
                 .tag("about")
@@ -284,9 +287,6 @@ private struct PermissionSettingsView: View {
 private struct RemoteSettingsView: View {
     @ObservedObject var model: ClawdeskModel
     @State private var remoteEnabled = false
-    @State private var updateStatus = ""
-    @State private var latestRelease: ReleaseInfo?
-    @State private var latestAsset: ReleaseAsset?
     @State private var telegramApprovalEnabled = false
     @State private var telegramToken = ""
     @State private var telegramChatID = ""
@@ -442,44 +442,6 @@ private struct RemoteSettingsView: View {
                 Text("The selected platform controls both REST and WebSocket endpoints. Only the configured approver ID can act on a card; transport failures leave the local bubble pending.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            Section(model.preferences.text("Updates")) {
-                HStack {
-                    Button(model.preferences.text("Check GitHub releases")) {
-                        updateStatus = model.preferences.text("Checking…")
-                        Task {
-                            do {
-                                let service = UpdateService()
-                                let release = try await service.latestRelease()
-                                latestRelease = release
-                                latestAsset = service.compatibleAsset(in: release)
-                                updateStatus = latestAsset == nil
-                                    ? "Latest: \(release.tag) (no compatible macOS package)"
-                                    : "Latest: \(release.tag) · package: \(latestAsset!.name)"
-                            } catch {
-                                updateStatus = error.localizedDescription
-                            }
-                        }
-                    }
-                    if let release = latestRelease, let asset = latestAsset {
-                        Button(model.preferences.text("Download package")) {
-                            guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
-                            updateStatus = "Downloading \(asset.name)…"
-                            Task {
-                                do {
-                                    let url = try await UpdateService().download(asset: asset, to: downloads)
-                                    updateStatus = "Downloaded \(release.tag) to \(url.path)"
-                                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                                } catch {
-                                    updateStatus = error.localizedDescription
-                                }
-                            }
-                        }
-                    }
-                    Text(updateStatus)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .formStyle(.grouped)
@@ -696,6 +658,68 @@ private struct DoctorSettingsView: View {
         case .notInstalled: return model.preferences.text("Not installed")
         case .fixable: return model.preferences.text("Needs repair")
         case .notChecked: return model.preferences.text("Not checked")
+        }
+    }
+}
+
+private struct SoftwareUpdateSettingsView: View {
+    @ObservedObject var model: ClawdeskModel
+    @ObservedObject private var updater: ClawdeskSoftwareUpdater
+
+    init(model: ClawdeskModel) {
+        self.model = model
+        _updater = ObservedObject(wrappedValue: model.softwareUpdater)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent(model.preferences.text("Current version"), value: updater.currentVersion)
+                Toggle(model.preferences.text("Automatically check for updates"), isOn: $model.preferences.autoCheckForUpdates)
+                HStack {
+                    Button(model.preferences.text("Check for Updates")) {
+                        Task { await updater.checkForUpdates() }
+                    }
+                    .disabled(updater.state.isBusy)
+                    if updater.state.availableRelease != nil {
+                        Button(model.preferences.text("Download & Install")) {
+                            Task { await updater.downloadAndInstall() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(updater.state.isBusy)
+                    }
+                    Spacer()
+                }
+                statusRow
+            } header: {
+                Text(model.preferences.text("Software Update"))
+            } footer: {
+                Text("Updates are downloaded from GitHub Releases, verified with SHA-256 and Apple notarization, then installed atomically with automatic rollback.")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var statusRow: some View {
+        switch updater.state {
+        case .idle:
+            EmptyView()
+        case .checking:
+            Label(model.preferences.text("Checking for updates…"), systemImage: "arrow.triangle.2.circlepath")
+        case .upToDate:
+            Label(model.preferences.text("You're up to date"), systemImage: "checkmark.circle")
+        case .available(let release):
+            let text = "\(model.preferences.text("Update available")) · v\(release.version)"
+            Label(text, systemImage: "arrow.down.circle")
+                .foregroundStyle(.orange)
+        case .downloading:
+            Label(model.preferences.text("Downloading update…"), systemImage: "arrow.down.circle")
+        case .installing:
+            Label(model.preferences.text("Installing update…"), systemImage: "arrow.triangle.2.circlepath")
+        case .failed(let failure):
+            Label("\(model.preferences.text("Update failed")) · \(failure.displayText)", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
         }
     }
 }

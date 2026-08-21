@@ -9,7 +9,8 @@ let package = Package(
     ],
     products: [
         .executable(name: "Clawdesk", targets: ["Clawdesk"]),
-        .executable(name: "ClawdeskStatusline", targets: ["ClawdeskStatusline"])
+        .executable(name: "ClawdeskStatusline", targets: ["ClawdeskStatusline"]),
+        .executable(name: "ClawdeskUpdater", targets: ["ClawdeskUpdater"])
     ],
     targets: [
         .executableTarget(
@@ -20,9 +21,13 @@ let package = Package(
             name: "ClawdeskStatusline",
             path: "Sources/ClawdeskStatusline"
         ),
+        .executableTarget(
+            name: "ClawdeskUpdater",
+            path: "Sources/ClawdeskUpdater"
+        ),
         .testTarget(
             name: "ClawdeskTests",
-            dependencies: ["Clawdesk"],
+            dependencies: ["Clawdesk", "ClawdeskUpdater"],
             path: "Tests/ClawdeskTests"
         )
     ]

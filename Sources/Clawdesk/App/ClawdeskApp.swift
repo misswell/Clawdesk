@@ -64,6 +64,16 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         model.start()
         shortcuts.start()
         petWindow.start()
+        if model.preferences.autoCheckForUpdates {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                await self.model.softwareUpdater.checkForUpdates()
+                if let release = self.model.softwareUpdater.state.availableRelease {
+                    self.presentUpdatePrompt(release)
+                }
+            }
+        }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -153,20 +163,24 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     @objc private func terminate() { NSApp.terminate(nil) }
 
     @objc private func checkForUpdates() {
-        Task {
-            do {
-                let service = UpdateService()
-                let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-                    ?? FileManager.default.temporaryDirectory
-                let url = try await service.downloadLatestCompatibleAsset(to: downloads)
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            } catch {
-                let alert = NSAlert()
-                alert.messageText = "Clawdesk"
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: model.preferences.text("OK"))
-                alert.runModal()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.model.softwareUpdater.checkForUpdates()
+            if let release = self.model.softwareUpdater.state.availableRelease {
+                self.presentUpdatePrompt(release)
+            }
+        }
+    }
+
+    private func presentUpdatePrompt(_ release: ClawdeskRelease) {
+        let alert = NSAlert()
+        alert.messageText = model.preferences.text("Update available")
+        alert.informativeText = "Clawdesk \(release.version) is available."
+        alert.addButton(withTitle: model.preferences.text("Download & Install"))
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn {
+            Task { @MainActor [weak self] in
+                await self?.model.softwareUpdater.downloadAndInstall()
             }
         }
     }
