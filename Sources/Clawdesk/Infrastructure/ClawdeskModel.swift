@@ -77,9 +77,9 @@ public final class ClawdeskModel: ObservableObject {
         preferences.$collectClaudeUsage.dropFirst().sink { [weak self] enabled in
             guard let self else { return }
             if enabled {
-                try? self.hookInstaller.ensureClaudeStatusLine()
+                _ = try? self.hookInstaller.ensureClaudeStatusLine()
             } else {
-                try? self.hookInstaller.removeClaudeStatusLine()
+                _ = try? self.hookInstaller.removeClaudeStatusLine()
             }
         }.store(in: &preferenceCancellables)
     }
@@ -104,7 +104,7 @@ public final class ClawdeskModel: ObservableObject {
             preferences.serverPort = eventServer.port
             try? hookInstaller.writeRuntimeFile(port: eventServer.port, autoStart: preferences.autoStart)
             if preferences.collectClaudeUsage {
-                try? hookInstaller.ensureClaudeStatusLine()
+                _ = try? hookInstaller.ensureClaudeStatusLine()
             }
         }
     }
