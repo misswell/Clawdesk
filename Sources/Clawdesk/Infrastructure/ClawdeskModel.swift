@@ -27,6 +27,7 @@ public final class ClawdeskModel: ObservableObject {
 
     public var onPermission: ((PermissionRequest) -> Void)?
     public var onCompletion: (() -> Void)?
+    public var onError: ((String) -> Void)?
 
     private var replies: [String: PermissionReply] = [:]
     private var completionTask: Task<Void, Never>?
@@ -333,6 +334,7 @@ public final class ClawdeskModel: ObservableObject {
         } else if transition.state == .error || transition.state == .notification {
             if transition.state == .error {
                 remoteNotifier.send(RemoteNotification(title: "Agent error", body: event.eventName, sessionTitle: event.title))
+                onError?(event.title ?? event.eventName)
             }
             scheduleReturn(to: fallbackState, after: 6)
         } else {

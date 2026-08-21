@@ -98,6 +98,28 @@ final class ThemeImportTests: XCTestCase {
         ))
     }
 
+    func testImportsThemeSoundsAndSkipsMissingFiles() throws {
+        let source = root.appendingPathComponent("sound-theme", isDirectory: true)
+        try makeTheme(at: source, id: "sound-theme", displayName: "Sound Theme")
+        let soundsDirectory = source.appendingPathComponent("sounds", isDirectory: true)
+        try FileManager.default.createDirectory(at: soundsDirectory, withIntermediateDirectories: true)
+        try Data("placeholder".utf8).write(to: soundsDirectory.appendingPathComponent("complete.mp3"), options: .atomic)
+
+        var manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: source.appendingPathComponent("theme.json"))) as! [String: Any]
+        manifest["sounds"] = [
+            "complete": "complete.mp3",
+            "confirm": "missing.mp3"
+        ]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: source.appendingPathComponent("theme.json"), options: .atomic)
+
+        let preferences = AppPreferences(defaults: defaults, homeDirectory: root)
+        try preferences.importTheme(from: source)
+
+        XCTAssertEqual(preferences.theme.sounds["complete"], "complete.mp3")
+        XCTAssertNil(preferences.theme.sounds["confirm"], "a sound file that does not exist must be skipped")
+        XCTAssertTrue(preferences.theme.sounds.isEmpty == false)
+    }
+
     private func makeTheme(at directory: URL, id: String, displayName: String) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let manifest: [String: Any] = [

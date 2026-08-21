@@ -42,13 +42,13 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         petWindow.onQuit = { NSApp.terminate(nil) }
 
         model.onPermission = { [weak self] _ in
-            if self?.model.preferences.soundEnabled == true {
-                NSSound(named: "Funk")?.play()
-            }
+            self?.playSound(logical: "confirm", systemFallback: "Funk")
         }
         model.onCompletion = { [weak self] in
-            guard let self, self.model.preferences.soundEnabled else { return }
-            NSSound(named: "Glass")?.play()
+            self?.playSound(logical: "complete", systemFallback: "Glass")
+        }
+        model.onError = { [weak self] _ in
+            self?.playSound(logical: "error", systemFallback: "Sosumi")
         }
 
         installStatusItem()
@@ -168,6 +168,23 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
                 alert.addButton(withTitle: model.preferences.text("OK"))
                 alert.runModal()
             }
+        }
+    }
+
+    /// Plays the active theme's sound for a logical name, falling back to a
+    /// system sound when the theme has none or the file cannot be loaded.
+    private func playSound(logical name: String, systemFallback: String?) {
+        guard model.preferences.soundEnabled else { return }
+        if let file = model.preferences.theme.sounds[name],
+           let directory = model.preferences.theme.assetDirectory {
+            let url = directory.appendingPathComponent("sounds").appendingPathComponent(file)
+            if let sound = NSSound(contentsOf: url, byReference: true) {
+                sound.play()
+                return
+            }
+        }
+        if let systemFallback, let sound = NSSound(named: systemFallback) {
+            sound.play()
         }
     }
 }

@@ -266,6 +266,15 @@ public final class AppPreferences: ObservableObject {
             })
         }
         idleVisualFiles = Array(NSOrderedSet(array: idleVisualFiles)) as? [String] ?? idleVisualFiles
+        var sounds: [String: String] = [:]
+        if let rawSounds = object["sounds"] as? [String: Any] {
+            for (name, value) in rawSounds {
+                guard let file = value as? String,
+                      isSafeRelativePath(file),
+                      FileManager.default.fileExists(atPath: directory.appendingPathComponent("sounds").appendingPathComponent(file).path) else { continue }
+                sounds[name] = file
+            }
+        }
         guard !stateFiles.isEmpty else { throw ThemeImportError.invalidManifest }
         let eyeTracking = (object["supportsEyeTracking"] as? Bool)
             ?? ((object["eyeTracking"] as? [String: Any])?["enabled"] as? Bool)
@@ -277,7 +286,8 @@ public final class AppPreferences: ObservableObject {
             supportsEyeTracking: eyeTracking,
             assetDirectory: directory,
             stateFiles: stateFiles,
-            idleVisualFiles: idleVisualFiles
+            idleVisualFiles: idleVisualFiles,
+            sounds: sounds
         )
     }
 

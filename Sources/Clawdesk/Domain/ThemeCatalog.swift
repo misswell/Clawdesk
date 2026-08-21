@@ -39,6 +39,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let assetDirectory: URL?
     public let stateFiles: [String: String]
     public let idleVisualFiles: [String]
+    public let sounds: [String: String]
 
     public init(
         id: String,
@@ -47,7 +48,8 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         supportsEyeTracking: Bool = true,
         assetDirectory: URL? = nil,
         stateFiles: [String: String] = [:],
-        idleVisualFiles: [String]? = nil
+        idleVisualFiles: [String]? = nil,
+        sounds: [String: String] = [:]
     ) {
         self.id = id
         self.displayName = displayName
@@ -55,6 +57,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         self.supportsEyeTracking = supportsEyeTracking
         self.assetDirectory = assetDirectory
         self.stateFiles = stateFiles
+        self.sounds = sounds
         let declared = idleVisualFiles ?? stateFiles["idle"].map { [$0] } ?? []
         self.idleVisualFiles = declared.filter(Self.isSafeRelativePath)
     }
