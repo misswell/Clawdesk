@@ -88,8 +88,8 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
 public enum ThemeCatalog {
     public static let builtIn: [ThemeDefinition] = [
         ThemeDefinition(
-            id: "clawd",
-            displayName: "Clawd",
+            id: "pinch",
+            displayName: "Pinch",
             palette: PetPalette(
                 body: RGBColor(red: 0.95, green: 0.35, blue: 0.16),
                 accent: RGBColor(red: 0.98, green: 0.62, blue: 0.18),
@@ -98,8 +98,8 @@ public enum ThemeCatalog {
             )
         ),
         ThemeDefinition(
-            id: "calico",
-            displayName: "Calico",
+            id: "patches",
+            displayName: "Patches",
             palette: PetPalette(
                 body: RGBColor(red: 0.93, green: 0.79, blue: 0.61),
                 accent: RGBColor(red: 0.34, green: 0.18, blue: 0.13),
@@ -108,8 +108,8 @@ public enum ThemeCatalog {
             )
         ),
         ThemeDefinition(
-            id: "cloudling",
-            displayName: "Cloudling",
+            id: "cumulus",
+            displayName: "Cumulus",
             palette: PetPalette(
                 body: RGBColor(red: 0.47, green: 0.73, blue: 1.0),
                 accent: RGBColor(red: 0.29, green: 0.42, blue: 0.92),

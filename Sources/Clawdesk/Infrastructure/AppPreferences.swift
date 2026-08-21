@@ -53,7 +53,7 @@ public final class AppPreferences: ObservableObject {
     ) {
         self.defaults = defaults
         customThemesDirectory = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk/themes", isDirectory: true)
-        selectedThemeID = defaults.string(forKey: "theme") ?? "clawd"
+        selectedThemeID = defaults.string(forKey: "theme") ?? "pinch"
         isMiniMode = defaults.bool(forKey: "miniMode")
         doNotDisturb = defaults.bool(forKey: "doNotDisturb")
         soundEnabled = defaults.object(forKey: "soundEnabled") as? Bool ?? true
@@ -77,7 +77,7 @@ public final class AppPreferences: ObservableObject {
     }
 
     public var theme: ThemeDefinition {
-        availableThemes.first(where: { $0.id == selectedThemeID }) ?? ThemeCatalog.theme(id: "clawd")
+        availableThemes.first(where: { $0.id == selectedThemeID }) ?? ThemeCatalog.theme(id: "pinch")
     }
 
     public var availableThemes: [ThemeDefinition] {
@@ -157,7 +157,7 @@ public final class AppPreferences: ObservableObject {
         let directory = customThemesDirectory.appendingPathComponent(id, isDirectory: true)
         try FileManager.default.removeItem(at: directory)
         customThemes = Self.loadCustomThemes(from: customThemesDirectory)
-        if selectedThemeID == id { selectedThemeID = "clawd" }
+        if selectedThemeID == id { selectedThemeID = "pinch" }
     }
 
     private func persist() {
@@ -211,7 +211,7 @@ public final class AppPreferences: ObservableObject {
         }
         let name = ((object["displayName"] as? String) ?? (object["name"] as? String) ?? id)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let basePalette = ThemeCatalog.theme(id: "clawd").palette
+        let basePalette = ThemeCatalog.theme(id: "pinch").palette
         let paletteObject = object["palette"] as? [String: Any] ?? [:]
         let palette = PetPalette(
             body: color(paletteObject["body"], fallback: basePalette.body),

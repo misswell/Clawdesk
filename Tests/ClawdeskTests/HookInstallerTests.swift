@@ -196,7 +196,7 @@ final class HookInstallerTests: XCTestCase {
         let openclawInstalled = try JSONSerialization.jsonObject(with: Data(contentsOf: openclawInstall.configPath)) as! [String: Any]
         let plugins = openclawInstalled["plugins"] as! [String: Any]
         XCTAssertNotNil((plugins["entries"] as! [String: Any])["user"])
-        XCTAssertNotNil((plugins["entries"] as! [String: Any])["clawd-on-desk"])
+        XCTAssertNotNil((plugins["entries"] as! [String: Any])["clawdesk"])
         XCTAssertTrue(try installer.uninstall(agentID: "openclaw").changed)
         let openclawRestored = try JSONSerialization.jsonObject(with: Data(contentsOf: openclawInstall.configPath)) as! [String: Any]
         XCTAssertNotNil((((openclawRestored["plugins"] as! [String: Any])["entries"] as! [String: Any])["user"]))
@@ -216,8 +216,8 @@ final class HookInstallerTests: XCTestCase {
         let files: [(String, String)] = [
             (".clawdesk-opencode", "Library/Application Support/Clawdesk/plugins/opencode-plugin/index.mjs"),
             (".clawdesk-openclaw", "Library/Application Support/Clawdesk/plugins/openclaw-plugin/index.js"),
-            (".clawdesk-hermes", ".hermes/plugins/clawd-on-desk/__init__.py"),
-            (".clawdesk-pi", ".pi/agent/extensions/clawd-on-desk/index.ts"),
+            (".clawdesk-hermes", ".hermes/plugins/clawdesk/__init__.py"),
+            (".clawdesk-pi", ".pi/agent/extensions/clawdesk/index.ts"),
             (".clawdesk-deepseek", ".dsh/profiles/web/node_modules/@dsh-external/dsh-clawd-bridge/lib/index.js")
         ]
 
@@ -229,7 +229,7 @@ final class HookInstallerTests: XCTestCase {
         let familySource = try String(contentsOf: root.appendingPathComponent("Library/Application Support/Clawdesk/plugins/opencode-plugin/index.mjs"), encoding: .utf8)
         XCTAssertTrue(familySource.contains("readFileSync"))
         XCTAssertFalse(familySource.contains("require(\"fs\")"))
-        let hermesSource = try String(contentsOf: root.appendingPathComponent(".hermes/plugins/clawd-on-desk/__init__.py"), encoding: .utf8)
+        let hermesSource = try String(contentsOf: root.appendingPathComponent(".hermes/plugins/clawdesk/__init__.py"), encoding: .utf8)
         XCTAssertTrue(hermesSource.contains("_port()"))
     }
 

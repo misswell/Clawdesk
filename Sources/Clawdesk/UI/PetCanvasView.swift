@@ -10,7 +10,7 @@ public final class PetCanvasView: NSView {
         }
     }
 
-    public var theme: ThemeDefinition = ThemeCatalog.theme(id: "clawd") {
+    public var theme: ThemeDefinition = ThemeCatalog.theme(id: "pinch") {
         didSet {
             assetCache.removeAll()
             assetCacheOrder.removeAll()
@@ -145,9 +145,9 @@ public final class PetCanvasView: NSView {
         }
 
         drawShadow(in: context)
-        if theme.id == "calico" {
+        if theme.id == "patches" {
             drawCat(in: context)
-        } else if theme.id == "cloudling" {
+        } else if theme.id == "cumulus" {
             drawCloudling(in: context)
         } else {
             drawCrab(in: context)
@@ -480,7 +480,7 @@ public final class PetCanvasView: NSView {
 
     private func drawJugglingOverlay(in context: CGContext) {
         let isTierTwo = subagentCount >= 2
-        if theme.id != "clawd", isTierTwo {
+        if theme.id != "pinch", isTierTwo {
             // Calico and Cloudling use the conducting pose for 2+ live
             // subagents, while Clawd uses the three-ball tier below.
             fillRect(context, CGRect(x: 104, y: 22, width: 6, height: 56), theme.palette.shadow.cgColor())

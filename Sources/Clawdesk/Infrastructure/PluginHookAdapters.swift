@@ -83,8 +83,8 @@ extension HookInstaller {
             agentID: "openclaw",
             files: [
                 "index.js": openClawPluginSource(port: port),
-                "package.json": #"{"name":"clawd-on-desk","version":"0.1.0","private":true,"type":"module","main":"./index.js"}"#,
-                "openclaw.plugin.json": #"{"id":"clawd-on-desk","name":"Clawdesk","activation":{"onStartup":true}}"#
+                "package.json": #"{"name":"clawdesk","version":"0.1.0","private":true,"type":"module","main":"./index.js"}"#,
+                "openclaw.plugin.json": #"{"id":"clawdesk","name":"Clawdesk","activation":{"onStartup":true}}"#
             ]
         )
         let configURL = homeDirectory.appendingPathComponent(".openclaw/openclaw.json")
@@ -99,7 +99,7 @@ extension HookInstaller {
         load["paths"] = paths
         plugins["load"] = load
         var entries = plugins["entries"] as? [String: Any] ?? [:]
-        if let existing = entries["clawd-on-desk"] as? [String: Any], !isManagedOpenClawEntry(existing, pluginPath: pluginDirectory.path) {
+        if let existing = entries["clawdesk"] as? [String: Any], !isManagedOpenClawEntry(existing, pluginPath: pluginDirectory.path) {
             throw HookInstallerError.invalidConfiguration(configURL)
         }
         let entry: [String: Any] = [
@@ -107,8 +107,8 @@ extension HookInstaller {
             "path": pluginDirectory.path,
             "clawdesk": pluginMarker
         ]
-        if !jsonObjectEqual(entries["clawd-on-desk"], entry) {
-            entries["clawd-on-desk"] = entry
+        if !jsonObjectEqual(entries["clawdesk"], entry) {
+            entries["clawdesk"] = entry
             changed = true
         }
         plugins["entries"] = entries
@@ -138,9 +138,9 @@ extension HookInstaller {
                 plugins["load"] = load
             }
             if var entries = plugins["entries"] as? [String: Any],
-               let existing = entries["clawd-on-desk"] as? [String: Any],
+               let existing = entries["clawdesk"] as? [String: Any],
                isManagedOpenClawEntry(existing, pluginPath: pluginDirectory.path) {
-                entries.removeValue(forKey: "clawd-on-desk")
+                entries.removeValue(forKey: "clawdesk")
                 plugins["entries"] = entries
                 changed = true
             }
@@ -161,7 +161,7 @@ extension HookInstaller {
 
     func installHermesPlugin(port: UInt16) throws -> HookInstallResult {
         let hermesHome = hermesHomeDirectory
-        let pluginDirectory = hermesHome.appendingPathComponent("plugins/clawd-on-desk", isDirectory: true)
+        let pluginDirectory = hermesHome.appendingPathComponent("plugins/clawdesk", isDirectory: true)
         let changed = try installManagedPluginDirectory(
             pluginDirectory,
             agentID: "hermes",
@@ -179,7 +179,7 @@ extension HookInstaller {
     }
 
     func uninstallHermesPlugin() throws -> HookInstallResult {
-        let pluginDirectory = hermesHomeDirectory.appendingPathComponent("plugins/clawd-on-desk", isDirectory: true)
+        let pluginDirectory = hermesHomeDirectory.appendingPathComponent("plugins/clawdesk", isDirectory: true)
         guard isManagedPluginDirectory(pluginDirectory, agentID: "hermes") else {
             return HookInstallResult(agentID: "hermes", configPath: pluginDirectory, changed: false, message: "No managed Hermes plugin found; unmanaged files were preserved.")
         }
@@ -188,7 +188,7 @@ extension HookInstaller {
     }
 
     func installPiExtension(port: UInt16) throws -> HookInstallResult {
-        let extensionDirectory = homeDirectory.appendingPathComponent(".pi/agent/extensions/clawd-on-desk", isDirectory: true)
+        let extensionDirectory = homeDirectory.appendingPathComponent(".pi/agent/extensions/clawdesk", isDirectory: true)
         let changed = try installManagedPluginDirectory(
             extensionDirectory,
             agentID: "pi",
@@ -200,7 +200,7 @@ extension HookInstaller {
     }
 
     func uninstallPiExtension() throws -> HookInstallResult {
-        let extensionDirectory = homeDirectory.appendingPathComponent(".pi/agent/extensions/clawd-on-desk", isDirectory: true)
+        let extensionDirectory = homeDirectory.appendingPathComponent(".pi/agent/extensions/clawdesk", isDirectory: true)
         guard isManagedPluginDirectory(extensionDirectory, agentID: "pi") else {
             return HookInstallResult(agentID: "pi", configPath: extensionDirectory, changed: false, message: "No managed Pi extension found; unmanaged files were preserved.")
         }
@@ -479,13 +479,13 @@ extension HookInstaller {
         const DEFAULT_PORT = \#(port);
         function readPort() { try { const raw = JSON.parse(readFileSync(join(homedir(), "Library/Application Support/Clawdesk/runtime.json"), "utf8")); const value = Number(raw.port); return Number.isInteger(value) && value > 0 && value <= 65535 ? value : DEFAULT_PORT; } catch { return DEFAULT_PORT; } }
         async function post(event, state, native = {}, ctx = {}) { try { const body = { agent_id: AGENT_ID, hook_source: "openclaw-plugin", event, state, session_id: native.sessionId || ctx.sessionId || native.sessionKey || "openclaw:default", session_title: native.title || native.sessionTitle, cwd: native.cwd || ctx.workspaceDir, tool_name: native.toolName }; await fetch(`http://127.0.0.1:${readPort()}/state?clawdesk-hook-v1=1`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); } catch {} }
-        export default { id: "clawd-on-desk", name: "Clawdesk", register(api) { if (!api?.on) return; const hooks = { session_start: ["SessionStart", "idle"], model_call_started: ["UserPromptSubmit", "thinking"], before_tool_call: ["PreToolUse", "typing"], after_tool_call: ["PostToolUse", "typing"], before_compaction: ["PreCompact", "sweeping"], after_compaction: ["PostCompact", "attention"], session_end: ["SessionEnd", "idle"] }; for (const [name, [event, state]] of Object.entries(hooks)) api.on(name, (native, ctx) => post(event, state, native, ctx), { priority: -100, timeoutMs: 1000 }); } };
+        export default { id: "clawdesk", name: "Clawdesk", register(api) { if (!api?.on) return; const hooks = { session_start: ["SessionStart", "idle"], model_call_started: ["UserPromptSubmit", "thinking"], before_tool_call: ["PreToolUse", "typing"], after_tool_call: ["PostToolUse", "typing"], before_compaction: ["PreCompact", "sweeping"], after_compaction: ["PostCompact", "attention"], session_end: ["SessionEnd", "idle"] }; for (const [name, [event, state]] of Object.entries(hooks)) api.on(name, (native, ctx) => post(event, state, native, ctx), { priority: -100, timeoutMs: 1000 }); } };
         """#
     }
 
     private var hermesPluginManifest: String {
         #"""
-name: clawd-on-desk
+name: clawdesk
 version: "0.2.0"
 description: "Forward Hermes lifecycle events to Clawdesk."
 hooks:

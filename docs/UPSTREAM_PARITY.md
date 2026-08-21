@@ -21,7 +21,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Interface language (en / zh-Hans / zh-Hant / ja / ko / es) | `Localization` table + `AppPreferences.language` | Implemented: settings, menus, dashboard, and window titles switch immediately; untranslated keys fall back to English |
 | Settings, Dashboard, permission bubble | SwiftUI windows | Implemented |
 | Global allow/deny shortcuts | `GlobalShortcutManager` | Implemented |
-| Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for the registered Claude-compatible, JSON/TOML, and plugin adapters; new upstream agents remain isolated additions |
+| Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for the registered Claude-compatible, JSON/TOML, and plugin adapters. Plugin identities, extension directories, and the Kiro managed agent use Clawdesk's own names (never the upstream product id), so the two integrations cannot collide or impersonate each other |
 | Codex `request_user_input` | `DefaultAgentEventAdapter` + `CodexLogMonitor` + read-only card | Implemented: bounded question/options preview parsed in the adapter; answers stay in Codex and the matching output clears the card |
 | Gemini `AfterAgent` / `PreCompress` semantics | `EventStateMapper` | Implemented: AfterAgent returns idle; PreCompress is recorded without forcing sweeping |
 | Kimi legacy approval modes | `DefaultAgentEventAdapter` + Kimi TOML adapter | Implemented: explicit/suspect modes, persisted command flag, runtime env overrides (`CLAWD_KIMI_PERMISSION_MODE`, `CLAWD_KIMI_PERMISSION_IMMEDIATE`, `CLAWD_KIMI_PERMISSION_SUSPECT`, `CLAWD_KIMI_PERMISSION_SUSPECT_MS`, `CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION`), tunable suspect window, and per-session gate close ledger |
@@ -29,8 +29,8 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Mobile read-only PWA | LAN companion seam | Implemented: token-gated HTTP fallback, v1 WebSocket snapshots, state/deletion broadcasts, pairing URL, and bounded clients/rate limits |
 | Codex JSONL fallback and quota rings | session/telemetry adapters | Implemented: bounded JSONL fallback, Claude statusline quota, Codex/Codex Spark windows, dashboard rings |
 | SSH / WSL deployment | transport adapters | Implemented for native macOS Remote SSH: profile-bound loopback ingress, nonce validation, atomic remote hook repair, Copilot registration, optional Codex fallback monitor, automatic/single-session transport mode, and reverse tunnel. WSL is outside the macOS product boundary |
-| Custom animated asset packs | theme importer seam | Implemented for validated folder/ZIP themes with ImageIO animation plus static SVG fallback, per-theme idle visual selection, and bounded frame caching (downsampled frames, per-animation and total cache byte budgets); upstream Codex Pet atlas/capability schema is not bundled |
-| GitHub release updater | update service seam | Implemented: compatible macOS asset selection, download, safe filename, SHA-256 verification, and Finder reveal; installation remains a deliberate manual step |
+| Custom animated asset packs | theme importer seam | Implemented for validated folder/ZIP themes with ImageIO animation plus static SVG fallback, per-theme idle visual selection, and bounded frame caching (downsampled frames, per-animation and total cache byte budgets); upstream Codex Pet atlas/capability schema is not bundled. Built-in pets are original characters (Pinch, Patches, Cumulus) drawn natively — no upstream character names or artwork are reused |
+| GitHub release updater | update service seam | Implemented: compatible macOS asset selection, download, safe filename, SHA-256 verification, and Finder reveal; installation remains a deliberate manual step. The default repository is the Clawdesk project itself, never the upstream release feed |
 
 ## Current integration boundary
 

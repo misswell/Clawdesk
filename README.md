@@ -62,12 +62,14 @@ instructions live in [AGENTS.md](AGENTS.md).
 
 Upstream artwork is not bundled: its separate artwork license does not permit
 redistribution outside the original application. The built-in themes here are
-native CoreGraphics renderers. Custom themes can be imported from a validated
-folder or ZIP using PNG/GIF/APNG/WebP/JPEG and static SVG states; animated
-raster frames are cached and capped to keep idle memory use low. Themes with
-multiple idle visuals can select and persist one per theme. Full upstream Codex
-Pet atlas conversion is intentionally not claimed, and custom themes remain an
-isolated renderer seam.
+native CoreGraphics renderers with original characters (Pinch the crab,
+Patches the cat, and Cumulus the cloud); they deliberately do not reuse the
+upstream character names or artwork. Custom themes can be imported from a
+validated folder or ZIP using PNG/GIF/APNG/WebP/JPEG and static SVG states;
+animated raster frames are cached and capped to keep idle memory use low.
+Themes with multiple idle visuals can select and persist one per theme. Full
+upstream Codex Pet atlas conversion is intentionally not claimed, and custom
+themes remain an isolated renderer seam.
 
 Settings → General includes a continuous pet-size slider (40%–200%) that
 resizes the floating pet in place, and an interface-language picker that

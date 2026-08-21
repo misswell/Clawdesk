@@ -48,7 +48,7 @@ public enum UpdateServiceError: LocalizedError {
 public struct UpdateService {
     public let repository: String
 
-    public init(repository: String = "rullerzhou-afk/clawd-on-desk") {
+    public init(repository: String = "misswell/Clawdesk") {
         self.repository = repository
     }
 

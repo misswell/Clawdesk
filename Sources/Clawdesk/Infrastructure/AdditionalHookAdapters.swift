@@ -133,7 +133,7 @@ extension HookInstaller {
 
     private func installKiroHooks() throws -> HookInstallResult {
         try writeSharedHookScript()
-        let configURL = homeDirectory.appendingPathComponent(".kiro/agents/clawd.json")
+        let configURL = homeDirectory.appendingPathComponent(".kiro/agents/clawdesk.json")
         var settings = try readJSON(at: configURL)
         if fileManager.fileExists(atPath: configURL.path), !containsClawdeskMarker(settings) {
             throw HookInstallerError.invalidConfiguration(configURL)
@@ -150,7 +150,7 @@ extension HookInstaller {
                 changed = true
             }
         }
-        settings["name"] = "clawd"
+        settings["name"] = "clawdesk"
         settings["description"] = "Clawdesk desktop pet integration"
         settings["hooks"] = hooks
         if changed || !fileManager.fileExists(atPath: configURL.path) {
@@ -160,12 +160,12 @@ extension HookInstaller {
             agentID: "kiro-cli",
             configPath: configURL,
             changed: changed,
-            message: changed ? "Kiro hooks installed in the managed clawd agent." : "Kiro hooks already installed."
+            message: changed ? "Kiro hooks installed in the managed clawdesk agent." : "Kiro hooks already installed."
         )
     }
 
     private func uninstallKiroHooks() throws -> HookInstallResult {
-        let configURL = homeDirectory.appendingPathComponent(".kiro/agents/clawd.json")
+        let configURL = homeDirectory.appendingPathComponent(".kiro/agents/clawdesk.json")
         guard fileManager.fileExists(atPath: configURL.path) else {
             return HookInstallResult(agentID: "kiro-cli", configPath: configURL, changed: false, message: "No managed Kiro agent found.")
         }
@@ -174,7 +174,7 @@ extension HookInstaller {
             return HookInstallResult(agentID: "kiro-cli", configPath: configURL, changed: false, message: "Unmanaged Kiro agent preserved.")
         }
         try fileManager.removeItem(at: configURL)
-        return HookInstallResult(agentID: "kiro-cli", configPath: configURL, changed: true, message: "Managed Kiro clawd agent removed.")
+        return HookInstallResult(agentID: "kiro-cli", configPath: configURL, changed: true, message: "Managed Kiro clawdesk agent removed.")
     }
 
     private func installKimiHooks() throws -> HookInstallResult {
