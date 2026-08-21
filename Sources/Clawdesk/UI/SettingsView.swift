@@ -144,6 +144,14 @@ private struct GeneralSettingsView: View {
                 }
             }
 
+            Section {
+                Toggle(model.preferences.text("Collect local Claude usage"), isOn: $model.preferences.collectClaudeUsage)
+            } header: {
+                Text(model.preferences.text("Quota ring"))
+            } footer: {
+                Text("Off by default. Enabling it adds Clawdesk's status line to ~/.claude/settings.json using Claude Code's documented extension mechanism.")
+            }
+
             HStack {
                 Button(model.preferences.text("Reset position")) { model.preferences.resetPosition() }
                 Spacer()

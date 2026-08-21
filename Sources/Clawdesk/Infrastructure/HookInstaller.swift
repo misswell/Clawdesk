@@ -77,42 +77,57 @@ public final class HookInstaller {
     public func installClaudeHooks(port: UInt16) throws -> HookInstallResult {
         let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
         let (settings, changed, hooks) = try installClaudeHookEntries(port: port)
-
-        // Claude Code exposes subscription quota through its documented
-        // statusLine stdin payload. Take the slot only when it is empty or
-        // already owned by Clawdesk; a user's custom renderer is never
-        // replaced. The native helper is bundled beside the app executable.
         var updatedSettings = settings
-        var updatedChanged = changed
-        if let statusline = statuslineExecutable,
-           let existingStatusline = settings["statusLine"] as? [String: Any],
-           let command = existingStatusline["command"] as? String,
-           command.contains(Self.statuslineMarker) {
-            let desired: [String: Any] = [
-                "type": "command",
-                "command": statusline.path.shellQuoted,
-                "padding": 0
-            ]
-            if !jsonValuesEqual(existingStatusline, desired) {
-                updatedSettings["statusLine"] = desired
-                updatedChanged = true
-            }
-        } else if settings["statusLine"] == nil, let statusline = statuslineExecutable {
-            updatedSettings["statusLine"] = [
-                "type": "command",
-                "command": statusline.path.shellQuoted,
-                "padding": 0
-            ]
-            updatedChanged = true
-        }
         updatedSettings["hooks"] = hooks
-        if updatedChanged { try writeJSON(updatedSettings, to: settingsURL) }
+        if changed { try writeJSON(updatedSettings, to: settingsURL) }
         return HookInstallResult(
             agentID: "claude-code",
             configPath: settingsURL,
-            changed: updatedChanged,
-            message: updatedChanged ? "Claude Code hooks installed. Existing hooks were preserved." : "Claude Code hooks already installed."
+            changed: changed,
+            message: changed ? "Claude Code hooks installed. Existing hooks were preserved." : "Claude Code hooks already installed."
         )
+    }
+
+    /// Opt-in Claude usage status line. Called only when the user enables
+    /// "Collect local Claude usage"; it takes the slot when it is empty or
+    /// already owned by Clawdesk and never replaces a custom renderer.
+    public func ensureClaudeStatusLine() throws -> Bool {
+        guard let statusline = statuslineExecutable else { return false }
+        let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
+        var settings = try readJSONObject(at: settingsURL)
+        let desired: [String: Any] = [
+            "type": "command",
+            "command": statusline.path.shellQuoted,
+            "padding": 0
+        ]
+        var changed = false
+        if let existing = settings["statusLine"] as? [String: Any],
+           let command = existing["command"] as? String,
+           command.contains(Self.statuslineMarker) {
+            if !jsonValuesEqual(existing, desired) {
+                settings["statusLine"] = desired
+                changed = true
+            }
+        } else if settings["statusLine"] == nil {
+            settings["statusLine"] = desired
+            changed = true
+        }
+        if changed { try writeJSON(settings, to: settingsURL) }
+        return changed
+    }
+
+    /// Removes only a Clawdesk-owned statusLine, leaving a user's custom
+    /// renderer untouched.
+    public func removeClaudeStatusLine() throws -> Bool {
+        let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
+        guard fileManager.fileExists(atPath: settingsURL.path) else { return false }
+        var settings = try readJSONObject(at: settingsURL)
+        guard let statusline = settings["statusLine"] as? [String: Any],
+              let command = statusline["command"] as? String,
+              command.contains(Self.statuslineMarker) else { return false }
+        settings.removeValue(forKey: "statusLine")
+        try writeJSON(settings, to: settingsURL)
+        return true
     }
 
     /// Regenerates the hook script and merges the managed hook entries without

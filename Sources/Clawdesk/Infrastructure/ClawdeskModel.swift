@@ -74,6 +74,14 @@ public final class ClawdeskModel: ObservableObject {
             guard let self else { return }
             if enabled { self.mobileBridge.start() } else { self.mobileBridge.stop() }
         }.store(in: &preferenceCancellables)
+        preferences.$collectClaudeUsage.dropFirst().sink { [weak self] enabled in
+            guard let self else { return }
+            if enabled {
+                try? self.hookInstaller.ensureClaudeStatusLine()
+            } else {
+                try? self.hookInstaller.removeClaudeStatusLine()
+            }
+        }.store(in: &preferenceCancellables)
     }
 
     public func start() {
@@ -95,6 +103,9 @@ public final class ClawdeskModel: ObservableObject {
             serverPort = eventServer.port
             preferences.serverPort = eventServer.port
             try? hookInstaller.writeRuntimeFile(port: eventServer.port, autoStart: preferences.autoStart)
+            if preferences.collectClaudeUsage {
+                try? hookInstaller.ensureClaudeStatusLine()
+            }
         }
     }
 
@@ -213,6 +224,9 @@ public final class ClawdeskModel: ObservableObject {
         do {
             let result = try hookInstaller.install(agentID: agentID, port: serverPort)
             agentInstallStatus[agentID] = result.message
+            if agentID == "claude-code", preferences.collectClaudeUsage {
+                _ = try hookInstaller.ensureClaudeStatusLine()
+            }
             eventLog.insert("system · \(result.message)", at: 0)
         } catch {
             agentInstallStatus[agentID] = error.localizedDescription

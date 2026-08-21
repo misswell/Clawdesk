@@ -11,7 +11,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Shared lifecycle states | `EventStateMapper` | Implemented |
 | Multi-session priority | `SessionStore` | Implemented |
 | Local `/state`, `/permission`, `/health` bridge | `LocalEventServer` | Implemented |
-| Claude Code command + HTTP hooks + periodic health self-heal | `HookInstaller` + `ClaudeHookHealthMonitor` | Implemented: a read-only check every 5 minutes verifies the managed hook script still exists and repairs it without touching the statusLine slot; after 3 consecutive failed repairs it stops auto-retrying and asks for a manual fix |
+| Claude Code command + HTTP hooks + periodic health self-heal | `HookInstaller` + `ClaudeHookHealthMonitor` | Implemented: a read-only check every 5 minutes verifies the managed hook script still exists and repairs it without touching the statusLine slot; after 3 consecutive failed repairs it stops auto-retrying and asks for a manual fix. Local usage collection via the documented statusLine is opt-in and off by default |
 | Codex official hook shape + feature flag | `HookInstaller` | Implemented |
 | Transparent floating pet window | `PetWindowController` | Implemented |
 | Low-power native animation loop | `PetCanvasView` | Implemented |

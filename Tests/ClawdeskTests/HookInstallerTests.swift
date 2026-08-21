@@ -31,7 +31,7 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(String(data: try Data(contentsOf: installer.runtimeFile), encoding: .utf8)?.contains("37801") == true)
     }
 
-    func testClaudeStatuslineIsOwnedOnlyWhenSlotIsEmpty() throws {
+    func testClaudeStatuslineIsOptInAndOwnedOnlyWhenSlotIsEmpty() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-statusline-test-\(UUID().uuidString)")
         let settingsURL = root.appendingPathComponent(".claude/settings.json")
         try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -43,11 +43,28 @@ final class HookInstallerTests: XCTestCase {
         let preserved = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
         XCTAssertEqual((preserved["statusLine"] as? [String: Any])?["command"] as? String, "echo user-status")
 
+        // Plain hook install must NOT add a status line; collection is opt-in.
         try JSONSerialization.data(withJSONObject: [:]).write(to: settingsURL)
         _ = try installer.installClaudeHooks(port: 37809)
+        let withoutOptIn = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
+        XCTAssertNil(withoutOptIn["statusLine"])
+
+        // Explicit opt-in takes an empty slot and never replaces a custom one.
+        _ = try installer.ensureClaudeStatusLine()
         let installed = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
         XCTAssertTrue(((installed["statusLine"] as? [String: Any])?["command"] as? String)?.contains("ClawdeskStatusline") == true)
 
+        try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command", "command": "echo user-status"]]).write(to: settingsURL)
+        _ = try installer.ensureClaudeStatusLine()
+        let notReplaced = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
+        XCTAssertEqual(((notReplaced["statusLine"] as? [String: Any])?["command"] as? String), "echo user-status")
+
+        _ = try installer.removeClaudeStatusLine()
+        let kept = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
+        XCTAssertEqual(((kept["statusLine"] as? [String: Any])?["command"] as? String), "echo user-status")
+
+        try JSONSerialization.data(withJSONObject: [:]).write(to: settingsURL)
+        _ = try installer.ensureClaudeStatusLine()
         _ = try installer.uninstall(agentID: "claude-code")
         let removed = try JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL)) as! [String: Any]
         XCTAssertNil(removed["statusLine"])

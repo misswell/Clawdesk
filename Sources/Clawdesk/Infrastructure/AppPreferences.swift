@@ -43,6 +43,7 @@ public final class AppPreferences: ObservableObject {
     @Published public var mobilePort: UInt16 { didSet { persist() } }
     @Published public var petScale: Double { didSet { persist() } }
     @Published public var freeRoamEnabled: Bool { didSet { persist() } }
+    @Published public var collectClaudeUsage: Bool { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
@@ -75,6 +76,7 @@ public final class AppPreferences: ObservableObject {
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
         petScale = min(2.0, max(0.4, defaults.object(forKey: "petScale") as? Double ?? 1.0))
         freeRoamEnabled = defaults.bool(forKey: "freeRoam")
+        collectClaudeUsage = defaults.object(forKey: "collectClaudeUsage") as? Bool ?? false
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
@@ -185,6 +187,7 @@ public final class AppPreferences: ObservableObject {
         defaults.set(Int(mobilePort), forKey: "mobilePort")
         defaults.set(petScale, forKey: "petScale")
         defaults.set(freeRoamEnabled, forKey: "freeRoam")
+        defaults.set(collectClaudeUsage, forKey: "collectClaudeUsage")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")
