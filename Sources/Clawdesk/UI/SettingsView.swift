@@ -304,15 +304,15 @@ private struct RemoteSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Local bridge") {
-                LabeledContent("Endpoint", value: "http://127.0.0.1:\(model.serverPort)")
+            Section(model.preferences.text("Local bridge")) {
+                LabeledContent(model.preferences.text("Endpoint"), value: "http://127.0.0.1:\(model.serverPort)")
                 Text("POST /state for lifecycle events, POST /permission for approval requests, GET /health for diagnostics, and GET /mobile for the read-only companion.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Mobile companion (read-only LAN)") {
-                Toggle("Enable LAN bridge", isOn: $model.preferences.mobileEnabled)
-                LabeledContent("LAN port", value: String(model.mobileBridge.port))
+            Section(model.preferences.text("Mobile companion (read-only LAN)")) {
+                Toggle(model.preferences.text("Enable LAN bridge"), isOn: $model.preferences.mobileEnabled)
+                LabeledContent(model.preferences.text("LAN port"), value: String(model.mobileBridge.port))
                 if let pairingURL = model.mobileBridge.pairingURL() {
                     Text(pairingURL.absoluteString)
                         .font(.caption.monospaced())
@@ -324,7 +324,7 @@ private struct RemoteSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 HStack {
-                    Button("Rotate token") {
+                    Button(model.preferences.text("Rotate token")) {
                         _ = model.mobileBridge.rotateToken()
                     }
                     Text("Token file: \(model.mobileBridge.tokenURL.path)")
@@ -336,8 +336,8 @@ private struct RemoteSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Remote notifications") {
-                Toggle("Enable configured channels", isOn: $remoteEnabled)
+            Section(model.preferences.text("Remote notifications")) {
+                Toggle(model.preferences.text("Enable configured channels"), isOn: $remoteEnabled)
                     .onChange(of: remoteEnabled) { enabled in
                         var settings = model.remoteNotifier.settings
                         settings.enabled = enabled
@@ -348,18 +348,18 @@ private struct RemoteSettingsView: View {
                 Label(model.remoteNotifier.settings.enabled ? "Remote notifications enabled" : "No remote channel enabled", systemImage: "checkmark.circle")
                     .foregroundStyle(.secondary)
             }
-            Section("Telegram remote approval") {
-                Toggle("Mirror eligible permission requests", isOn: $telegramApprovalEnabled)
+            Section(model.preferences.text("Telegram remote approval")) {
+                Toggle(model.preferences.text("Mirror eligible permission requests"), isOn: $telegramApprovalEnabled)
                 SecureField("Bot token (leave blank to keep saved)", text: $telegramToken)
-                TextField("Target chat ID", text: $telegramChatID)
-                TextField("Allowed approver user ID", text: $telegramUserID)
-                Picker("Remote card timeout", selection: $telegramTimeout) {
+                TextField(model.preferences.text("Target chat ID"), text: $telegramChatID)
+                TextField(model.preferences.text("Allowed approver user ID"), text: $telegramUserID)
+                Picker(model.preferences.text("Remote card timeout"), selection: $telegramTimeout) {
                     ForEach([30, 60, 120, 300], id: \.self) { seconds in
                         Text("\(seconds) seconds").tag(seconds)
                     }
                 }
                 HStack {
-                    Button("Save Telegram approval") {
+                    Button(model.preferences.text("Save Telegram approval")) {
                         var settings = model.remoteNotifier.settings
                         settings.telegramApprovalEnabled = telegramApprovalEnabled
                         settings.telegramChatID = telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -388,27 +388,27 @@ private struct RemoteSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Feishu / Lark interactive approval") {
-                Picker("Platform", selection: $feishuPlatform) {
-                    Text("Feishu (China)").tag("feishu")
-                    Text("Lark (International)").tag("lark")
+            Section(model.preferences.text("Feishu / Lark interactive approval")) {
+                Picker(model.preferences.text("Platform"), selection: $feishuPlatform) {
+                    Text(model.preferences.text("Feishu (China)")).tag("feishu")
+                    Text(model.preferences.text("Lark (International)")).tag("lark")
                 }
-                Toggle("Mirror eligible permission requests", isOn: $feishuApprovalEnabled)
-                TextField("App ID (cli_…)", text: $feishuAppID)
+                Toggle(model.preferences.text("Mirror eligible permission requests"), isOn: $feishuApprovalEnabled)
+                TextField(model.preferences.text("App ID (cli_…)"), text: $feishuAppID)
                 SecureField("App secret (leave blank to keep saved)", text: $feishuAppSecret)
-                TextField("Approver ID", text: $feishuApproverID)
-                Picker("Approver ID type", selection: $feishuApproverIDType) {
+                TextField(model.preferences.text("Approver ID"), text: $feishuApproverID)
+                Picker(model.preferences.text("Approver ID type"), selection: $feishuApproverIDType) {
                     Text("open_id (recommended)").tag("open_id")
                     Text("union_id").tag("union_id")
                     Text("user_id").tag("user_id")
                 }
-                Picker("Connection timeout", selection: $feishuConnectionTimeout) {
+                Picker(model.preferences.text("Connection timeout"), selection: $feishuConnectionTimeout) {
                     ForEach([5, 10, 15, 30, 60], id: \.self) { seconds in
                         Text("\(seconds) seconds").tag(seconds)
                     }
                 }
                 HStack {
-                    Button("Save Feishu / Lark approval") {
+                    Button(model.preferences.text("Save Feishu / Lark approval")) {
                         var settings = model.remoteNotifier.settings
                         settings.feishuApprovalEnabled = feishuApprovalEnabled
                         settings.feishuPlatform = feishuPlatform
@@ -443,10 +443,10 @@ private struct RemoteSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Updates") {
+            Section(model.preferences.text("Updates")) {
                 HStack {
-                    Button("Check GitHub releases") {
-                        updateStatus = "Checking…"
+                    Button(model.preferences.text("Check GitHub releases")) {
+                        updateStatus = model.preferences.text("Checking…")
                         Task {
                             do {
                                 let service = UpdateService()
@@ -462,7 +462,7 @@ private struct RemoteSettingsView: View {
                         }
                     }
                     if let release = latestRelease, let asset = latestAsset {
-                        Button("Download package") {
+                        Button(model.preferences.text("Download package")) {
                             guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
                             updateStatus = "Downloading \(asset.name)…"
                             Task {
