@@ -11,6 +11,7 @@ public final class ClawdeskModel: ObservableObject {
     public let remoteSSHManager: RemoteSSHManager
     public let mobileBridge: MobileBridge
     public let codexLogMonitor: CodexLogMonitor
+    public let claudeHookHealth: ClaudeHookHealthMonitor
     public let quotaStore = QuotaStore()
 
     @Published public private(set) var petState: PetState = .idle
@@ -32,6 +33,7 @@ public final class ClawdeskModel: ObservableObject {
     private var lastPointerActivity = Date.now
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
+    private var healthTimer: Timer?
 
     public init(preferences: AppPreferences = AppPreferences()) {
         self.preferences = preferences
@@ -42,6 +44,7 @@ public final class ClawdeskModel: ObservableObject {
         remoteNotifier = RemoteNotifier()
         mobileBridge = MobileBridge(preferredPort: preferences.mobilePort)
         codexLogMonitor = CodexLogMonitor()
+        claudeHookHealth = ClaudeHookHealthMonitor(installer: hookInstaller)
         serverPort = preferences.serverPort
         eventServer.onMessage = { [weak self] message in
             Task { @MainActor [weak self] in
@@ -76,6 +79,12 @@ public final class ClawdeskModel: ObservableObject {
         codexLogMonitor.start()
         try? hookInstaller.writeRuntimeFile(port: eventServer.port, autoStart: preferences.autoStart)
         LaunchAtLogin.setEnabled(preferences.autoStart)
+        // Read-only Claude hook health check every five minutes, matching the
+        // upstream cadence. It only mutates when a managed script is missing
+        // and never touches the statusLine slot.
+        healthTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.runHealthCheck() }
+        }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard let self else { return }
@@ -93,8 +102,16 @@ public final class ClawdeskModel: ObservableObject {
         eventServer.stop()
         mobileBridge.stop()
         codexLogMonitor.stop()
+        healthTimer?.invalidate()
+        healthTimer = nil
         remoteNotifier.stop()
         remoteSSHManager.stop()
+    }
+
+    private func runHealthCheck() {
+        guard serverPort > 0 else { return }
+        claudeHookHealth.check(port: serverPort)
+        objectWillChange.send()
     }
 
     public func receive(_ message: ServerMessage) {

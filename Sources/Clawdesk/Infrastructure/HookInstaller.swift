@@ -75,6 +75,64 @@ public final class HookInstaller {
     }
 
     public func installClaudeHooks(port: UInt16) throws -> HookInstallResult {
+        let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
+        let (settings, changed, hooks) = try installClaudeHookEntries(port: port)
+
+        // Claude Code exposes subscription quota through its documented
+        // statusLine stdin payload. Take the slot only when it is empty or
+        // already owned by Clawdesk; a user's custom renderer is never
+        // replaced. The native helper is bundled beside the app executable.
+        var updatedSettings = settings
+        var updatedChanged = changed
+        if let statusline = statuslineExecutable,
+           let existingStatusline = settings["statusLine"] as? [String: Any],
+           let command = existingStatusline["command"] as? String,
+           command.contains(Self.statuslineMarker) {
+            let desired: [String: Any] = [
+                "type": "command",
+                "command": statusline.path.shellQuoted,
+                "padding": 0
+            ]
+            if !jsonValuesEqual(existingStatusline, desired) {
+                updatedSettings["statusLine"] = desired
+                updatedChanged = true
+            }
+        } else if settings["statusLine"] == nil, let statusline = statuslineExecutable {
+            updatedSettings["statusLine"] = [
+                "type": "command",
+                "command": statusline.path.shellQuoted,
+                "padding": 0
+            ]
+            updatedChanged = true
+        }
+        updatedSettings["hooks"] = hooks
+        if updatedChanged { try writeJSON(updatedSettings, to: settingsURL) }
+        return HookInstallResult(
+            agentID: "claude-code",
+            configPath: settingsURL,
+            changed: updatedChanged,
+            message: updatedChanged ? "Claude Code hooks installed. Existing hooks were preserved." : "Claude Code hooks already installed."
+        )
+    }
+
+    /// Regenerates the hook script and merges the managed hook entries without
+    /// touching the statusLine slot. Used by the periodic health monitor so an
+    /// auto-repair can never opt a user into the usage status line.
+    public func repairClaudeHooks(port: UInt16) throws -> HookInstallResult {
+        let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
+        let (settings, changed, hooks) = try installClaudeHookEntries(port: port)
+        var updated = settings
+        updated["hooks"] = hooks
+        if changed { try writeJSON(updated, to: settingsURL) }
+        return HookInstallResult(
+            agentID: "claude-code",
+            configPath: settingsURL,
+            changed: changed,
+            message: changed ? "Claude Code hooks repaired. Existing hooks were preserved." : "Claude Code hooks are healthy."
+        )
+    }
+
+    private func installClaudeHookEntries(port: UInt16) throws -> ([String: Any], Bool, [String: Any]) {
         try prepareHookScript()
         let settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
         var settings = try readJSONObject(at: settingsURL)
@@ -119,40 +177,8 @@ public final class HookInstaller {
             hooks["PermissionRequest"] = permissionEntries
             changed = true
         }
-
-        // Claude Code exposes subscription quota through its documented
-        // statusLine stdin payload. Take the slot only when it is empty or
-        // already owned by Clawdesk; a user's custom renderer is never
-        // replaced. The native helper is bundled beside the app executable.
-        if let statusline = statuslineExecutable,
-           let existingStatusline = settings["statusLine"] as? [String: Any],
-           let command = existingStatusline["command"] as? String,
-           command.contains(Self.statuslineMarker) {
-            let desired: [String: Any] = [
-                "type": "command",
-                "command": statusline.path.shellQuoted,
-                "padding": 0
-            ]
-            if !jsonValuesEqual(existingStatusline, desired) {
-                settings["statusLine"] = desired
-                changed = true
-            }
-        } else if settings["statusLine"] == nil, let statusline = statuslineExecutable {
-            settings["statusLine"] = [
-                "type": "command",
-                "command": statusline.path.shellQuoted,
-                "padding": 0
-            ]
-            changed = true
-        }
         settings["hooks"] = hooks
-        if changed { try writeJSON(settings, to: settingsURL) }
-        return HookInstallResult(
-            agentID: "claude-code",
-            configPath: settingsURL,
-            changed: changed,
-            message: changed ? "Claude Code hooks installed. Existing hooks were preserved." : "Claude Code hooks already installed."
-        )
+        return (settings, changed, hooks)
     }
 
     public func installCodexHooks(port: UInt16) throws -> HookInstallResult {

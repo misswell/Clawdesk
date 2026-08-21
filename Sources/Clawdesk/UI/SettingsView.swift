@@ -221,6 +221,18 @@ private struct AgentSettingsView: View {
             Text("Install merges only Clawdesk-owned entries and keeps a backup before changing an agent config. Agent-specific payload parsing stays inside each adapter so upstream changes remain localized.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if model.claudeHookHealth.status != .unknown {
+                Label(
+                    model.claudeHookHealth.status == .healthy
+                        ? "Claude hooks: healthy"
+                        : model.claudeHookHealth.status == .manualFixRequired
+                            ? "Claude hooks: manual fix required"
+                            : "Claude hooks: \(model.claudeHookHealth.status.rawValue)",
+                    systemImage: model.claudeHookHealth.status == .healthy ? "checkmark.circle" : "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(model.claudeHookHealth.status == .healthy ? Color.secondary : Color.orange)
+            }
         }
         .padding(8)
     }
