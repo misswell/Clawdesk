@@ -1,0 +1,287 @@
+import AppKit
+import Combine
+import Foundation
+
+@MainActor
+public final class PetWindowController: NSWindowController, NSWindowDelegate {
+    private let model: ClawdeskModel
+    private let petView: PetCanvasView
+    private var animationTimer: Timer?
+    private var pointerTimer: Timer?
+    private var sleepTimer: Timer?
+    private var animationTarget: MainTimerTarget?
+    private var pointerTarget: MainTimerTarget?
+    private var sleepTarget: MainTimerTarget?
+    private var cancellables = Set<AnyCancellable>()
+    private var isDragging = false
+    private var hoverRestoreTask: Task<Void, Never>?
+
+    public var onSettings: (() -> Void)?
+    public var onDashboard: (() -> Void)?
+    public var onQuit: (() -> Void)?
+
+    public init(model: ClawdeskModel) {
+        self.model = model
+        petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 240),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = false
+        panel.contentView = petView
+        super.init(window: panel)
+        panel.delegate = self
+        panel.title = "Clawdesk"
+
+        petView.theme = model.preferences.theme
+        petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
+        petView.onDragBegan = { [weak self] in self?.beginDrag() }
+        petView.onDrag = { [weak self] delta in self?.drag(by: delta) }
+        petView.onDragEnded = { [weak self] in self?.endDrag() }
+        petView.onDoubleTap = { [weak self] in self?.showReaction(.reactDouble, duration: 1.3) }
+        petView.onFlail = { [weak self] in self?.showReaction(.reactFlail, duration: 1.4) }
+        petView.onContextMenu = { [weak self] _ in self?.makeContextMenu() }
+        petView.onHoverChanged = { [weak self] hovering in self?.handleHover(hovering) }
+
+        model.$petState.sink { [weak self] state in
+            self?.apply(state: state)
+        }.store(in: &cancellables)
+        model.$sessions.sink { [weak self] sessions in
+            self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
+        }.store(in: &cancellables)
+        model.preferences.$selectedThemeID.sink { [weak self] _ in
+            self?.petView.theme = model.preferences.theme
+            self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
+        }.store(in: &cancellables)
+        model.preferences.$idleVisualByTheme.sink { [weak self] _ in
+            self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
+        }.store(in: &cancellables)
+        model.preferences.$isMiniMode.sink { [weak self] enabled in
+            self?.setMiniMode(enabled, animate: true)
+        }.store(in: &cancellables)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    public override func windowDidLoad() {
+        super.windowDidLoad()
+        restorePosition()
+    }
+
+    public func start() {
+        restorePosition()
+        window?.orderFrontRegardless()
+        animationTarget = MainTimerTarget { [weak self] in
+            self?.petView.advanceFrame()
+        }
+        pointerTarget = MainTimerTarget { [weak self] in
+            guard let self, let window = self.window else { return }
+            self.model.noteMouseActivity(at: NSEvent.mouseLocation)
+            guard self.petView.petState == .idle || self.petView.petState == .miniIdle else { return }
+            self.petView.setPointerLocation(NSEvent.mouseLocation)
+            if window.isVisible == false { window.orderFrontRegardless() }
+        }
+        sleepTarget = MainTimerTarget { [weak self] in
+            self?.model.tickForMaintenance()
+        }
+        let animationFrequency = model.preferences.lowPowerAnimations ? 8.0 : 18.0
+        let pointerFrequency = model.preferences.lowPowerAnimations ? 12.0 : 24.0
+        animationTimer = Timer.scheduledTimer(timeInterval: 1.0 / animationFrequency, target: animationTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
+        pointerTimer = Timer.scheduledTimer(timeInterval: 1.0 / pointerFrequency, target: pointerTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
+        sleepTimer = Timer.scheduledTimer(timeInterval: 5, target: sleepTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
+    }
+
+    public func stop() {
+        animationTimer?.invalidate()
+        pointerTimer?.invalidate()
+        sleepTimer?.invalidate()
+        animationTimer = nil
+        pointerTimer = nil
+        sleepTimer = nil
+        animationTarget = nil
+        pointerTarget = nil
+        sleepTarget = nil
+        hoverRestoreTask?.cancel()
+        close()
+    }
+
+    public func setMiniMode(_ enabled: Bool, animate: Bool) {
+        guard window != nil else { return }
+        petView.miniMode = enabled
+        if enabled {
+            moveToMiniEdge(animated: animate)
+            if model.petState == .idle { petView.petState = .miniIdle }
+        } else {
+            moveBackFromMini()
+            petView.petState = model.petState
+        }
+    }
+
+    private func apply(state: PetState) {
+        guard !isDragging else { return }
+        if model.preferences.isMiniMode {
+            switch state {
+            case .notification: petView.petState = .miniAlert
+            case .attention: petView.petState = .miniHappy
+            case .idle: petView.petState = .miniIdle
+            default: petView.petState = state
+            }
+        } else {
+            petView.petState = state
+        }
+    }
+
+    private func beginDrag() {
+        isDragging = true
+        petView.petState = .dragging
+        window?.invalidateCursorRects(for: petView)
+    }
+
+    private func drag(by delta: CGSize) {
+        guard let window else { return }
+        let origin = window.frame.origin
+        window.setFrameOrigin(NSPoint(x: origin.x + delta.width, y: origin.y + delta.height))
+    }
+
+    private func endDrag() {
+        guard isDragging else { return }
+        isDragging = false
+        if shouldEnterMiniMode {
+            model.preferences.isMiniMode = true
+        } else {
+            model.preferences.windowOrigin = window?.frame.origin
+            petView.petState = model.petState
+        }
+    }
+
+    private var shouldEnterMiniMode: Bool {
+        guard let window, let screen = screenForWindow(window) else { return false }
+        return window.frame.maxX >= screen.visibleFrame.maxX - 8
+    }
+
+    private func showReaction(_ state: PetState, duration: Double) {
+        guard !isDragging else { return }
+        petView.petState = model.preferences.isMiniMode
+            ? (state == .reactDouble ? .miniHappy : .miniAlert)
+            : state
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self, !Task.isCancelled else { return }
+            self.apply(state: self.model.petState)
+        }
+    }
+
+    private func handleHover(_ hovering: Bool) {
+        guard model.preferences.isMiniMode, !isDragging else { return }
+        hoverRestoreTask?.cancel()
+        if hovering {
+            petView.petState = .miniPeek
+        } else {
+            hoverRestoreTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self, !Task.isCancelled else { return }
+                self.apply(state: self.model.petState)
+            }
+        }
+    }
+
+    private func restorePosition() {
+        guard let window else { return }
+        if model.preferences.isMiniMode {
+            moveToMiniEdge(animated: false)
+            return
+        }
+        if let saved = model.preferences.windowOrigin {
+            window.setFrameOrigin(saved)
+        } else if let screen = NSScreen.main {
+            let frame = screen.visibleFrame
+            window.setFrameOrigin(NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30))
+        }
+    }
+
+    private func moveToMiniEdge(animated: Bool) {
+        guard let window, let screen = screenForWindow(window) else { return }
+        let frame = screen.visibleFrame
+        let target = NSPoint(x: frame.maxX - window.frame.width * 0.48, y: max(frame.minY + 16, window.frame.minY))
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                window.animator().setFrameOrigin(target)
+            }
+        } else {
+            window.setFrameOrigin(target)
+        }
+    }
+
+    private func moveBackFromMini() {
+        guard let window, let screen = screenForWindow(window) else { return }
+        let frame = screen.visibleFrame
+        let target = NSPoint(x: frame.maxX - window.frame.width - 26, y: max(frame.minY + 30, window.frame.minY))
+        window.setFrameOrigin(target)
+        model.preferences.windowOrigin = target
+    }
+
+    private func screenForWindow(_ window: NSWindow) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main
+    }
+
+    private func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        addMenuItem(to: menu, title: "Open Dashboard", action: #selector(openDashboard))
+        addMenuItem(to: menu, title: "Settings…", action: #selector(openSettings))
+        menu.addItem(.separator())
+        let mini = addMenuItem(to: menu, title: model.preferences.isMiniMode ? "Exit Mini Mode" : "Mini Mode", action: #selector(toggleMini))
+        mini.state = model.preferences.isMiniMode ? .on : .off
+        let dnd = addMenuItem(to: menu, title: model.preferences.doNotDisturb ? "Wake Clawdesk" : "Do Not Disturb", action: #selector(toggleDND))
+        dnd.state = model.preferences.doNotDisturb ? .on : .off
+        let sound = addMenuItem(to: menu, title: "Sound effects", action: #selector(toggleSound))
+        sound.state = model.preferences.soundEnabled ? .on : .off
+        menu.addItem(.separator())
+        addMenuItem(to: menu, title: "Quit Clawdesk", action: #selector(quit))
+        return menu
+    }
+
+    @discardableResult
+    private func addMenuItem(to menu: NSMenu, title: String, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return item
+    }
+
+    @objc private func openDashboard() { onDashboard?() }
+    @objc private func openSettings() { onSettings?() }
+    @objc private func toggleMini() { model.preferences.isMiniMode.toggle() }
+    @objc private func toggleDND() { model.preferences.doNotDisturb.toggle() }
+    @objc private func toggleSound() { model.preferences.soundEnabled.toggle() }
+    @objc private func quit() { onQuit?() ?? NSApp.terminate(nil) }
+
+    public func windowDidMove(_ notification: Notification) {
+        guard !model.preferences.isMiniMode else { return }
+        model.preferences.windowOrigin = window?.frame.origin
+    }
+}
+
+@MainActor
+private final class MainTimerTarget: NSObject {
+    private let handler: () -> Void
+
+    init(handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init()
+    }
+
+    @objc func fire(_ timer: Timer) {
+        handler()
+    }
+}

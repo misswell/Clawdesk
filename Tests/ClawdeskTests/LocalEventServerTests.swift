@@ -1,0 +1,226 @@
+import Foundation
+import XCTest
+@testable import Clawdesk
+
+private final class EventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var event: AgentEvent?
+
+    func record(_ event: AgentEvent) {
+        lock.lock()
+        self.event = event
+        lock.unlock()
+    }
+
+    func value() -> AgentEvent? {
+        lock.lock()
+        defer { lock.unlock() }
+        return event
+    }
+}
+
+private struct TestQuotaAdapter: AgentQuotaAdapter {
+    func quotaReport(agentID: String, rateLimits: [String: Any], capturedAt: Date, now: Date) -> QuotaReport? {
+        QuotaReport(
+            providerID: "test-\(agentID)",
+            displayName: "Injected",
+            buckets: [QuotaBucket(id: "test", usedPercent: rateLimits.isEmpty ? 0 : 42)],
+            capturedAt: capturedAt
+        )
+    }
+}
+
+@MainActor
+final class LocalEventServerTests: XCTestCase {
+    func testRemoteIngressIsProfileBoundAndRejectsOtherRoutes() async throws {
+        let server = LocalEventServer(preferredPort: 37_870)
+        let nonce = String(repeating: "a", count: 32)
+        let recorder = EventRecorder()
+        let eventReceived = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            eventReceived.signal()
+        }
+        server.start()
+        defer { server.stop() }
+
+        let mainPort = try await waitForServer(server)
+        server.registerRemoteNonce(nonce)
+        let ingressPort = try await startRemoteIngress(server, nonce: nonce)
+
+        let missingNonce = try curl(
+            port: ingressPort,
+            path: "/state?event=UserPromptSubmit&agent=claude-code",
+            body: "{}"
+        )
+        XCTAssertEqual(missingNonce.status, 404)
+
+        let health = try curl(port: ingressPort, path: "/health")
+        XCTAssertEqual(health.status, 404)
+
+        let accepted = try curl(
+            port: ingressPort,
+            path: "/state?event=UserPromptSubmit&agent=claude-code&session_id=raw-session&remote_prefix=remote-a&clawdesk-remote-v1=1&clawdesk-remote-nonce=\(nonce)",
+            body: "{\"title\":\"Remote task\"}"
+        )
+        XCTAssertEqual(accepted.status, 200)
+        XCTAssertEqual(eventReceived.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(recorder.value()?.sessionID, "remote-a:raw-session")
+        XCTAssertEqual(recorder.value()?.title, "Remote task")
+
+        let localHealth = try curl(port: mainPort, path: "/health")
+        XCTAssertEqual(localHealth.status, 200)
+    }
+
+    func testQuotaDecodingIsDelegatedToInjectedAgentAdapter() async throws {
+        let server = LocalEventServer(preferredPort: 37_871, quotaAdapter: TestQuotaAdapter())
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=QuotaUpdate&agent=unknown-agent&session_id=quota",
+            body: "{\"rate_limits\":{\"custom\":true}}"
+        )
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(recorder.value()?.quota?.providerID, "test-unknown-agent")
+    }
+
+    func testKimiSuspectAndGateCloseStayNonBlocking() async throws {
+        let server = LocalEventServer(preferredPort: 37_872)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let suspect = try curl(
+            port: server.port,
+            path: "/state?event=PreToolUse&agent=kimi-cli&session_id=kimi&clawdesk-kimi-permission-mode=suspect",
+            body: "{\"tool_name\":\"shell\",\"tool_call_id\":\"gate-1\"}"
+        )
+        XCTAssertEqual(suspect.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertTrue(recorder.value()?.permissionSuspect == true)
+        XCTAssertNil(recorder.value()?.permission)
+
+        let close = try curl(
+            port: server.port,
+            path: "/state?event=PostToolUse&agent=kimi-cli&session_id=kimi",
+            body: "{\"tool_name\":\"shell\",\"tool_call_id\":\"gate-1\"}"
+        )
+        XCTAssertEqual(close.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertTrue(recorder.value()?.permissionGated == true)
+    }
+
+    func testCodexRequestUserInputThroughHTTPIsReadOnlyQuestion() async throws {
+        let server = LocalEventServer(preferredPort: 37_873)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=RequestUserInput&agent=codex&session_id=codex-q",
+            body: #"{"questions":[{"question":"Continue?","options":[{"label":"Yes"}]}],"call_id":"q-9"}"#
+        )
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertNil(recorder.value()?.permission)
+        XCTAssertEqual(recorder.value()?.question?.id, "q-9")
+        XCTAssertEqual(recorder.value()?.question?.questions.first?.question, "Continue?")
+    }
+
+    func testOversizedRequestBodyIsRejectedInsteadOfBuffered() async throws {
+        let server = LocalEventServer(preferredPort: 37_874)
+        server.start()
+        defer { server.stop() }
+        let port = try await waitForServer(server)
+
+        let body = String(repeating: "x", count: 700 * 1024)
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-oversize-\(UUID().uuidString).json")
+        try Data(body.utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+        process.arguments = [
+            "--silent", "--show-error", "--max-time", "3",
+            "-X", "POST", "-H", "Content-Type: application/json",
+            "--data-binary", "@\(file.path)",
+            "http://127.0.0.1:\(port)/state?event=UserPromptSubmit&agent=claude-code"
+        ]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertNotEqual(process.terminationStatus, 0, "the server should close the connection instead of buffering 700 KiB")
+    }
+
+    private func waitForServer(_ server: LocalEventServer) async throws -> UInt16 {
+        for _ in 0..<80 {
+            if let response = try? curl(port: server.port, path: "/health"), response.status == 200 {
+                return server.port
+            }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        throw XCTSkip("LocalEventServer did not become ready")
+    }
+
+    private func startRemoteIngress(_ server: LocalEventServer, nonce: String) async throws -> UInt16 {
+        try await withCheckedThrowingContinuation { continuation in
+            server.startRemoteIngress(nonce: nonce) { result in
+                switch result {
+                case let .success(port): continuation.resume(returning: port)
+                case let .failure(error): continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func curl(port: UInt16, path: String, body: String? = nil) throws -> (status: Int, body: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+        var arguments = ["--silent", "--show-error", "--max-time", "3", "-w", "\n%{http_code}"]
+        if let body {
+            arguments += ["-X", "POST", "-H", "Content-Type: application/json", "--data-binary", body]
+        }
+        arguments.append("http://127.0.0.1:\(port)\(path)")
+        process.arguments = arguments
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(domain: "ClawdeskTests", code: Int(process.terminationStatus))
+        }
+        let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        guard let split = text.lastIndex(of: "\n"), let status = Int(text[text.index(after: split)...]) else {
+            throw NSError(domain: "ClawdeskTests", code: -1)
+        }
+        return (status, String(text[..<split]))
+    }
+}

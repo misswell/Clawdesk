@@ -1,0 +1,546 @@
+import AppKit
+import Foundation
+import ImageIO
+
+@MainActor
+public final class PetCanvasView: NSView {
+    public var petState: PetState = .idle {
+        didSet {
+            if oldValue != petState { needsDisplay = true }
+        }
+    }
+
+    public var theme: ThemeDefinition = ThemeCatalog.theme(id: "clawd") {
+        didSet {
+            assetCache.removeAll()
+            assetCacheOrder.removeAll()
+            assetCacheBytes = 0
+            assetClock = 0
+            needsDisplay = true
+        }
+    }
+
+    public var miniMode = false {
+        didSet { needsDisplay = true }
+    }
+
+    /// Live subagent count selects the visual tier for the juggling state.
+    /// Zero is used for the two-session working tier and intentionally falls
+    /// back to the single-subagent visual.
+    public var subagentCount = 0 {
+        didSet { needsDisplay = true }
+    }
+
+    public var idleVisualFile: String? {
+        didSet {
+            assetClock = 0
+            needsDisplay = true
+        }
+    }
+
+    public var pointerOffset = CGPoint.zero {
+        didSet { needsDisplay = true }
+    }
+
+    public var onDragBegan: (() -> Void)?
+    public var onDrag: ((CGSize) -> Void)?
+    public var onDragEnded: (() -> Void)?
+    public var onDoubleTap: (() -> Void)?
+    public var onFlail: (() -> Void)?
+    public var onContextMenu: ((NSPoint) -> NSMenu?)?
+    public var onHoverChanged: ((Bool) -> Void)?
+
+    private var phase: CGFloat = 0
+    private var assetClock: TimeInterval = 0
+    private static let maxAssetDimension = 512
+    private static let maxAnimationBytes = 64 * 1024 * 1024
+    private static let maxAssetCacheBytes = 96 * 1024 * 1024
+    private struct AssetFrames {
+        let frames: [CGImage]
+        let durations: [TimeInterval]
+        let bytes: Int
+    }
+    private var assetCache: [String: AssetFrames] = [:]
+    private var assetCacheOrder: [String] = []
+    private var assetCacheBytes = 0
+    private var mouseDownPoint: NSPoint?
+    private var lastDragPoint: NSPoint?
+    private var clickTimes: [Date] = []
+    private var trackingArea: NSTrackingArea?
+
+    public override var acceptsFirstResponder: Bool { true }
+
+    public override func updateTrackingAreas() {
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+        super.updateTrackingAreas()
+    }
+
+    public override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    public override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+    }
+
+    public override func hitTest(_ point: NSPoint) -> NSView? {
+        let center = NSPoint(x: bounds.midX, y: bounds.midY + bounds.height * 0.04)
+        let radiusX = max(1, bounds.width * (miniMode ? 0.24 : 0.38))
+        let radiusY = max(1, bounds.height * (miniMode ? 0.30 : 0.40))
+        let x = (point.x - center.x) / radiusX
+        let y = (point.y - center.y) / radiusY
+        return x * x + y * y <= 1.08 ? self : nil
+    }
+
+    public func advanceFrame() {
+        phase += 0.075
+        if phase > 1_000 { phase = 0 }
+        assetClock += 0.075
+        if assetClock > 86_400 { assetClock = 0 }
+        needsDisplay = true
+    }
+
+    public func setPointerLocation(_ point: NSPoint) {
+        guard theme.supportsEyeTracking, petState == .idle || petState == .miniIdle else {
+            if pointerOffset != .zero { pointerOffset = .zero }
+            return
+        }
+        let windowPoint = window?.convertFromScreen(NSRect(origin: point, size: .zero)).origin ?? point
+        let local = convert(windowPoint, from: nil)
+        let dx = (local.x - bounds.midX) / max(1, bounds.width * 0.20)
+        let dy = (local.y - bounds.midY) / max(1, bounds.height * 0.25)
+        pointerOffset = CGPoint(x: max(-5, min(5, dx * 5)), y: max(-4, min(4, dy * 4)))
+    }
+
+    public override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.saveGState()
+        context.setShouldAntialias(false)
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1, y: -1)
+
+        let scale = min(bounds.width / 220, bounds.height / 220) * (miniMode ? 0.86 : 1.0)
+        let bob: CGFloat
+        switch petState {
+        case .sleeping: bob = 0
+        case .attention, .miniHappy: bob = sin(phase * 6) * 5
+        case .error, .reactFlail: bob = sin(phase * 12) * 3
+        default: bob = sin(phase * 2) * 1.7
+        }
+        context.translateBy(x: bounds.midX, y: bounds.midY + bob)
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -110, y: -110)
+
+        if drawCustomAsset(in: context) {
+            context.restoreGState()
+            return
+        }
+
+        drawShadow(in: context)
+        if theme.id == "calico" {
+            drawCat(in: context)
+        } else if theme.id == "cloudling" {
+            drawCloudling(in: context)
+        } else {
+            drawCrab(in: context)
+        }
+        drawStateOverlay(in: context)
+        context.restoreGState()
+    }
+
+    private func drawCustomAsset(in context: CGContext) -> Bool {
+        let idleFile = petState == .idle ? idleVisualFile : nil
+        guard let url = theme.assetURL(for: petState, idleVisualFile: idleFile),
+              let animation = loadAsset(at: url),
+              !animation.frames.isEmpty else { return false }
+        let frame = currentFrame(in: animation)
+        let width = CGFloat(frame.width)
+        let height = CGFloat(frame.height)
+        guard width > 0, height > 0 else { return false }
+        let ratio = min(190.0 / width, 190.0 / height)
+        let target = CGRect(
+            x: 110 - width * ratio / 2,
+            y: 110 - height * ratio / 2,
+            width: width * ratio,
+            height: height * ratio
+        )
+        context.interpolationQuality = .none
+        context.draw(frame, in: target)
+        return true
+    }
+
+    private func loadAsset(at url: URL) -> AssetFrames? {
+        if let cached = assetCache[url.path] { return cached }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let count = min(CGImageSourceGetCount(source), 180)
+        guard count > 0 else { return nil }
+        var frames: [CGImage] = []
+        var durations: [TimeInterval] = []
+        var bytes = 0
+        for index in 0..<count {
+            // Downsample every raster frame to a bounded canvas instead of
+            // caching full-resolution images; a pet animation only ever draws
+            // inside a 220x220 logical area.
+            guard let image = Self.boundedFrame(source: source, index: index) else { continue }
+            frames.append(image)
+            durations.append(Self.frameDuration(source: source, index: index))
+            bytes += image.width * image.height * 4
+        }
+        if frames.isEmpty {
+            // ImageIO intentionally has no animated SVG timeline. For a
+            // vector theme state, rasterize one bounded frame through
+            // AppKit; the render loop still draws only the cached CGImage.
+            return loadStaticAppKitAsset(at: url)
+        }
+        if bytes > Self.maxAnimationBytes {
+            // Keep the total memory of any single animation bounded. Falling
+            // back to the first frame is a deliberate low-memory policy for
+            // oversized theme packs rather than caching hundreds of MB.
+            frames = [frames[0]]
+            durations = [durations[0]]
+            bytes = frames[0].width * frames[0].height * 4
+        }
+        let animation = AssetFrames(frames: frames, durations: durations, bytes: bytes)
+        cache(animation, for: url.path)
+        return animation
+    }
+
+    private static func boundedFrame(source: CGImageSource, index: Int) -> CGImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxAssetDimension
+        ]
+        if let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary) {
+            return thumbnail
+        }
+        return CGImageSourceCreateImageAtIndex(source, index, nil)
+    }
+
+    private func cache(_ animation: AssetFrames, for key: String) {
+        assetCache[key] = animation
+        if let existing = assetCacheOrder.firstIndex(of: key) {
+            assetCacheOrder.remove(at: existing)
+        }
+        assetCacheOrder.append(key)
+        assetCacheBytes += animation.bytes
+        while assetCacheBytes > Self.maxAssetCacheBytes, let oldest = assetCacheOrder.first {
+            assetCacheOrder.removeFirst()
+            if let removed = assetCache.removeValue(forKey: oldest) {
+                assetCacheBytes -= removed.bytes
+            }
+        }
+    }
+
+    private func loadStaticAppKitAsset(at url: URL) -> AssetFrames? {
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        var proposedRect = NSRect(x: 0, y: 0, width: 220, height: 220)
+        guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            return nil
+        }
+        let animation = AssetFrames(frames: [cgImage], durations: [0.08], bytes: cgImage.width * cgImage.height * 4)
+        cache(animation, for: url.path)
+        return animation
+    }
+
+    private func currentFrame(in animation: AssetFrames) -> CGImage {
+        guard animation.frames.count > 1 else { return animation.frames[0] }
+        let total = animation.durations.reduce(0, +)
+        guard total > 0 else { return animation.frames[Int(assetClock * 12) % animation.frames.count] }
+        var remaining = assetClock.truncatingRemainder(dividingBy: total)
+        for (index, duration) in animation.durations.enumerated() {
+            if remaining < duration { return animation.frames[index] }
+            remaining -= duration
+        }
+        return animation.frames.last ?? animation.frames[0]
+    }
+
+    private static func frameDuration(source: CGImageSource, index: Int) -> TimeInterval {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] else { return 0.08 }
+        let dictionaries = [
+            properties[kCGImagePropertyGIFDictionary] as? [CFString: Any],
+            properties[kCGImagePropertyPNGDictionary] as? [CFString: Any]
+        ].compactMap { $0 }
+        for dictionary in dictionaries {
+            let value = dictionary[kCGImagePropertyGIFUnclampedDelayTime] ?? dictionary[kCGImagePropertyGIFDelayTime]
+            if let seconds = value as? NSNumber, seconds.doubleValue > 0 {
+                return min(2, max(0.04, seconds.doubleValue))
+            }
+        }
+        return 0.08
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        let now = Date.now
+        clickTimes.append(now)
+        clickTimes.removeAll { now.timeIntervalSince($0) > 0.9 }
+        if clickTimes.count >= 4 {
+            clickTimes.removeAll()
+            onFlail?()
+        } else if event.clickCount == 2 {
+            clickTimes.removeAll()
+            onDoubleTap?()
+        }
+        mouseDownPoint = convert(event.locationInWindow, from: nil)
+        lastDragPoint = mouseDownPoint
+        onDragBegan?()
+    }
+
+    public override func mouseDragged(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard let lastDragPoint else { return }
+        let delta = CGSize(width: point.x - lastDragPoint.x, height: point.y - lastDragPoint.y)
+        self.lastDragPoint = point
+        onDrag?(delta)
+    }
+
+    public override func mouseUp(with event: NSEvent) {
+        mouseDownPoint = nil
+        lastDragPoint = nil
+        onDragEnded?()
+    }
+
+    public override func rightMouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let menu = onContextMenu?(point) {
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+        }
+    }
+
+    private func drawShadow(in context: CGContext) {
+        fillEllipse(context, rect: CGRect(x: 40, y: 174, width: 140, height: 18), color: NSColor.black.withAlphaComponent(0.18).cgColor)
+    }
+
+    private func drawCrab(in context: CGContext) {
+        let p = theme.palette
+        let body = cgColor(p.body)
+        let accent = cgColor(p.accent)
+        let shadow = cgColor(p.shadow)
+        let highlight = cgColor(p.highlight)
+        let yShift: CGFloat = petState == .sleeping ? -12 : 0
+        context.saveGState()
+        context.translateBy(x: 0, y: yShift)
+
+        fillRect(context, CGRect(x: 57, y: 65, width: 106, height: 92), body)
+        fillRect(context, CGRect(x: 48, y: 80, width: 124, height: 60), body)
+        fillRect(context, CGRect(x: 65, y: 55, width: 90, height: 112), body)
+        fillRect(context, CGRect(x: 68, y: 58, width: 84, height: 7), highlight)
+        fillRect(context, CGRect(x: 72, y: 65, width: 76, height: 5), accent)
+
+        fillRect(context, CGRect(x: 36, y: 91, width: 18, height: 38), body)
+        fillRect(context, CGRect(x: 28, y: 105, width: 16, height: 22), accent)
+        fillRect(context, CGRect(x: 166, y: 91, width: 18, height: 38), body)
+        fillRect(context, CGRect(x: 176, y: 105, width: 16, height: 22), accent)
+        fillRect(context, CGRect(x: 23, y: 119, width: 16, height: 10), body)
+        fillRect(context, CGRect(x: 181, y: 119, width: 16, height: 10), body)
+
+        fillRect(context, CGRect(x: 70, y: 143, width: 13, height: 35), shadow)
+        fillRect(context, CGRect(x: 93, y: 148, width: 12, height: 30), shadow)
+        fillRect(context, CGRect(x: 115, y: 148, width: 12, height: 30), shadow)
+        fillRect(context, CGRect(x: 137, y: 143, width: 13, height: 35), shadow)
+        fillRect(context, CGRect(x: 64, y: 174, width: 23, height: 7), accent)
+        fillRect(context, CGRect(x: 132, y: 174, width: 23, height: 7), accent)
+
+        let eyeY: CGFloat = petState == .sleeping ? 98 : 105
+        let eyeColor = NSColor(white: 0.10, alpha: 1).cgColor
+        if petState == .sleeping || petState == .dozing {
+            fillRect(context, CGRect(x: 78, y: eyeY, width: 16, height: 4), eyeColor)
+            fillRect(context, CGRect(x: 126, y: eyeY, width: 16, height: 4), eyeColor)
+        } else {
+            fillRect(context, CGRect(x: 77 + pointerOffset.x, y: eyeY + pointerOffset.y, width: 17, height: 20), eyeColor)
+            fillRect(context, CGRect(x: 126 + pointerOffset.x, y: eyeY + pointerOffset.y, width: 17, height: 20), eyeColor)
+            fillRect(context, CGRect(x: 80 + pointerOffset.x, y: eyeY + 14 + pointerOffset.y, width: 5, height: 5), highlight)
+            fillRect(context, CGRect(x: 129 + pointerOffset.x, y: eyeY + 14 + pointerOffset.y, width: 5, height: 5), highlight)
+        }
+        fillRect(context, CGRect(x: 97, y: 133, width: 26, height: 5), shadow)
+        fillRect(context, CGRect(x: 103, y: 138, width: 14, height: 4), shadow)
+        context.restoreGState()
+    }
+
+    private func drawCat(in context: CGContext) {
+        let p = theme.palette
+        let body = cgColor(p.body)
+        let accent = cgColor(p.accent)
+        let shadow = cgColor(p.shadow)
+        let highlight = cgColor(p.highlight)
+        let shift: CGFloat = petState == .sleeping ? -10 : 0
+        context.saveGState()
+        context.translateBy(x: 0, y: shift)
+        let ears = CGMutablePath()
+        ears.move(to: CGPoint(x: 60, y: 128))
+        ears.addLine(to: CGPoint(x: 64, y: 173))
+        ears.addLine(to: CGPoint(x: 88, y: 151))
+        ears.addLine(to: CGPoint(x: 132, y: 151))
+        ears.addLine(to: CGPoint(x: 156, y: 173))
+        ears.addLine(to: CGPoint(x: 160, y: 128))
+        ears.closeSubpath()
+        context.addPath(ears)
+        context.setFillColor(body)
+        context.fillPath()
+        fillEllipse(context, rect: CGRect(x: 52, y: 58, width: 116, height: 112), color: body)
+        fillEllipse(context, rect: CGRect(x: 75, y: 92, width: 28, height: 45), color: accent)
+        fillEllipse(context, rect: CGRect(x: 121, y: 80, width: 29, height: 44), color: accent)
+        fillRect(context, CGRect(x: 78, y: 102, width: 16, height: 18), shadow)
+        fillRect(context, CGRect(x: 126, y: 102, width: 16, height: 18), shadow)
+        fillRect(context, CGRect(x: 82 + pointerOffset.x, y: 114 + pointerOffset.y, width: 5, height: 5), highlight)
+        fillRect(context, CGRect(x: 130 + pointerOffset.x, y: 114 + pointerOffset.y, width: 5, height: 5), highlight)
+        fillRect(context, CGRect(x: 101, y: 132, width: 18, height: 5), shadow)
+        fillRect(context, CGRect(x: 76, y: 164, width: 18, height: 9), accent)
+        fillRect(context, CGRect(x: 126, y: 164, width: 18, height: 9), accent)
+        context.restoreGState()
+    }
+
+    private func drawCloudling(in context: CGContext) {
+        let p = theme.palette
+        let body = cgColor(p.body)
+        let accent = cgColor(p.accent)
+        let shadow = cgColor(p.shadow)
+        let highlight = cgColor(p.highlight)
+        let shift: CGFloat = petState == .sleeping ? -9 : 0
+        context.saveGState()
+        context.translateBy(x: 0, y: shift)
+        fillEllipse(context, rect: CGRect(x: 45, y: 74, width: 70, height: 72), color: body)
+        fillEllipse(context, rect: CGRect(x: 88, y: 55, width: 82, height: 90), color: body)
+        fillEllipse(context, rect: CGRect(x: 57, y: 60, width: 100, height: 105), color: body)
+        fillRect(context, CGRect(x: 65, y: 153, width: 90, height: 22), accent)
+        fillRect(context, CGRect(x: 78, y: 99, width: 16, height: 18), shadow)
+        fillRect(context, CGRect(x: 126, y: 99, width: 16, height: 18), shadow)
+        fillRect(context, CGRect(x: 81 + pointerOffset.x, y: 111 + pointerOffset.y, width: 5, height: 5), highlight)
+        fillRect(context, CGRect(x: 129 + pointerOffset.x, y: 111 + pointerOffset.y, width: 5, height: 5), highlight)
+        fillRect(context, CGRect(x: 99, y: 132, width: 22, height: 5), accent)
+        fillRect(context, CGRect(x: 69, y: 170, width: 24, height: 7), shadow)
+        fillRect(context, CGRect(x: 127, y: 170, width: 24, height: 7), shadow)
+        context.restoreGState()
+    }
+
+    private func drawStateOverlay(in context: CGContext) {
+        switch petState {
+        case .thinking:
+            drawThoughtBubble(in: context)
+        case .typing:
+            fillRect(context, CGRect(x: 78, y: 45, width: 64, height: 22), NSColor(white: 0.12, alpha: 1).cgColor)
+            for index in 0..<5 {
+                fillRect(context, CGRect(x: 84 + CGFloat(index) * 10, y: 51, width: 6, height: 5), NSColor.white.cgColor)
+            }
+        case .building:
+            fillRect(context, CGRect(x: 168, y: 42, width: 24, height: 24), theme.palette.highlight.cgColor())
+            fillRect(context, CGRect(x: 176, y: 48, width: 8, height: 12), theme.palette.shadow.cgColor())
+        case .juggling:
+            drawJugglingOverlay(in: context)
+        case .error, .reactFlail:
+            fillRect(context, CGRect(x: 76, y: 36, width: 42, height: 7), NSColor.systemRed.cgColor)
+            fillRect(context, CGRect(x: 94, y: 18, width: 7, height: 43), NSColor.systemRed.cgColor)
+        case .attention, .miniHappy:
+            for x in stride(from: 35, through: 180, by: 29) {
+                let y = 30 + CGFloat((Int(x) / 29) % 3) * 13
+                fillRect(context, CGRect(x: CGFloat(x), y: y, width: 7, height: 7), theme.palette.highlight.cgColor())
+            }
+        case .notification, .miniAlert:
+            fillEllipse(context, rect: CGRect(x: 145, y: 18, width: 46, height: 39), color: NSColor.white.cgColor)
+            fillRect(context, CGRect(x: 166, y: 26, width: 6, height: 17), NSColor.systemRed.cgColor)
+            fillRect(context, CGRect(x: 166, y: 47, width: 6, height: 5), NSColor.systemRed.cgColor)
+        case .sweeping:
+            fillRect(context, CGRect(x: 154, y: 46, width: 8, height: 80), theme.palette.shadow.cgColor())
+            fillRect(context, CGRect(x: 148, y: 40, width: 28, height: 10), theme.palette.highlight.cgColor())
+        case .carrying:
+            fillRect(context, CGRect(x: 145, y: 102, width: 43, height: 37), theme.palette.accent.cgColor())
+            fillRect(context, CGRect(x: 164, y: 102, width: 5, height: 37), theme.palette.shadow.cgColor())
+            fillRect(context, CGRect(x: 145, y: 119, width: 43, height: 5), theme.palette.shadow.cgColor())
+        case .sleeping, .dozing:
+            drawSleepMarks(in: context)
+        case .waking:
+            drawSparkle(in: context)
+        case .dragging:
+            fillEllipse(context, rect: CGRect(x: 36, y: 34, width: 16, height: 16), color: theme.palette.highlight.cgColor())
+            fillRect(context, CGRect(x: 40, y: 50, width: 8, height: 35), theme.palette.highlight.cgColor())
+        case .miniPeek:
+            fillRect(context, CGRect(x: 173, y: 72, width: 25, height: 7), theme.palette.highlight.cgColor())
+        default:
+            break
+        }
+    }
+
+    private func drawThoughtBubble(in context: CGContext) {
+        fillEllipse(context, rect: CGRect(x: 146, y: 16, width: 52, height: 40), color: NSColor.white.cgColor)
+        fillEllipse(context, rect: CGRect(x: 134, y: 50, width: 12, height: 12), color: NSColor.white.cgColor)
+        fillEllipse(context, rect: CGRect(x: 124, y: 62, width: 8, height: 8), color: NSColor.white.cgColor)
+        for index in 0..<3 {
+            fillRect(context, CGRect(x: 158 + CGFloat(index) * 10, y: 31, width: 5, height: 5), theme.palette.accent.cgColor())
+        }
+    }
+
+    private func drawJugglingOverlay(in context: CGContext) {
+        let isTierTwo = subagentCount >= 2
+        if theme.id != "clawd", isTierTwo {
+            // Calico and Cloudling use the conducting pose for 2+ live
+            // subagents, while Clawd uses the three-ball tier below.
+            fillRect(context, CGRect(x: 104, y: 22, width: 6, height: 56), theme.palette.shadow.cgColor())
+            fillRect(context, CGRect(x: 92, y: 20, width: 30, height: 6), theme.palette.highlight.cgColor())
+            fillEllipse(context, rect: CGRect(x: 60, y: 35, width: 14, height: 14), color: theme.palette.accent.cgColor())
+            fillEllipse(context, rect: CGRect(x: 151, y: 35, width: 14, height: 14), color: theme.palette.accent.cgColor())
+            return
+        }
+        if isTierTwo {
+            for (index, position) in [(0, CGPoint(x: 55, y: 42)), (1, CGPoint(x: 107, y: 28)), (2, CGPoint(x: 160, y: 42))] {
+                let color = index == 1 ? theme.palette.highlight.cgColor() : theme.palette.accent.cgColor()
+                fillEllipse(context, rect: CGRect(x: position.x, y: position.y, width: 14, height: 14), color: color)
+            }
+        } else {
+            // The one-subagent / two-session tier is a compact headphones
+            // cue, visually distinct from the 2+ juggling tier.
+            context.setStrokeColor(theme.palette.accent.cgColor())
+            context.setLineWidth(6)
+            context.addArc(center: CGPoint(x: 110, y: 43), radius: 28, startAngle: .pi, endAngle: 0, clockwise: false)
+            context.strokePath()
+            fillRect(context, CGRect(x: 77, y: 42, width: 8, height: 20), theme.palette.accent.cgColor())
+            fillRect(context, CGRect(x: 135, y: 42, width: 8, height: 20), theme.palette.accent.cgColor())
+        }
+    }
+
+    private func drawSleepMarks(in context: CGContext) {
+        let color = theme.palette.shadow.cgColor()
+        fillRect(context, CGRect(x: 156, y: 24, width: 16, height: 4), color)
+        fillRect(context, CGRect(x: 168, y: 28, width: 4, height: 12), color)
+        fillRect(context, CGRect(x: 168, y: 36, width: 14, height: 4), color)
+        fillRect(context, CGRect(x: 177, y: 44, width: 12, height: 4), color)
+        fillRect(context, CGRect(x: 185, y: 48, width: 4, height: 10), color)
+        fillRect(context, CGRect(x: 177, y: 54, width: 12, height: 4), color)
+    }
+
+    private func drawSparkle(in context: CGContext) {
+        let color = theme.palette.highlight.cgColor()
+        fillRect(context, CGRect(x: 36, y: 42, width: 5, height: 24), color)
+        fillRect(context, CGRect(x: 27, y: 51, width: 23, height: 5), color)
+        fillRect(context, CGRect(x: 177, y: 64, width: 5, height: 22), color)
+        fillRect(context, CGRect(x: 168, y: 73, width: 23, height: 5), color)
+    }
+
+    private func cgColor(_ color: RGBColor) -> CGColor {
+        NSColor(calibratedRed: color.red, green: color.green, blue: color.blue, alpha: 1).cgColor
+    }
+
+    private func fillRect(_ context: CGContext, _ rect: CGRect, _ color: CGColor) {
+        context.setFillColor(color)
+        context.fill(rect)
+    }
+
+    private func fillEllipse(_ context: CGContext, rect: CGRect, color: CGColor) {
+        context.setFillColor(color)
+        context.fillEllipse(in: rect)
+    }
+}
+
+private extension RGBColor {
+    func cgColor() -> CGColor {
+        NSColor(calibratedRed: red, green: green, blue: blue, alpha: 1).cgColor
+    }
+}
