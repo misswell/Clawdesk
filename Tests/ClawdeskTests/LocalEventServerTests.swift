@@ -153,6 +153,38 @@ final class LocalEventServerTests: XCTestCase {
         XCTAssertEqual(recorder.value()?.question?.questions.first?.question, "Continue?")
     }
 
+    func testPermissionSuggestionsAreParsed() async throws {
+        let server = LocalEventServer(preferredPort: 37_875)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .permission(event, reply) = message else { return }
+            recorder.record(event)
+            reply.resolve(.allow)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        let port = try await waitForServer(server)
+
+        let response = try curl(
+            port: port,
+            path: "/permission?event=PermissionRequest&agent=claude-code&session_id=perm",
+            body: #"{"tool_name":"Bash","command":"ls","permission_suggestions":[{"label":"Yes","decision":"allow"},{"label":"No","decision":"deny"},"always"]}"#
+        )
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+
+        let suggestions = recorder.value()?.permission?.suggestions
+        XCTAssertEqual(suggestions?.count, 3)
+        XCTAssertEqual(suggestions?[0].label, "Yes")
+        XCTAssertEqual(suggestions?[0].decision, .allow)
+        XCTAssertEqual(suggestions?[1].label, "No")
+        XCTAssertEqual(suggestions?[1].decision, .deny)
+        XCTAssertEqual(suggestions?[2].label, "always")
+        XCTAssertEqual(suggestions?[2].decision, .allow)
+    }
+
     func testOversizedRequestBodyIsRejectedInsteadOfBuffered() async throws {
         let server = LocalEventServer(preferredPort: 37_874)
         server.start()

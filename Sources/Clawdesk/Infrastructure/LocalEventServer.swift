@@ -427,7 +427,8 @@ public final class LocalEventServer: @unchecked Sendable {
                 title: string(["title", "message", "description", "prompt", "tool_name", "toolName"]) ?? "Agent is waiting for permission",
                 action: string(["action", "permission_action"]),
                 command: string(["command", "cmd"]),
-                input: string(["input", "tool_input", "toolInput"])
+                input: string(["input", "tool_input", "toolInput"]),
+                suggestions: permissionSuggestions(from: object)
             )
         } else {
             permission = nil
@@ -458,6 +459,57 @@ public final class LocalEventServer: @unchecked Sendable {
             questionResolution: adapterResult.questionResolution,
             payload: payload
         )
+    }
+
+    /// Parses the agent's concrete allow/deny suggestions offered alongside a
+    /// permission request. Plain strings map to allow unless they clearly
+    /// mean deny; structured entries read their own label and decision.
+    private func permissionSuggestions(from object: [String: Any]) -> [PermissionSuggestion] {
+        let raw: Any? = object["permission_suggestions"]
+            ?? object["permissionSuggestions"]
+            ?? object["suggestions"]
+        guard let list = raw as? [Any] else { return [] }
+        return list.prefix(6).compactMap { item -> PermissionSuggestion? in
+            if let dictionary = item as? [String: Any] {
+                guard let label = stringValueIn(dictionary, keys: ["label", "title", "text", "name"]),
+                      !label.isEmpty else { return nil }
+                let decision = suggestionDecision(from: dictionary)
+                return PermissionSuggestion(
+                    id: stringValueIn(dictionary, keys: ["id", "suggestion_id"]) ?? UUID().uuidString,
+                    label: String(label.prefix(80)),
+                    decision: decision
+                )
+            }
+            guard let label = item as? String, !label.isEmpty else { return nil }
+            let normalized = label.lowercased()
+            let decision: PermissionDecision = ["no", "deny", "denied", "reject", "拒绝"].contains(normalized)
+                ? .deny
+                : .allow
+            return PermissionSuggestion(label: String(label.prefix(80)), decision: decision)
+        }
+    }
+
+    private func stringValueIn(_ dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = dictionary[key] as? String, !value.isEmpty { return value }
+            if let value = dictionary[key] as? NSNumber { return value.stringValue }
+        }
+        return nil
+    }
+
+    private func suggestionDecision(from dictionary: [String: Any]) -> PermissionDecision {
+        if let value = dictionary["decision"] as? String {
+            return value.lowercased().contains("deny") || value.lowercased().contains("no") ? .deny : .allow
+        }
+        if let value = dictionary["action"] as? String {
+            return value.lowercased().contains("deny") ? .deny : .allow
+        }
+        if let bool = dictionary["allow"] as? Bool, bool { return .allow }
+        if let bool = dictionary["deny"] as? Bool, bool { return .deny }
+        if let value = dictionary["behavior"] as? String {
+            return value.lowercased() == "deny" ? .deny : .allow
+        }
+        return .allow
     }
 
     private func date(from value: Any?) -> Date? {

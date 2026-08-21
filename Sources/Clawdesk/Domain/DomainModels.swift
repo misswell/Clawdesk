@@ -224,6 +224,7 @@ public struct PermissionRequest: Equatable, Sendable, Identifiable {
     public let action: String?
     public let command: String?
     public let input: String?
+    public let suggestions: [PermissionSuggestion]
     public let createdAt: Date
 
     public init(
@@ -234,6 +235,7 @@ public struct PermissionRequest: Equatable, Sendable, Identifiable {
         action: String? = nil,
         command: String? = nil,
         input: String? = nil,
+        suggestions: [PermissionSuggestion] = [],
         createdAt: Date = .now
     ) {
         self.id = id
@@ -243,7 +245,22 @@ public struct PermissionRequest: Equatable, Sendable, Identifiable {
         self.action = action
         self.command = command
         self.input = input
+        self.suggestions = suggestions
         self.createdAt = createdAt
+    }
+}
+
+/// A concrete allow/deny choice offered by the agent as part of a permission
+/// request (for example a "yes" or "no" suggestion button).
+public struct PermissionSuggestion: Equatable, Sendable, Identifiable {
+    public let id: String
+    public let label: String
+    public let decision: PermissionDecision
+
+    public init(id: String = UUID().uuidString, label: String, decision: PermissionDecision) {
+        self.id = id
+        self.label = label
+        self.decision = decision
     }
 }
 

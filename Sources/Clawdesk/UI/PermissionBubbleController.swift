@@ -138,6 +138,10 @@ private struct PermissionBubbleView: View {
                         Button(model.preferences.text("Allow")) { model.resolvePermission(id: request.id, decision: .allow) }
                             .keyboardShortcut(.init("y"), modifiers: [.control, .shift])
                             .buttonStyle(.borderedProminent)
+                        ForEach(request.suggestions) { suggestion in
+                            Button(suggestion.label) { model.resolvePermission(id: request.id, decision: suggestion.decision) }
+                                .buttonStyle(.bordered)
+                        }
                         Spacer()
                         Text(request.agentID)
                             .font(.caption2)
