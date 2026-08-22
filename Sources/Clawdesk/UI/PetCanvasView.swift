@@ -326,43 +326,38 @@ public final class PetCanvasView: NSView {
         let accent = cgColor(p.accent)
         let shadow = cgColor(p.shadow)
         let highlight = cgColor(p.highlight)
-        let yShift: CGFloat = petState == .sleeping ? -12 : 0
+        let outline = shadow
+        let yShift: CGFloat = petState == .sleeping ? -14 : 0
         context.saveGState()
         context.translateBy(x: 0, y: yShift)
 
-        fillRect(context, CGRect(x: 57, y: 65, width: 106, height: 92), body)
-        fillRect(context, CGRect(x: 48, y: 80, width: 124, height: 60), body)
-        fillRect(context, CGRect(x: 65, y: 55, width: 90, height: 112), body)
-        fillRect(context, CGRect(x: 68, y: 58, width: 84, height: 7), highlight)
-        fillRect(context, CGRect(x: 72, y: 65, width: 76, height: 5), accent)
+        // Legs behind the shell.
+        drawCrabLegs(context, x: 48, body: body, outline: outline)
+        drawCrabLegs(context, x: 172, body: body, outline: outline)
 
-        fillRect(context, CGRect(x: 36, y: 91, width: 18, height: 38), body)
-        fillRect(context, CGRect(x: 28, y: 105, width: 16, height: 22), accent)
-        fillRect(context, CGRect(x: 166, y: 91, width: 18, height: 38), body)
-        fillRect(context, CGRect(x: 176, y: 105, width: 16, height: 22), accent)
-        fillRect(context, CGRect(x: 23, y: 119, width: 16, height: 10), body)
-        fillRect(context, CGRect(x: 181, y: 119, width: 16, height: 10), body)
+        // Rounded shell with a cartoon outline and soft belly.
+        fillEllipseStroke(context, CGRect(x: 52, y: 56, width: 116, height: 102), fill: body, outline: outline, width: 5)
+        fillEllipse(context, rect: CGRect(x: 72, y: 78, width: 76, height: 70), color: accent.copy(alpha: 0.35)!)
+        fillRoundedRect(context, CGRect(x: 78, y: 86, width: 38, height: 7), radius: 3.5, highlight.copy(alpha: 0.75)!)
 
-        fillRect(context, CGRect(x: 70, y: 143, width: 13, height: 35), shadow)
-        fillRect(context, CGRect(x: 93, y: 148, width: 12, height: 30), shadow)
-        fillRect(context, CGRect(x: 115, y: 148, width: 12, height: 30), shadow)
-        fillRect(context, CGRect(x: 137, y: 143, width: 13, height: 35), shadow)
-        fillRect(context, CGRect(x: 64, y: 174, width: 23, height: 7), accent)
-        fillRect(context, CGRect(x: 132, y: 174, width: 23, height: 7), accent)
+        // Antennae with ball tips.
+        drawAntenna(context, baseX: 90, body: body, outline: outline, direction: -1)
+        drawAntenna(context, baseX: 130, body: body, outline: outline, direction: 1)
 
-        let eyeY: CGFloat = petState == .sleeping ? 98 : 105
-        let eyeColor = NSColor(white: 0.10, alpha: 1).cgColor
-        if petState == .sleeping || petState == .dozing {
-            fillRect(context, CGRect(x: 78, y: eyeY, width: 16, height: 4), eyeColor)
-            fillRect(context, CGRect(x: 126, y: eyeY, width: 16, height: 4), eyeColor)
-        } else {
-            fillRect(context, CGRect(x: 77 + pointerOffset.x, y: eyeY + pointerOffset.y, width: 17, height: 20), eyeColor)
-            fillRect(context, CGRect(x: 126 + pointerOffset.x, y: eyeY + pointerOffset.y, width: 17, height: 20), eyeColor)
-            fillRect(context, CGRect(x: 80 + pointerOffset.x, y: eyeY + 14 + pointerOffset.y, width: 5, height: 5), highlight)
-            fillRect(context, CGRect(x: 129 + pointerOffset.x, y: eyeY + 14 + pointerOffset.y, width: 5, height: 5), highlight)
-        }
-        fillRect(context, CGRect(x: 97, y: 133, width: 26, height: 5), shadow)
-        fillRect(context, CGRect(x: 103, y: 138, width: 14, height: 4), shadow)
+        // Pincer claws.
+        drawCrabClaw(context, side: -1, body: body, accent: accent, highlight: highlight, outline: outline)
+        drawCrabClaw(context, side: 1, body: body, accent: accent, highlight: highlight, outline: outline)
+
+        drawCuteFace(
+            in: context,
+            leftEye: CGRect(x: 76, y: 96, width: 28, height: 36),
+            rightEye: CGRect(x: 116, y: 96, width: 28, height: 36),
+            mouthY: 140,
+            outline: outline,
+            pupil: shadow,
+            highlight: highlight,
+            accent: accent
+        )
         context.restoreGState()
     }
 
@@ -372,30 +367,39 @@ public final class PetCanvasView: NSView {
         let accent = cgColor(p.accent)
         let shadow = cgColor(p.shadow)
         let highlight = cgColor(p.highlight)
-        let shift: CGFloat = petState == .sleeping ? -10 : 0
+        let outline = shadow
+        let shift: CGFloat = petState == .sleeping ? -12 : 0
         context.saveGState()
         context.translateBy(x: 0, y: shift)
-        let ears = CGMutablePath()
-        ears.move(to: CGPoint(x: 60, y: 128))
-        ears.addLine(to: CGPoint(x: 64, y: 173))
-        ears.addLine(to: CGPoint(x: 88, y: 151))
-        ears.addLine(to: CGPoint(x: 132, y: 151))
-        ears.addLine(to: CGPoint(x: 156, y: 173))
-        ears.addLine(to: CGPoint(x: 160, y: 128))
-        ears.closeSubpath()
-        context.addPath(ears)
-        context.setFillColor(body)
-        context.fillPath()
-        fillEllipse(context, rect: CGRect(x: 52, y: 58, width: 116, height: 112), color: body)
-        fillEllipse(context, rect: CGRect(x: 75, y: 92, width: 28, height: 45), color: accent)
-        fillEllipse(context, rect: CGRect(x: 121, y: 80, width: 29, height: 44), color: accent)
-        fillRect(context, CGRect(x: 78, y: 102, width: 16, height: 18), shadow)
-        fillRect(context, CGRect(x: 126, y: 102, width: 16, height: 18), shadow)
-        fillRect(context, CGRect(x: 82 + pointerOffset.x, y: 114 + pointerOffset.y, width: 5, height: 5), highlight)
-        fillRect(context, CGRect(x: 130 + pointerOffset.x, y: 114 + pointerOffset.y, width: 5, height: 5), highlight)
-        fillRect(context, CGRect(x: 101, y: 132, width: 18, height: 5), shadow)
-        fillRect(context, CGRect(x: 76, y: 164, width: 18, height: 9), accent)
-        fillRect(context, CGRect(x: 126, y: 164, width: 18, height: 9), accent)
+
+        // Blunt outlined ears with accent inner ears.
+        drawBluntEar(context, base: CGPoint(x: 72, y: 150), tip: CGPoint(x: 66, y: 194), body: body, outline: outline)
+        drawBluntEar(context, base: CGPoint(x: 148, y: 150), tip: CGPoint(x: 154, y: 194), body: body, outline: outline)
+        fillRoundedRect(context, CGRect(x: 84, y: 156, width: 22, height: 22), radius: 11, accent)
+        fillRoundedRect(context, CGRect(x: 114, y: 156, width: 22, height: 22), radius: 11, accent)
+
+        // Compact body with two little outlined paws.
+        fillEllipseStroke(context, CGRect(x: 62, y: 30, width: 96, height: 52), fill: body, outline: outline, width: 4)
+        fillEllipseStroke(context, CGRect(x: 74, y: 14, width: 24, height: 26), fill: body, outline: outline, width: 4)
+        fillEllipseStroke(context, CGRect(x: 122, y: 14, width: 24, height: 26), fill: body, outline: outline, width: 4)
+
+        // Big round outlined head with a calico patch.
+        fillEllipseStroke(context, CGRect(x: 46, y: 62, width: 128, height: 120), fill: body, outline: outline, width: 5)
+        fillEllipse(context, rect: CGRect(x: 64, y: 68, width: 48, height: 44), color: accent)
+        fillRoundedRect(context, CGRect(x: 96, y: 94, width: 40, height: 7), radius: 3.5, highlight.copy(alpha: 0.75)!)
+
+        drawWhiskers(context, leftEye: CGRect(x: 72, y: 100, width: 28, height: 36), rightEye: CGRect(x: 120, y: 100, width: 28, height: 36), mouthY: 148, outline: outline)
+
+        drawCuteFace(
+            in: context,
+            leftEye: CGRect(x: 74, y: 100, width: 28, height: 36),
+            rightEye: CGRect(x: 118, y: 100, width: 28, height: 36),
+            mouthY: 148,
+            outline: outline,
+            pupil: shadow,
+            highlight: highlight,
+            accent: accent
+        )
         context.restoreGState()
     }
 
@@ -405,21 +409,193 @@ public final class PetCanvasView: NSView {
         let accent = cgColor(p.accent)
         let shadow = cgColor(p.shadow)
         let highlight = cgColor(p.highlight)
-        let shift: CGFloat = petState == .sleeping ? -9 : 0
+        let outline = shadow
+        let shift: CGFloat = petState == .sleeping ? -10 : 0
         context.saveGState()
         context.translateBy(x: 0, y: shift)
-        fillEllipse(context, rect: CGRect(x: 45, y: 74, width: 70, height: 72), color: body)
-        fillEllipse(context, rect: CGRect(x: 88, y: 55, width: 82, height: 90), color: body)
-        fillEllipse(context, rect: CGRect(x: 57, y: 60, width: 100, height: 105), color: body)
-        fillRect(context, CGRect(x: 65, y: 153, width: 90, height: 22), accent)
-        fillRect(context, CGRect(x: 78, y: 99, width: 16, height: 18), shadow)
-        fillRect(context, CGRect(x: 126, y: 99, width: 16, height: 18), shadow)
-        fillRect(context, CGRect(x: 81 + pointerOffset.x, y: 111 + pointerOffset.y, width: 5, height: 5), highlight)
-        fillRect(context, CGRect(x: 129 + pointerOffset.x, y: 111 + pointerOffset.y, width: 5, height: 5), highlight)
-        fillRect(context, CGRect(x: 99, y: 132, width: 22, height: 5), accent)
-        fillRect(context, CGRect(x: 69, y: 170, width: 24, height: 7), shadow)
-        fillRect(context, CGRect(x: 127, y: 170, width: 24, height: 7), shadow)
+
+        // Puffy cloud body as one outlined silhouette (lobes share one stroke).
+        fillEllipsesStroke(
+            context,
+            [
+                CGRect(x: 46, y: 76, width: 66, height: 66),
+                CGRect(x: 108, y: 60, width: 74, height: 82),
+                CGRect(x: 58, y: 54, width: 100, height: 100),
+                CGRect(x: 62, y: 104, width: 96, height: 56)
+            ],
+            fill: body,
+            outline: outline,
+            width: 5
+        )
+        fillEllipse(context, rect: CGRect(x: 70, y: 74, width: 34, height: 20), color: accent.copy(alpha: 0.5)!)
+        fillEllipse(context, rect: CGRect(x: 110, y: 68, width: 40, height: 20), color: accent.copy(alpha: 0.5)!)
+
+        // Two little outlined cloud feet.
+        fillEllipseStroke(context, CGRect(x: 78, y: 40, width: 26, height: 22), fill: body, outline: outline, width: 4)
+        fillEllipseStroke(context, CGRect(x: 118, y: 40, width: 26, height: 22), fill: body, outline: outline, width: 4)
+
+        drawCuteFace(
+            in: context,
+            leftEye: CGRect(x: 80, y: 96, width: 26, height: 34),
+            rightEye: CGRect(x: 116, y: 96, width: 26, height: 34),
+            mouthY: 138,
+            outline: outline,
+            pupil: shadow,
+            highlight: highlight,
+            accent: accent
+        )
         context.restoreGState()
+    }
+
+    private func fillRoundedRect(_ context: CGContext, _ rect: CGRect, radius: CGFloat, _ color: CGColor) {
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        context.addPath(path)
+        context.setFillColor(color)
+        context.fillPath()
+    }
+
+    private func fillEllipseStroke(_ context: CGContext, _ rect: CGRect, fill: CGColor, outline: CGColor, width: CGFloat) {
+        let path = CGPath(ellipseIn: rect, transform: nil)
+        context.addPath(path)
+        context.setFillColor(fill)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(outline)
+        context.setLineWidth(width)
+        context.setLineJoin(.round)
+        context.strokePath()
+    }
+
+    private func fillRoundedRectStroke(_ context: CGContext, _ rect: CGRect, radius: CGFloat, fill: CGColor, outline: CGColor, width: CGFloat) {
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        context.addPath(path)
+        context.setFillColor(fill)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(outline)
+        context.setLineWidth(width)
+        context.setLineJoin(.round)
+        context.strokePath()
+    }
+
+    private func fillEllipsesStroke(_ context: CGContext, _ rects: [CGRect], fill: CGColor, outline: CGColor, width: CGFloat) {
+        let path = CGMutablePath()
+        for rect in rects { path.addEllipse(in: rect) }
+        context.addPath(path)
+        context.setFillColor(fill)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(outline)
+        context.setLineWidth(width)
+        context.setLineJoin(.round)
+        context.strokePath()
+    }
+
+    /// Big white cartoon eyes with dark pupils that track the pointer,
+    /// catchlights, blush cheeks, and a tiny mouth. Eyes become rounded
+    /// closed lines when asleep.
+    private func drawCuteFace(
+        in context: CGContext,
+        leftEye: CGRect,
+        rightEye: CGRect,
+        mouthY: CGFloat,
+        outline: CGColor,
+        pupil: CGColor,
+        highlight: CGColor,
+        accent: CGColor
+    ) {
+        let offset = CGPoint(x: pointerOffset.x, y: pointerOffset.y)
+        for rect in [leftEye, rightEye] {
+            if petState == .sleeping || petState == .dozing {
+                fillRoundedRect(context, CGRect(x: rect.minX, y: rect.midY - 3, width: rect.width, height: 7), radius: 3.5, outline)
+                continue
+            }
+            fillEllipseStroke(context, rect, fill: NSColor.white.cgColor, outline: outline, width: 4)
+            let pupilWidth = rect.width * 0.34
+            let pupilHeight = rect.height * 0.52
+            let pupilRect = CGRect(
+                x: rect.midX - pupilWidth / 2 + offset.x * 0.4,
+                y: rect.midY - pupilHeight / 2 + offset.y * 0.4,
+                width: pupilWidth,
+                height: pupilHeight
+            )
+            fillEllipse(context, rect: pupilRect, color: pupil)
+            let glow = pupilWidth * 0.34
+            fillEllipse(context, rect: CGRect(x: pupilRect.minX + pupilWidth * 0.16, y: pupilRect.maxY - pupilHeight * 0.52, width: glow, height: glow), color: highlight)
+        }
+        fillEllipse(context, rect: CGRect(x: leftEye.minX - 14, y: leftEye.minY - 4, width: 14, height: 9), color: accent.copy(alpha: 0.8)!)
+        fillEllipse(context, rect: CGRect(x: rightEye.maxX, y: rightEye.minY - 4, width: 14, height: 9), color: accent.copy(alpha: 0.8)!)
+        fillRoundedRect(context, CGRect(x: 107, y: mouthY, width: 6, height: 6), radius: 3, outline)
+    }
+
+    private func drawAntenna(_ context: CGContext, baseX: CGFloat, body: CGColor, outline: CGColor, direction: CGFloat) {
+        let tipX = baseX + direction * 10
+        let tipY: CGFloat = 194
+        let stalk = CGMutablePath()
+        stalk.move(to: CGPoint(x: baseX, y: 158))
+        stalk.addLine(to: CGPoint(x: tipX, y: tipY - 10))
+        context.addPath(stalk)
+        context.setStrokeColor(outline)
+        context.setLineWidth(7)
+        context.setLineCap(.round)
+        context.strokePath()
+        fillEllipseStroke(context, CGRect(x: tipX - 8, y: tipY - 8, width: 16, height: 16), fill: body, outline: outline, width: 4)
+    }
+
+    private func drawWhiskers(_ context: CGContext, leftEye: CGRect, rightEye: CGRect, mouthY: CGFloat, outline: CGColor) {
+        let y = mouthY + 4
+        context.setStrokeColor(outline)
+        context.setLineWidth(3)
+        context.setLineCap(.round)
+        for index in 0..<3 {
+            let yOffset = CGFloat(index - 1) * 8
+            let left = CGMutablePath()
+            left.move(to: CGPoint(x: leftEye.minX - 4, y: y + yOffset))
+            left.addLine(to: CGPoint(x: leftEye.minX - 30, y: y + yOffset + 4))
+            context.addPath(left)
+            context.strokePath()
+            let right = CGMutablePath()
+            right.move(to: CGPoint(x: rightEye.maxX + 4, y: y + yOffset))
+            right.addLine(to: CGPoint(x: rightEye.maxX + 30, y: y + yOffset + 4))
+            context.addPath(right)
+            context.strokePath()
+        }
+    }
+
+    private func drawCrabLegs(_ context: CGContext, x: CGFloat, body: CGColor, outline: CGColor) {
+        let direction: CGFloat = x < 110 ? -1 : 1
+        for (dy, length) in [(24.0, 28.0), (46.0, 24.0), (66.0, 26.0)] as [(CGFloat, CGFloat)] {
+            let y = 64 + dy
+            let start = x + direction * length * 0.15
+            fillRoundedRectStroke(context, CGRect(x: min(start, start + direction * length), y: y, width: length, height: 15), radius: 7.5, fill: body, outline: outline, width: 4)
+        }
+    }
+
+    private func drawCrabClaw(_ context: CGContext, side: CGFloat, body: CGColor, accent: CGColor, highlight: CGColor, outline: CGColor) {
+        let centerY: CGFloat = 112
+        let anchorX: CGFloat = side < 0 ? 54 : 166
+        fillRoundedRectStroke(context, CGRect(x: side < 0 ? anchorX - 22 : anchorX, y: centerY, width: 22, height: 18), radius: 9, fill: body, outline: outline, width: 4)
+        let clawX = side < 0 ? anchorX - 32 : anchorX + 32
+        fillEllipseStroke(context, CGRect(x: clawX - 16, y: centerY + 8, width: 32, height: 30), fill: accent, outline: outline, width: 4)
+        fillEllipseStroke(context, CGRect(x: clawX - 12, y: centerY - 6, width: 24, height: 22), fill: accent, outline: outline, width: 4)
+        fillEllipse(context, rect: CGRect(x: clawX - 8, y: centerY + 24, width: 10, height: 8), color: highlight.copy(alpha: 0.85)!)
+    }
+
+    private func drawBluntEar(_ context: CGContext, base: CGPoint, tip: CGPoint, body: CGColor, outline: CGColor) {
+        let path = CGMutablePath()
+        path.move(to: base)
+        path.addLine(to: tip)
+        path.addLine(to: CGPoint(x: base.x + 22, y: base.y + 4))
+        path.closeSubpath()
+        context.addPath(path)
+        context.setFillColor(body)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(outline)
+        context.setLineWidth(4)
+        context.setLineJoin(.round)
+        context.strokePath()
+        fillEllipseStroke(context, CGRect(x: tip.x - 7, y: tip.y - 7, width: 14, height: 14), fill: body, outline: outline, width: 4)
     }
 
     private func drawStateOverlay(in context: CGContext) {
