@@ -119,6 +119,7 @@ private struct GeneralSettingsView: View {
                 Toggle(model.preferences.text("Launch at login"), isOn: $model.preferences.autoStart)
                 Toggle(model.preferences.text("Do Not Disturb"), isOn: $model.preferences.doNotDisturb)
                 Toggle(model.preferences.text("Free roam"), isOn: $model.preferences.freeRoamEnabled)
+                Toggle(model.preferences.text("Show quota ring beside the pet"), isOn: $model.preferences.showQuotaRing)
                 HStack {
                     Button(model.preferences.text("Choose area…")) { chooseRoamArea() }
                     Button(model.preferences.text("Remove custom area")) { removeRoamArea() }

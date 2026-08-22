@@ -6,6 +6,7 @@ import Foundation
 public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private let model: ClawdeskModel
     private let petView: PetCanvasView
+    private let quotaRing: QuotaRingWindowController
     private var animationTimer: Timer?
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
@@ -28,6 +29,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     public init(model: ClawdeskModel) {
         self.model = model
+        quotaRing = QuotaRingWindowController(model: model)
         let base = 240.0 * model.preferences.petScale
         petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: base, height: base))
         let panel = NSPanel(
@@ -76,6 +78,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$petScale.sink { [weak self] scale in
             self?.applyScale(scale, animate: true)
+        }.store(in: &cancellables)
+        model.$quotaReports.sink { [weak self] _ in
+            self?.refreshQuotaRing()
+        }.store(in: &cancellables)
+        model.preferences.$showQuotaRing.sink { [weak self] _ in
+            self?.refreshQuotaRing()
         }.store(in: &cancellables)
     }
 
@@ -129,6 +137,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         sleepTarget = nil
         roamTarget = nil
         hoverRestoreTask?.cancel()
+        quotaRing.hide()
         close()
     }
 
@@ -388,8 +397,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     @objc private func quit() { onQuit?() ?? NSApp.terminate(nil) }
 
     public func windowDidMove(_ notification: Notification) {
+        refreshQuotaRing()
         guard !model.preferences.isMiniMode, !isRoaming else { return }
         model.preferences.windowOrigin = window?.frame.origin
+    }
+
+    private func refreshQuotaRing() {
+        guard let window, !model.preferences.isMiniMode else {
+            quotaRing.hide()
+            return
+        }
+        quotaRing.update(petWindowFrame: window.frame)
     }
 }
 
