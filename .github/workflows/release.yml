@@ -30,6 +30,19 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Select Swift 6 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode_app="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | tail -n 1 || true)"
+          [[ -n "$xcode_app" && -d "$xcode_app" ]] || {
+            echo "No Xcode 16 installation was found on the runner." >&2
+            exit 1
+          }
+          sudo xcode-select --switch "$xcode_app"
+          xcodebuild -version
+          swift --version
+
       - name: Resolve and validate version
         id: release
         shell: bash
