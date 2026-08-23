@@ -1,0 +1,33 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskStatusline'
+relocations:
+  - { offset: 0x8A917, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataVSgSo13NSURLResponseCSgs5Error_pSgIeghggg_So6NSDataCSgAGSo7NSErrorCSgIeyBhyyy_TR', symObjAddr: 0x0, symBinAddr: 0x100000C48, symSize: 0xC8 }
+  - { offset: 0x8AA51, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4findys10_HashTableV6BucketV6bucket_Sb5foundtxSHRzlFSS_Tg5', symObjAddr: 0xE0, symBinAddr: 0x100000D28, symSize: 0x64 }
+  - { offset: 0x8AA9F, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4find_9hashValues10_HashTableV6BucketV6bucket_Sb5foundtx_SitSHRzlFSS_Tg5', symObjAddr: 0x144, symBinAddr: 0x100000D8C, symSize: 0xAC }
+  - { offset: 0x8AB22, size: 0x8, addend: 0x0, symName: '_$ss17_NativeDictionaryV7_insert2at3key5valueys10_HashTableV6BucketV_xnq_ntFSS_ypTg5', symObjAddr: 0x1F0, symBinAddr: 0x100000E38, symSize: 0x68 }
+  - { offset: 0x8ABB1, size: 0x8, addend: 0x0, symName: '_$ss17_NativeDictionaryV8setValue_6forKey8isUniqueyq_n_xSbtFSS_ypTg5', symObjAddr: 0x258, symBinAddr: 0x100000EA0, symSize: 0x124 }
+  - { offset: 0x8AC16, size: 0x8, addend: 0x0, symName: '_$ss17_NativeDictionaryV4copyyyFSS_ypTg5', symObjAddr: 0x37C, symBinAddr: 0x100000FC4, symSize: 0x1A4 }
+  - { offset: 0x8ACDF, size: 0x8, addend: 0x0, symName: '_$ss17_NativeDictionaryV20_copyOrMoveAndResize8capacity12moveElementsySi_SbtFSS_ypTg5', symObjAddr: 0x520, symBinAddr: 0x100001168, symSize: 0x2BC }
+  - { offset: 0x8AE3D, size: 0x8, addend: 0x0, symName: '_$ss12_ArrayBufferV20_consumeAndCreateNew14bufferIsUnique15minimumCapacity13growForAppendAByxGSb_SiSbtFSS_Tg5', symObjAddr: 0x7DC, symBinAddr: 0x100001424, symSize: 0x108 }
+  - { offset: 0x8B191, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameV2, symObjAddr: 0x2410, symBinAddr: 0x100003058, symSize: 0x50 }
+  - { offset: 0x8B1A5, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataV15_RepresentationOWOe', symObjAddr: 0x2460, symBinAddr: 0x1000030A8, symSize: 0x40 }
+  - { offset: 0x8B1B9, size: 0x8, addend: 0x0, symName: '_$sypWOc', symObjAddr: 0x24A0, symBinAddr: 0x1000030E8, symSize: 0x3C }
+  - { offset: 0x8B1CD, size: 0x8, addend: 0x0, symName: '_$sSo8NSNumberCMa', symObjAddr: 0x24DC, symBinAddr: 0x100003124, symSize: 0x44 }
+  - { offset: 0x8B1E1, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataV15_RepresentationOWOy', symObjAddr: 0x2560, symBinAddr: 0x1000031A8, symSize: 0x40 }
+  - { offset: 0x8B1F5, size: 0x8, addend: 0x0, symName: '_$s18ClawdeskStatuslineAAV9postQuota33_5E1D2CD0F1325A22C7AA42112E653B21LL7payload10rateLimitsySDySSypG_AGtFZy10Foundation4DataVSg_So13NSURLResponseCSgs5Error_pSgtYbcfU_TA', symObjAddr: 0x25C4, symBinAddr: 0x10000320C, symSize: 0x20 }
+  - { offset: 0x8B227, size: 0x8, addend: 0x0, symName: _block_copy_helper, symObjAddr: 0x25E4, symBinAddr: 0x10000322C, symSize: 0x14 }
+  - { offset: 0x8B23B, size: 0x8, addend: 0x0, symName: _block_destroy_helper, symObjAddr: 0x25F8, symBinAddr: 0x100003240, symSize: 0x8 }
+  - { offset: 0x8B24F, size: 0x8, addend: 0x0, symName: '_$sypWOb', symObjAddr: 0x2600, symBinAddr: 0x100003248, symSize: 0x10 }
+  - { offset: 0x8B263, size: 0x8, addend: 0x0, symName: ___swift_destroy_boxed_opaque_existential_0, symObjAddr: 0x2610, symBinAddr: 0x100003258, symSize: 0x20 }
+  - { offset: 0x8B277, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataVSgWOe', symObjAddr: 0x2630, symBinAddr: 0x100003278, symSize: 0x14 }
+  - { offset: 0x8B28B, size: 0x8, addend: 0x0, symName: '_$sSaySSGSayxGSKsWl', symObjAddr: 0x2644, symBinAddr: 0x10000328C, symSize: 0x50 }
+  - { offset: 0x8B29F, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameAbstractV2, symObjAddr: 0x2694, symBinAddr: 0x1000032DC, symSize: 0x54 }
+  - { offset: 0x8B2B3, size: 0x8, addend: 0x0, symName: '_$sSdySdSgxcSyRzlufcSbSpySdGXEfU_SbSPys4Int8VGXEfU_TA', symObjAddr: 0x2730, symBinAddr: 0x100003378, symSize: 0x78 }
+  - { offset: 0x8B6C6, size: 0x8, addend: 0x0, symName: _ClawdeskStatusline_main, symObjAddr: 0xC8, symBinAddr: 0x100000D10, symSize: 0x18 }
+  - { offset: 0x8B73B, size: 0x8, addend: 0x0, symName: '_$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_ypTt0g5Tf4g_n', symObjAddr: 0x8E4, symBinAddr: 0x10000152C, symSize: 0x12C }
+  - { offset: 0x8B8D7, size: 0x8, addend: 0x0, symName: '_$s18ClawdeskStatuslineAAV9postQuota33_5E1D2CD0F1325A22C7AA42112E653B21LL7payload10rateLimitsySDySSypG_AGtFZTf4nnd_n', symObjAddr: 0xA10, symBinAddr: 0x100001658, symSize: 0xCE0 }
+  - { offset: 0x8BCC1, size: 0x8, addend: 0x0, symName: '_$sSlsE6prefixy11SubSequenceQzSiFSS_Tg5Tf4ng_n', symObjAddr: 0x16F0, symBinAddr: 0x100002338, symSize: 0x8C }
+  - { offset: 0x8BD2D, size: 0x8, addend: 0x0, symName: '_$s18ClawdeskStatuslineAAV6number33_5E1D2CD0F1325A22C7AA42112E653B21LLySdSgypSgFZTf4nd_n', symObjAddr: 0x177C, symBinAddr: 0x1000023C4, symSize: 0x1F8 }
+  - { offset: 0x8BED2, size: 0x8, addend: 0x0, symName: '_$s18ClawdeskStatuslineAAV4mainyyFZTf4d_n', symObjAddr: 0x1974, symBinAddr: 0x1000025BC, symSize: 0xA9C }
+...

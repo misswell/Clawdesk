@@ -1,0 +1,2186 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.xctest/Contents/MacOS/ClawdeskPackageTests",
+      "packagePath" : "/Users/guofeng/Code/solo/Clawdesk",
+      "productName" : "ClawdeskPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.Clawdesk-x86_64-apple-macosx13.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/sources",
+      "importPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/App/ClawdeskApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/AgentRegistry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/DomainModels.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/EventStateReducer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/PermissionPolicy.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaModels.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaRing.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/RoamFence.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/ThemeCatalog.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AdditionalHookAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentDoctor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentEventAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AppPreferences.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClaudeHookHealthMonitor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClawdeskModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/CodexLogMonitor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/FeishuApprovalTransport.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/GlobalShortcutManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/HookInstaller.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LaunchAtLogin.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LocalEventServer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/MobileBridge.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/PluginHookAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteNotifier.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteSSHManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RoamFenceCoordinator.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SingleInstanceGuard.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SoftwareUpdate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/TerminalFocusService.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/DashboardView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/Localization.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PermissionBubbleController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetCanvasView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetWindowController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/QuotaRingView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/RoamAreaPicker.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/SettingsView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/WindowControllers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "Clawdesk",
+      "moduleOutputPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/Clawdesk.swiftmodule",
+      "objects" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskApp.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentRegistry.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DomainModels.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/EventStateReducer.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionPolicy.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaModels.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRing.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFence.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ThemeCatalog.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AdditionalHookAdapters.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentDoctor.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentEventAdapters.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AppPreferences.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClaudeHookHealthMonitor.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskModel.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/CodexLogMonitor.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/FeishuApprovalTransport.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/GlobalShortcutManager.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/HookInstaller.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LaunchAtLogin.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LocalEventServer.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/MobileBridge.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PluginHookAdapters.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteNotifier.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteSSHManager.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFenceCoordinator.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SingleInstanceGuard.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SoftwareUpdate.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/TerminalFocusService.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DashboardView.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/Localization.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionBubbleController.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetCanvasView.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetWindowController.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRingView.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamAreaPicker.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SettingsView.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/WindowControllers.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "Clawdesk_main",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "clawdesk"
+      ],
+      "outputFileMapPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DomainModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/EventStateReducer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionPolicy.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRing.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFence.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ThemeCatalog.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AdditionalHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentDoctor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentEventAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AppPreferences.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClaudeHookHealthMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/CodexLogMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/FeishuApprovalTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/GlobalShortcutManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/HookInstaller.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LaunchAtLogin.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LocalEventServer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/MobileBridge.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PluginHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteNotifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteSSHManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFenceCoordinator.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SingleInstanceGuard.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SoftwareUpdate.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/TerminalFocusService.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DashboardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/Localization.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionBubbleController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetCanvasView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetWindowController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRingView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamAreaPicker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SettingsView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/WindowControllers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/Clawdesk.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/App/ClawdeskApp.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/AgentRegistry.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/DomainModels.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/EventStateReducer.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/PermissionPolicy.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaModels.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaRing.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/RoamFence.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/ThemeCatalog.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AdditionalHookAdapters.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentDoctor.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentEventAdapters.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AppPreferences.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClaudeHookHealthMonitor.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClawdeskModel.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/CodexLogMonitor.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/FeishuApprovalTransport.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/GlobalShortcutManager.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/HookInstaller.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LaunchAtLogin.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LocalEventServer.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/MobileBridge.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/PluginHookAdapters.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteNotifier.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteSSHManager.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RoamFenceCoordinator.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SingleInstanceGuard.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SoftwareUpdate.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/TerminalFocusService.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/DashboardView.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/Localization.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PermissionBubbleController.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetCanvasView.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetWindowController.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/QuotaRingView.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/RoamAreaPicker.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/SettingsView.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/WindowControllers.swift"
+      ],
+      "tempsPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.ClawdeskPackageTests-x86_64-apple-macosx13.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/sources",
+      "importPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ClawdeskPackageTests",
+      "moduleOutputPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/include/ClawdeskPackageTests-Swift.h",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "clawdesk"
+      ],
+      "outputFileMapPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.ClawdeskStatusline-x86_64-apple-macosx13.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/sources",
+      "importPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskStatusline/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "ClawdeskStatusline",
+      "moduleOutputPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskStatusline.swiftmodule",
+      "objects" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "ClawdeskStatusline_main",
+        "-parse-as-library",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "clawdesk"
+      ],
+      "outputFileMapPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskStatusline.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskStatusline/main.swift"
+      ],
+      "tempsPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.ClawdeskTests-x86_64-apple-macosx13.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/sources",
+      "importPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentDoctorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentEventAdapterTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AppPreferencesTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClaudeHookHealthTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClawdeskModelSleepTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/CodexLogMonitorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/EventStateReducerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/HookInstallerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/LocalEventServerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/MobileBridgeTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/PermissionPolicyTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaRingTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteNotifierTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteSSHTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RoamFenceTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/SoftwareUpdateTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ThemeImportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/UpdaterTerminationTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ClawdeskTests",
+      "moduleOutputPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskTests.swiftmodule",
+      "objects" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-apple-macosx14.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/index/store",
+        "-O",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "clawdesk"
+      ],
+      "outputFileMapPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentDoctorTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentEventAdapterTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AppPreferencesTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClaudeHookHealthTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClawdeskModelSleepTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/CodexLogMonitorTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/EventStateReducerTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/HookInstallerTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/LocalEventServerTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/MobileBridgeTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/PermissionPolicyTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaRingTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteNotifierTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteSSHTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RoamFenceTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/SoftwareUpdateTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ThemeImportTests.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/UpdaterTerminationTests.swift"
+      ],
+      "tempsPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.ClawdeskUpdater-x86_64-apple-macosx13.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/sources",
+      "importPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/ParentProcessTermination.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "ClawdeskUpdater",
+      "moduleOutputPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskUpdater.swiftmodule",
+      "objects" : [
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swift.o",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "ClawdeskUpdater_main",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "clawdesk"
+      ],
+      "outputFileMapPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules/ClawdeskUpdater.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/ParentProcessTermination.swift",
+        "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/main.swift"
+      ],
+      "tempsPath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "Clawdesk" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "Clawdesk",
+      "-package-name",
+      "clawdesk",
+      "-c",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/App/ClawdeskApp.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/AgentRegistry.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/DomainModels.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/EventStateReducer.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/PermissionPolicy.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaModels.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaRing.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/RoamFence.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/ThemeCatalog.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AdditionalHookAdapters.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentDoctor.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentEventAdapters.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AppPreferences.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClaudeHookHealthMonitor.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClawdeskModel.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/CodexLogMonitor.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/FeishuApprovalTransport.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/GlobalShortcutManager.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/HookInstaller.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LaunchAtLogin.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LocalEventServer.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/MobileBridge.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/PluginHookAdapters.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteNotifier.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteSSHManager.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RoamFenceCoordinator.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SingleInstanceGuard.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SoftwareUpdate.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/TerminalFocusService.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/DashboardView.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/Localization.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PermissionBubbleController.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetCanvasView.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetWindowController.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/QuotaRingView.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/RoamAreaPicker.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/SettingsView.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/WindowControllers.swift",
+      "-I",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "-target",
+      "x86_64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "Clawdesk_main",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "clawdesk",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ClawdeskPackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ClawdeskPackageTests",
+      "-package-name",
+      "clawdesk",
+      "-c",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "-target",
+      "x86_64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/include/ClawdeskPackageTests-Swift.h",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "clawdesk",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ClawdeskStatusline" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ClawdeskStatusline",
+      "-package-name",
+      "clawdesk",
+      "-c",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskStatusline/main.swift",
+      "-I",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "-target",
+      "x86_64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "ClawdeskStatusline_main",
+      "-parse-as-library",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "clawdesk",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ClawdeskTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ClawdeskTests",
+      "-package-name",
+      "clawdesk",
+      "-c",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentDoctorTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentEventAdapterTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AppPreferencesTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClaudeHookHealthTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClawdeskModelSleepTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/CodexLogMonitorTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/EventStateReducerTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/HookInstallerTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/LocalEventServerTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/MobileBridgeTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/PermissionPolicyTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaRingTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteNotifierTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteSSHTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RoamFenceTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/SoftwareUpdateTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ThemeImportTests.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/UpdaterTerminationTests.swift",
+      "-I",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "-target",
+      "x86_64-apple-macosx14.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/index/store",
+      "-O",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "clawdesk",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ClawdeskUpdater" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ClawdeskUpdater",
+      "-package-name",
+      "clawdesk",
+      "-c",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/ParentProcessTermination.swift",
+      "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/main.swift",
+      "-I",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Modules",
+      "-target",
+      "x86_64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "ClawdeskUpdater_main",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "clawdesk",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "Clawdesk" : [
+
+    ],
+    "ClawdeskPackageTests" : [
+      "ClawdeskTests",
+      "ClawdeskUpdater",
+      "Clawdesk"
+    ],
+    "ClawdeskStatusline" : [
+
+    ],
+    "ClawdeskTests" : [
+      "ClawdeskUpdater",
+      "Clawdesk"
+    ],
+    "ClawdeskUpdater" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/App/ClawdeskApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/AgentRegistry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/DomainModels.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/EventStateReducer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/PermissionPolicy.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaModels.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/QuotaRing.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/RoamFence.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Domain/ThemeCatalog.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AdditionalHookAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentDoctor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AgentEventAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/AppPreferences.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClaudeHookHealthMonitor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/ClawdeskModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/CodexLogMonitor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/FeishuApprovalTransport.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/GlobalShortcutManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/HookInstaller.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LaunchAtLogin.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/LocalEventServer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/MobileBridge.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/PluginHookAdapters.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteNotifier.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RemoteSSHManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/RoamFenceCoordinator.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SingleInstanceGuard.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/SoftwareUpdate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/Infrastructure/TerminalFocusService.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/DashboardView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/Localization.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PermissionBubbleController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetCanvasView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/PetWindowController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/QuotaRingView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/RoamAreaPicker.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/SettingsView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/Clawdesk/UI/WindowControllers.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/sources"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AdditionalHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentDoctor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentEventAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AppPreferences.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClaudeHookHealthMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/CodexLogMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DashboardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DomainModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/EventStateReducer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/FeishuApprovalTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/GlobalShortcutManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/HookInstaller.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LaunchAtLogin.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LocalEventServer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/Localization.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/MobileBridge.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionBubbleController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionPolicy.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetCanvasView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetWindowController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PluginHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRing.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRingView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteNotifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteSSHManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamAreaPicker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFence.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFenceCoordinator.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SettingsView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SingleInstanceGuard.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SoftwareUpdate.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/TerminalFocusService.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ThemeCatalog.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/WindowControllers.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.product/Objects.LinkFileList"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/sources"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AdditionalHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentDoctor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentEventAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AgentRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/AppPreferences.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClaudeHookHealthMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ClawdeskModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/CodexLogMonitor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DashboardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/DomainModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/EventStateReducer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/FeishuApprovalTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/GlobalShortcutManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/HookInstaller.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LaunchAtLogin.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/LocalEventServer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/Localization.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/MobileBridge.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionBubbleController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PermissionPolicy.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetCanvasView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PetWindowController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/PluginHookAdapters.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaModels.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRing.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/QuotaRingView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteNotifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RemoteSSHManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamAreaPicker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFence.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/RoamFenceCoordinator.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SettingsView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SingleInstanceGuard.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/SoftwareUpdate.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/TerminalFocusService.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/ThemeCatalog.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/Clawdesk.build/WindowControllers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/QuotaTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskStatusline/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/sources"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskStatusline.product/Objects.LinkFileList"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentDoctorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentEventAdapterTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AppPreferencesTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClaudeHookHealthTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClawdeskModelSleepTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/CodexLogMonitorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/EventStateReducerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/HookInstallerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/LocalEventServerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/MobileBridgeTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/PermissionPolicyTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaRingTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteNotifierTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteSSHTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RoamFenceTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/SoftwareUpdateTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ThemeImportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/UpdaterTerminationTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskTests.build/sources"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/ParentProcessTermination.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/sources"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.product/Objects.LinkFileList"
+    },
+    "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

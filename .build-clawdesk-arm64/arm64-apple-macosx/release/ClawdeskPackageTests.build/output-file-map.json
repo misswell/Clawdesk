@@ -1,0 +1,13 @@
+{
+  "": {
+    "dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/ClawdeskPackageTests.d",
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/ClawdeskPackageTests.o",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/primary.swiftdeps"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.derived/runner.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskPackageTests.build/runner.dia"
+  }
+}

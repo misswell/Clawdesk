@@ -1,0 +1,19 @@
+{
+  "": {
+    "dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ClawdeskUpdater.d",
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ClawdeskUpdater.o",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/primary.swiftdeps"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/ParentProcessTermination.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/ParentProcessTermination.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Sources/ClawdeskUpdater/main.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-x86_64/x86_64-apple-macosx/release/ClawdeskUpdater.build/main.dia"
+  }
+}

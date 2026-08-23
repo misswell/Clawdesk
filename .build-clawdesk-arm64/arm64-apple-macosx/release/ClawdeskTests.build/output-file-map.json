@@ -1,0 +1,121 @@
+{
+  "": {
+    "dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskTests.d",
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskTests.o",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/primary.swiftdeps"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentDoctorTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentDoctorTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AgentEventAdapterTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AgentEventAdapterTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/AppPreferencesTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/AppPreferencesTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClaudeHookHealthTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClaudeHookHealthTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ClawdeskModelSleepTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ClawdeskModelSleepTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/CodexLogMonitorTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/CodexLogMonitorTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/EventStateReducerTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/EventStateReducerTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/HookInstallerTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/HookInstallerTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/LocalEventServerTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/LocalEventServerTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/MobileBridgeTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/MobileBridgeTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/PermissionPolicyTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/PermissionPolicyTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaRingTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaRingTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/QuotaTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/QuotaTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteNotifierTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteNotifierTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RemoteSSHTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RemoteSSHTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/RoamFenceTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/RoamFenceTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/SoftwareUpdateTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/SoftwareUpdateTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/ThemeImportTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/ThemeImportTests.dia"
+  },
+  "/Users/guofeng/Code/solo/Clawdesk/Tests/ClawdeskTests/UpdaterTerminationTests.swift": {
+    "object": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.swift.o",
+    "swiftmodule": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.swiftdeps",
+    "diagnostics": "/Users/guofeng/Code/solo/Clawdesk/.build-clawdesk-arm64/arm64-apple-macosx/release/ClawdeskTests.build/UpdaterTerminationTests.dia"
+  }
+}
