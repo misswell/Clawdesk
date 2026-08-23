@@ -346,11 +346,16 @@ public final class HookInstaller {
     }
 
     private func containsManagedEntry(_ entries: [[String: Any]]) -> Bool {
-        entries.flatMap(flattenHookEntries).contains { hook in
-            let command = hook["command"] as? String ?? ""
-            let url = hook["url"] as? String ?? ""
-            return command.contains(Self.marker) || url.contains("/permission") && url.contains("127.0.0.1")
+        for entry in entries {
+            for hook in flattenHookEntries(entry) {
+                let command = hook["command"] as? String ?? ""
+                let url = hook["url"] as? String ?? ""
+                if command.contains(Self.marker) || url.contains("/permission") && url.contains("127.0.0.1") {
+                    return true
+                }
+            }
         }
+        return false
     }
 
     private func jsonValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
