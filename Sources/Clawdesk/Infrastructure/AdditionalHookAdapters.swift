@@ -367,8 +367,16 @@ extension HookInstaller {
 
     private func containsClawdeskMarker(_ value: Any) -> Bool {
         if let string = value as? String { return string.contains(HookInstaller.marker) }
-        if let dictionary = value as? [String: Any] { return dictionary.values.contains(where: containsClawdeskMarker) }
-        if let array = value as? [Any] { return array.contains(where: containsClawdeskMarker) }
+        if let dictionary = value as? [String: Any] {
+            for child in dictionary.values where containsClawdeskMarker(child) {
+                return true
+            }
+        }
+        if let array = value as? [Any] {
+            for child in array where containsClawdeskMarker(child) {
+                return true
+            }
+        }
         return false
     }
 
