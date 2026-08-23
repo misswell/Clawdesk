@@ -123,7 +123,7 @@ public final class PetCanvasView: NSView {
     public override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
-        context.setShouldAntialias(false)
+        context.setShouldAntialias(true)
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
 
@@ -145,13 +145,7 @@ public final class PetCanvasView: NSView {
         }
 
         drawShadow(in: context)
-        if theme.id == "patches" {
-            drawCat(in: context)
-        } else if theme.id == "cumulus" {
-            drawCloudling(in: context)
-        } else {
-            drawCrab(in: context)
-        }
+        drawBloub(in: context)
         drawStateOverlay(in: context)
         context.restoreGState()
     }
@@ -596,6 +590,116 @@ public final class PetCanvasView: NSView {
         context.setLineJoin(.round)
         context.strokePath()
         fillEllipseStroke(context, CGRect(x: tip.x - 7, y: tip.y - 7, width: 14, height: 14), fill: body, outline: outline, width: 4)
+    }
+
+    // MARK: - bloub pet (MIT, jeremy-prt/bloub; ported from its radial/eye model)
+
+    private struct BloubEyePose {
+        let x: Double
+        let y: Double
+        let a: Double
+        let b: Double
+        let c: Double
+        let d: Double
+    }
+
+    private struct BloubGaze {
+        let yaw: Double
+        let pitch: Double
+        let roll: Double
+    }
+
+    private static func bloubEyePoses(gaze: BloubGaze, scale: Double) -> [BloubEyePose] {
+        func spin(_ u: (Double, Double, Double), _ v: (Double, Double, Double), _ angle: Double) -> ((Double, Double, Double), (Double, Double, Double)) {
+            let c = cos(angle)
+            let s = sin(angle)
+            return (
+                (u.0 * c + v.0 * s, u.1 * c + v.1 * s, u.2 * c + v.2 * s),
+                (v.0 * c - u.0 * s, v.1 * c - u.1 * s, v.2 * c - u.2 * s)
+            )
+        }
+        func deg(_ d: Double) -> Double { d * .pi / 180 }
+        var f: (Double, Double, Double) = (0, 0, 1)
+        var right: (Double, Double, Double) = (1, 0, 0)
+        var down: (Double, Double, Double) = (0, 1, 0)
+        (f, right) = spin(f, right, deg(gaze.yaw))
+        (down, f) = spin(down, f, deg(gaze.pitch))
+        (right, down) = spin(right, down, deg(gaze.roll))
+        func build(_ side: Double) -> BloubEyePose {
+            let (ef, er) = spin(f, right, deg(15.46 * side))
+            return BloubEyePose(x: ef.0 * scale, y: ef.1 * scale, a: er.0, b: er.1, c: down.0, d: down.1)
+        }
+        return [build(-1), build(1)]
+    }
+
+    private static func bloubLid(time: TimeInterval) -> Double {
+        let cycle = time.truncatingRemainder(dividingBy: 4.4)
+        guard cycle < 0.18 else { return 1 }
+        if cycle < 0.08 { return max(0, 1 - cycle / 0.08) }
+        return min(1, (cycle - 0.08) / 0.10)
+    }
+
+    private func drawBloub(in context: CGContext) {
+        let center = CGPoint(x: 110, y: 108)
+        let radius: CGFloat = 74
+        let bodyColor = NSColor(white: 0.07, alpha: 1).cgColor
+        let eyeColor = NSColor.white.cgColor
+        let sleeping = petState == .sleeping || petState == .dozing
+        let shift: CGFloat = sleeping ? -14 : 0
+
+        context.saveGState()
+        context.translateBy(x: 0, y: shift)
+
+        // Body: a perfect circle (the bloub rest silhouette), breathing faintly.
+        let breath: CGFloat = petState == .idle ? 1 + CGFloat(sin(assetClock * 1.8) * 0.006) : 1
+        let bodyRect = CGRect(
+            x: center.x - radius,
+            y: center.y - radius * breath,
+            width: radius * 2,
+            height: radius * 2 * breath
+        )
+        fillEllipse(context, rect: bodyRect, color: bodyColor)
+
+        // Eyes: two white capsules placed by the spherical head model.
+        let baseGaze = BloubGaze(yaw: 28.49, pitch: 28.62, roll: -13)
+        let gaze = BloubGaze(
+            yaw: baseGaze.yaw + Double(pointerOffset.x) * 2.5,
+            pitch: baseGaze.pitch + Double(pointerOffset.y) * 2.5,
+            roll: baseGaze.roll
+        )
+        let poses = Self.bloubEyePoses(gaze: gaze, scale: Double(radius))
+        let lid = sleeping ? 0.0 : Self.bloubLid(time: assetClock)
+        let eyeWidth = 0.186 * Double(radius)
+        let eyeHeight = 0.412 * Double(radius) * (0.06 + 0.94 * lid)
+
+        for pose in poses {
+            let eyeX = center.x + CGFloat(pose.x)
+            let eyeY = center.y - CGFloat(pose.y)
+            if eyeHeight < 1.2 {
+                // Closed eye: rounded horizontal line.
+                fillRoundedRect(
+                    context,
+                    CGRect(x: eyeX - CGFloat(eyeWidth) * 0.85, y: eyeY - 2.5, width: CGFloat(eyeWidth) * 1.7, height: 5),
+                    radius: 2.5,
+                    eyeColor
+                )
+                continue
+            }
+            // Tangent frame, y-flipped into CoreGraphics' bottom-left space.
+            var transform = CGAffineTransform(
+                a: pose.a * eyeWidth,
+                b: -pose.b * eyeWidth,
+                c: pose.c * eyeHeight,
+                d: -pose.d * eyeHeight,
+                tx: eyeX,
+                ty: eyeY
+            )
+            let path = CGPath(ellipseIn: CGRect(x: -0.5, y: -0.5, width: 1, height: 1), transform: &transform)
+            context.addPath(path)
+            context.setFillColor(eyeColor)
+            context.fillPath()
+        }
+        context.restoreGState()
     }
 
     private func drawStateOverlay(in context: CGContext) {

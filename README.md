@@ -60,16 +60,16 @@ The upstream behavior map and the current native parity boundary are recorded
 in [docs/UPSTREAM_PARITY.md](docs/UPSTREAM_PARITY.md). Project-specific update
 instructions live in [AGENTS.md](AGENTS.md).
 
-Upstream artwork is not bundled: its separate artwork license does not permit
-redistribution outside the original application. The built-in themes here are
-native CoreGraphics renderers with original characters (Pinch the crab,
-Patches the cat, and Cumulus the cloud); they deliberately do not reuse the
-upstream character names or artwork. Custom themes can be imported from a
-validated folder or ZIP using PNG/GIF/APNG/WebP/JPEG and static SVG states;
-animated raster frames are cached and capped to keep idle memory use low.
-Themes with multiple idle visuals can select and persist one per theme. Full
-upstream Codex Pet atlas conversion is intentionally not claimed, and custom
-themes remain an isolated renderer seam.
+The desktop pet renders the **bloub** character — a filled round body with two
+spherical white eyes that track the pointer, blink, and close when asleep —
+ported from [jeremy-prt/bloub](https://github.com/jeremy-prt/bloub) (MIT).
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution. The
+upstream clawd-on-desk artwork is not bundled: its separate artwork license
+does not permit redistribution, and its character names are not reused.
+Custom themes can be imported from a validated folder or ZIP using
+PNG/GIF/APNG/WebP/JPEG and static SVG states; animated raster frames are
+cached and capped to keep idle memory use low. Themes with multiple idle
+visuals can select and persist one per theme.
 
 Settings → General includes a continuous pet-size slider (40%–200%) that
 resizes the floating pet in place, and an interface-language picker that
