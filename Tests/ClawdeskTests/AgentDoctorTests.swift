@@ -53,4 +53,22 @@ final class AgentDoctorTests: XCTestCase {
         let reports = AgentDoctor(installer: installer).diagnose()
         XCTAssertEqual(report(reports, "pi")?.state, .notChecked)
     }
+
+    func testManagedAgentIDsUseOwnershipMarkersAndIncludePluginDirectories() throws {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installer = HookInstaller(homeDirectory: root)
+        let doctor = AgentDoctor(installer: installer)
+
+        let unrelatedDirectory = root.appendingPathComponent(".gemini")
+        try FileManager.default.createDirectory(at: unrelatedDirectory, withIntermediateDirectories: true)
+        try Data(#"{"note":"clawdesk is mentioned but not installed"}"#.utf8)
+            .write(to: unrelatedDirectory.appendingPathComponent("settings.json"))
+        XCTAssertTrue(doctor.managedAgentIDs().isEmpty)
+
+        _ = try installer.install(agentID: "claude-code", port: 37_832)
+        _ = try installer.install(agentID: "pi", port: 37_832)
+
+        XCTAssertEqual(doctor.managedAgentIDs(), ["claude-code", "pi"])
+    }
 }

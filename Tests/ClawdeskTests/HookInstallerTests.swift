@@ -119,6 +119,23 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(second.contains("# user config"))
     }
 
+    func testKimiExistingOnlyRepairDoesNotCreateTheOtherProfile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-kimi-repair-test-\(UUID().uuidString)")
+        let configURL = root.appendingPathComponent(".kimi-code/config.toml")
+        try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("# managed profile\n".utf8).write(to: configURL)
+
+        let installer = HookInstaller(homeDirectory: root)
+        _ = try installer.install(agentID: "kimi-cli", port: 37811)
+        let legacyConfig = root.appendingPathComponent(".kimi/config.toml")
+        try FileManager.default.removeItem(at: legacyConfig)
+
+        _ = try installer.repairExistingAgent(agentID: "kimi-cli", port: 37811)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyConfig.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: configURL.path))
+    }
+
     func testAdditionalJSONAdaptersAreIdempotentAndPreserveUserEntries() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-extra-hook-test-\(UUID().uuidString)")
         let cursorDirectory = root.appendingPathComponent(".cursor")

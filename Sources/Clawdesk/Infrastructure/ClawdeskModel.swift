@@ -39,18 +39,23 @@ public final class ClawdeskModel: ObservableObject {
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
     private var healthTimer: Timer?
+    private var startupSyncTask: Task<Void, Never>?
 
-    public init(preferences: AppPreferences = AppPreferences()) {
+    public init(
+        preferences: AppPreferences = AppPreferences(),
+        hookInstaller providedHookInstaller: HookInstaller? = nil
+    ) {
         self.preferences = preferences
         let server = LocalEventServer(preferredPort: preferences.serverPort)
         eventServer = server
         remoteSSHManager = RemoteSSHManager(eventServer: server)
-        hookInstaller = HookInstaller()
-        doctor = AgentDoctor(installer: hookInstaller)
+        let installer = providedHookInstaller ?? HookInstaller()
+        hookInstaller = installer
+        doctor = AgentDoctor(installer: installer)
         remoteNotifier = RemoteNotifier()
         mobileBridge = MobileBridge(preferredPort: preferences.mobilePort)
         codexLogMonitor = CodexLogMonitor()
-        claudeHookHealth = ClaudeHookHealthMonitor(installer: hookInstaller)
+        claudeHookHealth = ClaudeHookHealthMonitor(installer: installer)
         softwareUpdater = ClawdeskSoftwareUpdater()
         serverPort = preferences.serverPort
         eventServer.onMessage = { [weak self] message in
@@ -100,12 +105,14 @@ public final class ClawdeskModel: ObservableObject {
         healthTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.runHealthCheck() }
         }
-        Task { @MainActor [weak self] in
+        startupSyncTask?.cancel()
+        startupSyncTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard let self else { return }
             serverPort = eventServer.port
             preferences.serverPort = eventServer.port
             try? hookInstaller.writeRuntimeFile(port: eventServer.port, autoStart: preferences.autoStart)
+            synchronizeEnabledIntegrations()
             if preferences.collectClaudeUsage {
                 _ = try? hookInstaller.ensureClaudeStatusLine()
             }
@@ -122,6 +129,8 @@ public final class ClawdeskModel: ObservableObject {
         codexLogMonitor.stop()
         healthTimer?.invalidate()
         healthTimer = nil
+        startupSyncTask?.cancel()
+        startupSyncTask = nil
         remoteNotifier.stop()
         remoteSSHManager.stop()
     }
@@ -130,6 +139,36 @@ public final class ClawdeskModel: ObservableObject {
         guard serverPort > 0 else { return }
         claudeHookHealth.check(port: serverPort)
         objectWillChange.send()
+    }
+
+    /// Reconcile only integrations that the user explicitly enabled or that
+    /// still contain a verifiable Clawdesk ownership marker. This mirrors the
+    /// upstream startup sync while preventing a launch from creating config
+    /// files for agents the user never installed.
+    private func synchronizeEnabledIntegrations() {
+        let discovered = Set(doctor.managedAgentIDs())
+        let candidates = AgentRegistry.all.map(\.id).filter { agentID in
+            HookInstaller.supportedAgentIDs.contains(agentID)
+                && (preferences.enabledAgentIDs.contains(agentID) || discovered.contains(agentID))
+        }
+
+        for agentID in candidates {
+            do {
+                let result: HookInstallResult
+                if discovered.contains(agentID) {
+                    result = try hookInstaller.repairExistingAgent(agentID: agentID, port: serverPort)
+                } else {
+                    result = try hookInstaller.install(agentID: agentID, port: serverPort)
+                }
+                guard result.changed else { continue }
+                agentInstallStatus[agentID] = result.message
+                eventLog.insert("system · startup integration sync: \(result.message)", at: 0)
+            } catch {
+                let message = "startup integration sync failed for \(agentID): \(error.localizedDescription)"
+                agentInstallStatus[agentID] = message
+                eventLog.insert("system · \(message)", at: 0)
+            }
+        }
     }
 
     public func receive(_ message: ServerMessage) {
@@ -235,6 +274,7 @@ public final class ClawdeskModel: ObservableObject {
     public func installAgent(_ agentID: String) {
         do {
             let result = try hookInstaller.install(agentID: agentID, port: serverPort)
+            preferences.enabledAgentIDs.insert(agentID)
             agentInstallStatus[agentID] = result.message
             if agentID == "claude-code", preferences.collectClaudeUsage {
                 _ = try hookInstaller.ensureClaudeStatusLine()
@@ -249,6 +289,7 @@ public final class ClawdeskModel: ObservableObject {
     public func uninstallAgent(_ agentID: String) {
         do {
             let result = try hookInstaller.uninstall(agentID: agentID)
+            preferences.enabledAgentIDs.remove(agentID)
             agentInstallStatus[agentID] = result.message
             eventLog.insert("system · \(result.message)", at: 0)
         } catch {

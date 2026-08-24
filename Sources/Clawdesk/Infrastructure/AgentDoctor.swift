@@ -84,6 +84,74 @@ public final class AgentDoctor {
         }
     }
 
+    /// Returns agents for which Clawdesk can prove ownership of an existing
+    /// integration. Startup reconciliation uses this instead of guessing
+    /// from an agent's executable or creating every possible config file.
+    public func managedAgentIDs() -> [String] {
+        AgentRegistry.all.compactMap { agent in
+            guard HookInstaller.supportedAgentIDs.contains(agent.id),
+                  integrationResourceURLs(for: agent.id).contains(where: {
+                      isManagedResource($0, agentID: agent.id)
+                  }) else { return nil }
+            return agent.id
+        }
+    }
+
+    private func integrationResourceURLs(for agentID: String) -> [URL] {
+        let home = installer.homeDirectory
+        switch agentID {
+        case "opencode":
+            return configURLs(for: agentID) + [
+                home.appendingPathComponent("Library/Application Support/Clawdesk/plugins/opencode-plugin", isDirectory: true)
+            ]
+        case "mimocode":
+            return configURLs(for: agentID) + [
+                home.appendingPathComponent("Library/Application Support/Clawdesk/plugins/mimocode-plugin", isDirectory: true)
+            ]
+        case "openclaw":
+            return configURLs(for: agentID) + [
+                home.appendingPathComponent("Library/Application Support/Clawdesk/plugins/openclaw-plugin", isDirectory: true)
+            ]
+        case "hermes":
+            let root = ProcessInfo.processInfo.environment["HERMES_HOME"].flatMap {
+                $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true)
+            } ?? home.appendingPathComponent(".hermes", isDirectory: true)
+            return [root.appendingPathComponent("plugins/clawdesk", isDirectory: true)]
+        case "pi":
+            return [home.appendingPathComponent(".pi/agent/extensions/clawdesk", isDirectory: true)]
+        case "deepseek-harness":
+            let root = ProcessInfo.processInfo.environment["DSH_HOME"].flatMap {
+                $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true)
+            } ?? home.appendingPathComponent(".dsh", isDirectory: true)
+            return [root.appendingPathComponent("profiles/web/node_modules/@dsh-external/dsh-clawd-bridge", isDirectory: true)]
+        default:
+            return configURLs(for: agentID)
+        }
+    }
+
+    private func isManagedResource(_ url: URL, agentID: String) -> Bool {
+        guard fileManager.fileExists(atPath: url.path) else { return false }
+        if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            let markerURL = url.appendingPathComponent(".clawdesk-managed.json")
+            guard let data = try? Data(contentsOf: markerURL),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return false
+            }
+            return object["app"] as? String == "Clawdesk"
+                && object["agent"] as? String == agentID
+                && object["marker"] as? String == "clawdesk-plugin-v1"
+        }
+
+        if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize), size > 2_000_000 {
+            return false
+        }
+        guard let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8) else { return false }
+        return text.contains(HookInstaller.marker)
+            || text.contains("# BEGIN CLAWDESK agent=\(agentID)")
+            || text.contains("clawdesk-plugin-v1")
+    }
+
     private func diagnose(agent: AgentDescriptor) -> AgentDiagnostic {
         let urls = configURLs(for: agent.id)
         guard !urls.isEmpty else {

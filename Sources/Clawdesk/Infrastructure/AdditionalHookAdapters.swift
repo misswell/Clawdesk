@@ -195,7 +195,11 @@ extension HookInstaller {
         return HookInstallResult(agentID: "kiro-cli", configPath: configURL, changed: true, message: "Managed Kiro clawdesk agent removed.")
     }
 
-    private func installKimiHooks() throws -> HookInstallResult {
+    func repairKimiHooks() throws -> HookInstallResult {
+        try installKimiHooks(existingOnly: true)
+    }
+
+    private func installKimiHooks(existingOnly: Bool = false) throws -> HookInstallResult {
         try writeSharedHookScript()
         let paths = [
             homeDirectory.appendingPathComponent(".kimi/config.toml"),
@@ -207,7 +211,8 @@ extension HookInstaller {
             // user installed the legacy CLI. An existing directory is the
             // same presence signal used by the upstream installer.
             let parent = path.deletingLastPathComponent()
-            guard fileManager.fileExists(atPath: parent.path) || path == paths[0] else { continue }
+            guard fileManager.fileExists(atPath: parent.path) || (!existingOnly && path == paths[0]) else { continue }
+            if existingOnly && !fileManager.fileExists(atPath: path.path) { continue }
             var source = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
             let permissionMode = kimiPermissionMode(source: source, configURL: path)
             let region = tomlRegion(agentID: "kimi-cli", events: [

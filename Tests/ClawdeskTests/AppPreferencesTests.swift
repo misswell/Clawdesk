@@ -62,4 +62,16 @@ final class AppPreferencesTests: XCTestCase {
         let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
         XCTAssertEqual(reloaded.permissionAutomation, .autoTools)
     }
+
+    func testEnabledAgentIDsPersistAsSortedUserDefaultsValues() {
+        let suite = "clawdesk-enabled-agents-\(UUID().uuidString)"
+        let prefs = makePreferences(suite: suite)
+        prefs.enabledAgentIDs = ["codex", "claude-code"]
+
+        let defaults = UserDefaults(suiteName: suite)!
+        XCTAssertEqual(defaults.stringArray(forKey: "enabledAgentIDs"), ["claude-code", "codex"])
+
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertEqual(reloaded.enabledAgentIDs, ["claude-code", "codex"])
+    }
 }
