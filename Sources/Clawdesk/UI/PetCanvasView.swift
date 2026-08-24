@@ -481,11 +481,6 @@ public final class PetCanvasView: NSView {
             drawSleepMarks(in: context)
         case .waking:
             drawSparkle(in: context)
-        case .dragging:
-            fillEllipse(context, rect: CGRect(x: 36, y: 34, width: 16, height: 16), color: theme.palette.highlight.cgColor())
-            fillRect(context, CGRect(x: 40, y: 50, width: 8, height: 35), theme.palette.highlight.cgColor())
-        case .miniPeek:
-            fillRect(context, CGRect(x: 173, y: 72, width: 25, height: 7), theme.palette.highlight.cgColor())
         default:
             break
         }
