@@ -21,13 +21,14 @@ public struct IdleAnimationCycle: Equatable, Sendable {
         activity: Date,
         animations: [ThemeIdleAnimation],
         selectedIdleFile: String?,
+        quietPeriod: TimeInterval = Self.quietPeriod,
         randomIndex: (Int) -> Int
     ) -> ThemeIdleAnimation? {
         if self.activity != activity {
             reset(for: activity)
         }
         guard !hasPlayed,
-              now.timeIntervalSince(activity) >= Self.quietPeriod else { return nil }
+              now.timeIntervalSince(activity) >= max(0.25, quietPeriod) else { return nil }
 
         hasPlayed = true
         let pool = animations.filter { $0.file != selectedIdleFile }

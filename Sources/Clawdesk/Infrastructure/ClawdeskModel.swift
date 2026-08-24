@@ -36,10 +36,12 @@ public final class ClawdeskModel: ObservableObject {
     private var kimiGateOrder: [String: [String]] = [:]
     var lastPointerActivity = Date.now
     var dozingSince: Date?
+    private var sleepPhaseStartedAt: Date?
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
     private var healthTimer: Timer?
     private var startupSyncTask: Task<Void, Never>?
+    private var sleepTransitionTask: Task<Void, Never>?
 
     public init(
         preferences: AppPreferences = AppPreferences(),
@@ -69,9 +71,18 @@ public final class ClawdeskModel: ObservableObject {
         preferences.$doNotDisturb.sink { [weak self] enabled in
             guard let self else { return }
             if enabled {
-                self.petState = .sleeping
-            } else if self.petState == .sleeping {
-                self.petState = self.preferences.isMiniMode ? .miniIdle : .idle
+                self.resetSleepSequence()
+                let timings = self.preferences.theme.timings
+                if timings.sleepMode == .direct {
+                    self.petState = .sleeping
+                } else if timings.dndSleepTransitionFile != nil || timings.dndSkipYawn {
+                    self.beginSleepPhase(.collapsing, at: .now, after: timings.dndCollapseDuration)
+                } else {
+                    self.beginSleepPhase(.yawning, at: .now, after: timings.yawnDuration)
+                }
+            } else if self.petState.isSleepSequence {
+                self.resetSleepSequence()
+                self.beginWakeTransition()
             }
         }.store(in: &preferenceCancellables)
         preferences.$autoStart.dropFirst().sink { [weak self] enabled in
@@ -121,6 +132,8 @@ public final class ClawdeskModel: ObservableObject {
 
     public func stop() {
         completionTask?.cancel()
+        sleepTransitionTask?.cancel()
+        sleepTransitionTask = nil
         for task in kimiSuspectTasks.values { task.cancel() }
         kimiSuspectTasks.removeAll()
         kimiGateOrder.removeAll()
@@ -246,10 +259,15 @@ public final class ClawdeskModel: ObservableObject {
         }
         lastPointerLocation = point
         lastPointerActivity = .now
-        guard !preferences.doNotDisturb, petState == .sleeping || petState == .dozing else { return }
-        dozingSince = nil
-        petState = .waking
-        scheduleReturn(to: preferences.isMiniMode ? .miniIdle : fallbackState, after: 0.9)
+        guard !preferences.doNotDisturb, petState.isSleepSequence else { return }
+        resetSleepSequence()
+        if petState == .yawning {
+            petState = preferences.isMiniMode ? .miniIdle : fallbackState
+        } else if petState == .dozing {
+            beginDozeWakeTransition()
+        } else {
+            beginWakeTransition()
+        }
     }
 
     public func resolvePermission(id: String, decision: PermissionDecision) {
@@ -308,19 +326,37 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func tickForSleep(now: Date = .now) -> Bool {
-        guard !preferences.doNotDisturb, now.timeIntervalSince(lastPointerActivity) >= 60 else { return false }
-        guard petState == .idle || petState == .typing || petState == .dozing else {
-            dozingSince = nil
+        guard !preferences.doNotDisturb else { return false }
+        let transition = SleepSequencePlanner.next(
+            state: petState,
+            now: now,
+            lastPointerActivity: lastPointerActivity,
+            phaseStartedAt: sleepPhaseStartedAt,
+            timings: preferences.theme.timings
+        )
+        switch transition {
+        case .none:
             return false
-        }
-        if let since = dozingSince {
-            guard now.timeIntervalSince(since) >= 25 else { return false }
+        case .beginYawning:
             dozingSince = nil
+            beginSleepPhase(.yawning, at: now, after: preferences.theme.timings.yawnDuration)
+        case .beginDozing:
+            let timings = preferences.theme.timings
+            let remainingDeepSleep = timings.deepSleepTimeout - now.timeIntervalSince(lastPointerActivity)
+            if remainingDeepSleep <= 0 {
+                beginSleepPhase(.collapsing, at: now, after: timings.collapseDuration)
+            } else {
+                sleepPhaseStartedAt = now
+                dozingSince = now
+                petState = .dozing
+                scheduleSleepTransition(after: remainingDeepSleep)
+            }
+        case .beginCollapsing:
+            beginSleepPhase(.collapsing, at: now, after: preferences.theme.timings.collapseDuration)
+        case .beginSleeping:
+            resetSleepSequence()
             petState = .sleeping
-            return true
         }
-        dozingSince = now
-        petState = .dozing
         return true
     }
 
@@ -328,13 +364,13 @@ public final class ClawdeskModel: ObservableObject {
         if let transition = sessionStore.pruneStale() {
             sessions = transition.sessions
             publishSnapshot(state: transition.state, sessions: transition.sessions)
-            if !preferences.doNotDisturb, petState != .sleeping { petState = transition.state }
+            if !preferences.doNotDisturb, !petState.isSleepSequence { petState = transition.state }
         }
         _ = tickForSleep()
     }
 
     private func apply(_ event: AgentEvent) {
-        dozingSince = nil
+        resetSleepSequence()
         if let question = event.question {
             pendingQuestions.removeAll { $0.id == question.id }
             pendingQuestions.append(question)
@@ -395,10 +431,73 @@ public final class ClawdeskModel: ObservableObject {
             try? await Task.sleep(for: .seconds(seconds))
             guard let self, !Task.isCancelled else { return }
             if self.petState == .attention || self.petState == .error || self.petState == .notification
-                || self.petState == .waking || self.petState == .dozing || self.petState == .sleeping {
+                || self.petState == .waking || self.petState == .wakingFromDoze || self.petState.isSleepSequence {
                 self.petState = self.preferences.isMiniMode ? .miniIdle : state
             }
         }
+    }
+
+    private func scheduleSleepTransition(after seconds: TimeInterval) {
+        sleepTransitionTask?.cancel()
+        guard seconds > 0 else { return }
+        sleepTransitionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, !Task.isCancelled else { return }
+            self.sleepTransitionTask = nil
+            if self.preferences.doNotDisturb {
+                self.advanceDoNotDisturbSleep()
+            } else {
+                _ = self.tickForSleep()
+            }
+        }
+    }
+
+    private func beginSleepPhase(_ state: PetState, at date: Date, after seconds: TimeInterval) {
+        sleepPhaseStartedAt = date
+        petState = state
+        if state == .collapsing, seconds <= 0 {
+            resetSleepSequence()
+            petState = .sleeping
+            return
+        }
+        scheduleSleepTransition(after: seconds)
+    }
+
+    private func advanceDoNotDisturbSleep() {
+        guard preferences.doNotDisturb else { return }
+        switch petState {
+        case .yawning:
+            beginSleepPhase(.collapsing, at: .now, after: preferences.theme.timings.dndCollapseDuration)
+        case .collapsing:
+            resetSleepSequence()
+            petState = .sleeping
+        default:
+            break
+        }
+    }
+
+    private func resetSleepSequence() {
+        sleepTransitionTask?.cancel()
+        sleepTransitionTask = nil
+        sleepPhaseStartedAt = nil
+        dozingSince = nil
+    }
+
+    private func beginWakeTransition() {
+        let target = preferences.isMiniMode ? .miniIdle : fallbackState
+        let timings = preferences.theme.timings
+        guard timings.sleepMode == .full || preferences.theme.hasVisualAsset(for: .waking) else {
+            petState = target
+            return
+        }
+        petState = .waking
+        scheduleReturn(to: target, after: preferences.theme.timings.wakeDuration)
+    }
+
+    private func beginDozeWakeTransition() {
+        let target = preferences.isMiniMode ? .miniIdle : fallbackState
+        petState = .wakingFromDoze
+        scheduleReturn(to: target, after: 0.35)
     }
 
     private var fallbackState: PetState {

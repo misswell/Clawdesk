@@ -1,5 +1,12 @@
 import Foundation
 
+enum ThemeAssetPathPolicy {
+    static func isSafeRelativePath(_ path: String) -> Bool {
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\") else { return false }
+        return path.split(separator: "/").allSatisfy { $0 != ".." && $0 != "." }
+    }
+}
+
 public struct RGBColor: Equatable, Sendable {
     public let red: Double
     public let green: Double
@@ -51,6 +58,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let stateFiles: [String: String]
     public let idleVisualFiles: [String]
     public let idleAnimations: [ThemeIdleAnimation]
+    public let timings: ThemeTimings
     public let sounds: [String: String]
 
     public init(
@@ -62,6 +70,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         stateFiles: [String: String] = [:],
         idleVisualFiles: [String]? = nil,
         idleAnimations: [ThemeIdleAnimation] = [],
+        timings: ThemeTimings = .standard,
         sounds: [String: String] = [:]
     ) {
         self.id = id
@@ -71,14 +80,23 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         self.assetDirectory = assetDirectory
         self.stateFiles = stateFiles
         self.sounds = sounds
-        self.idleAnimations = idleAnimations.filter { Self.isSafeRelativePath($0.file) }
+        self.idleAnimations = idleAnimations.filter { ThemeAssetPathPolicy.isSafeRelativePath($0.file) }
+        self.timings = timings
         let declared = idleVisualFiles ?? stateFiles["idle"].map { [$0] } ?? []
-        self.idleVisualFiles = declared.filter(Self.isSafeRelativePath)
+        self.idleVisualFiles = declared.filter(ThemeAssetPathPolicy.isSafeRelativePath)
     }
 
-    public func assetURL(for state: PetState, idleVisualFile: String? = nil) -> URL? {
+    public func assetURL(
+        for state: PetState,
+        idleVisualFile: String? = nil,
+        stateOverrideFile: String? = nil
+    ) -> URL? {
         guard let assetDirectory else { return nil }
-        if state == .idle, let idleVisualFile, Self.isSafeRelativePath(idleVisualFile) {
+        if let stateOverrideFile, ThemeAssetPathPolicy.isSafeRelativePath(stateOverrideFile) {
+            let url = assetDirectory.appendingPathComponent(stateOverrideFile)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        if state == .idle, let idleVisualFile, ThemeAssetPathPolicy.isSafeRelativePath(idleVisualFile) {
             return assetDirectory.appendingPathComponent(idleVisualFile)
         }
         let candidates = [
@@ -88,7 +106,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
             state == .miniIdle ? "idle" : nil
         ].compactMap { $0 }
         for key in candidates {
-            guard let file = stateFiles[key], Self.isSafeRelativePath(file) else { continue }
+            guard let file = stateFiles[key], ThemeAssetPathPolicy.isSafeRelativePath(file) else { continue }
             return assetDirectory.appendingPathComponent(file)
         }
         return nil
@@ -96,10 +114,24 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
 
     public var supportsIdleVisualSelection: Bool { idleVisualFiles.count > 1 }
 
-    private static func isSafeRelativePath(_ path: String) -> Bool {
-        guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\") else { return false }
-        return path.split(separator: "/").allSatisfy { $0 != ".." && $0 != "." }
+    /// Custom themes must provide a real asset before the model requests an
+    /// artwork-specific transition. The built-in native renderer has a
+    /// CoreGraphics fallback for every logical state, so it is considered
+    /// capable even though it has no asset directory.
+    public func hasVisualAsset(for state: PetState) -> Bool {
+        guard let assetDirectory else { return true }
+        let candidates = [
+            state.rawValue,
+            state == .typing ? "working" : nil,
+            state == .attention ? "happy" : nil,
+            state == .miniIdle ? "idle" : nil
+        ].compactMap { $0 }
+        return candidates.contains { key in
+            guard let file = stateFiles[key], ThemeAssetPathPolicy.isSafeRelativePath(file) else { return false }
+            return FileManager.default.fileExists(atPath: assetDirectory.appendingPathComponent(file).path)
+        }
     }
+
 }
 
 public enum ThemeCatalog {

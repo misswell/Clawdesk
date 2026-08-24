@@ -7,6 +7,7 @@ public final class PetCanvasView: NSView {
     public var petState: PetState = .idle {
         didSet {
             guard oldValue != petState else { return }
+            stateElapsed = 0
             if petState != .idle, petState != .miniIdle {
                 pointerOffset = .zero
                 pointerKnown = false
@@ -45,6 +46,16 @@ public final class PetCanvasView: NSView {
         }
     }
 
+    /// A theme-provided visual-only override used for a DND sleep transition.
+    /// The logical state remains `collapsing`, so lifecycle and wake semantics
+    /// do not depend on an artwork-specific state name.
+    public var stateAssetOverride: String? {
+        didSet {
+            animationClock.reset()
+            needsDisplay = true
+        }
+    }
+
     public var pointerOffset = CGPoint.zero {
         didSet {
             gazeMorph.setTarget(pointerOffset)
@@ -61,6 +72,7 @@ public final class PetCanvasView: NSView {
     public var onHoverChanged: ((Bool) -> Void)?
 
     private var phase: CGFloat = 0
+    private var stateElapsed: TimeInterval = 0
     private var animationClock = PetAnimationClock()
     private var gazeMorph = BloubGazeMorph()
     private var pointerKnown = false
@@ -114,6 +126,7 @@ public final class PetCanvasView: NSView {
     public func advanceFrame(at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         let delta = animationClock.advance(to: timestamp)
         phase += CGFloat(delta)
+        stateElapsed += delta
         gazeMorph.advance(by: delta)
         if phase > 1_000 { phase = 0 }
         needsDisplay = true
@@ -149,7 +162,7 @@ public final class PetCanvasView: NSView {
         switch petState {
         case .attention, .miniHappy: bob = sin(phase * 6) * 5
         case .error, .reactFlail: bob = sin(phase * 12) * 3
-        case .idle, .miniIdle, .sleeping, .dozing: bob = 0
+        case .idle, .miniIdle, .yawning, .dozing, .collapsing, .sleeping, .wakingFromDoze: bob = 0
         default: bob = sin(phase * 2) * 1.7
         }
         context.translateBy(x: bounds.midX, y: bounds.midY + bob)
@@ -168,7 +181,11 @@ public final class PetCanvasView: NSView {
 
     private func drawCustomAsset(in context: CGContext) -> Bool {
         let idleFile = petState == .idle ? idleVisualFile : nil
-        guard let url = theme.assetURL(for: petState, idleVisualFile: idleFile),
+        guard let url = theme.assetURL(
+            for: petState,
+            idleVisualFile: idleFile,
+            stateOverrideFile: stateAssetOverride
+        ),
               let animation = loadAsset(at: url),
               !animation.frames.isEmpty else { return false }
         let frame = currentFrame(in: animation)
@@ -374,30 +391,52 @@ public final class PetCanvasView: NSView {
         let radius: CGFloat = 74
         let bodyColor = theme.palette.body.cgColor()
         let eyeColor = NSColor.white.cgColor
-        let sleeping = petState == .sleeping || petState == .dozing
+        let dozing = petState == .dozing
+        let sleeping = petState == .sleeping
+        let yawning = petState == .yawning
+        let collapsing = petState == .collapsing
+        let wakingFromDoze = petState == .wakingFromDoze
         let idleLike = petState == .idle || petState == .miniIdle
+        let yawnProgress = yawning
+            ? min(1, max(0, stateElapsed / max(0.25, theme.timings.yawnDuration)))
+            : 0
+        let collapseDuration = stateAssetOverride != nil
+            ? max(0.25, theme.timings.dndCollapseDuration)
+            : max(0.25, theme.timings.collapseDuration)
+        let collapseProgress = collapsing
+            ? min(1, max(0, stateElapsed / collapseDuration))
+            : 0
+        let sleepPose = dozing || sleeping || collapsing
         let life = BloubMotion.liveliness(
             at: assetClock,
-            wander: idleLike && pointerKnown ? 0 : 1,
-            blink: !sleeping,
-            float: !sleeping
+            wander: idleLike && pointerKnown ? 0 : (sleepPose || yawning ? 0 : 1),
+            blink: !sleepPose && !wakingFromDoze,
+            float: !sleepPose && !yawning && !wakingFromDoze
         )
+        let yawnWave = sin(yawnProgress * .pi)
+        let bodyScaleX = 1 + yawnWave * 0.05 + collapseProgress * 0.26
+        let bodyScaleY = 1 + yawnWave * 0.10 - collapseProgress * 0.34
+        let sleepBreath = (dozing || sleeping)
+            ? 1 + sin((stateElapsed / 4) * .pi * 2) * 0.018
+            : 1
         let center = CGPoint(
             x: 110 + CGFloat(life.driftX) * radius,
-            y: 108 - CGFloat(life.driftY) * radius
+            y: 108 - CGFloat(life.driftY) * radius - collapseProgress * 6 + yawnProgress * 1.5
         )
-        let shift: CGFloat = sleeping ? -14 : 0
+        let shift: CGFloat = (dozing || sleeping ? -14 : 0) - collapseProgress * 2
 
         context.saveGState()
         context.translateBy(x: 0, y: shift)
 
-        // Body: a perfect circle (the bloub rest silhouette), breathing faintly.
-        let breath = CGFloat(life.breath)
+        // The bloub rest silhouette is round; sleep transitions deliberately
+        // squash or stretch that same shape instead of swapping in a heavy
+        // animation timeline.
+        let breath = CGFloat(life.breath * sleepBreath)
         let bodyRect = CGRect(
-            x: center.x - radius,
-            y: center.y - radius * breath,
-            width: radius * 2,
-            height: radius * 2 * breath
+            x: center.x - radius * CGFloat(bodyScaleX),
+            y: center.y - radius * CGFloat(bodyScaleY) * breath,
+            width: radius * 2 * CGFloat(bodyScaleX),
+            height: radius * 2 * CGFloat(bodyScaleY) * breath
         )
         fillEllipse(context, rect: bodyRect, color: bodyColor)
 
@@ -411,9 +450,19 @@ public final class PetCanvasView: NSView {
             roll: baseGaze.roll + life.dRoll
         )
         let poses = Self.bloubEyePoses(gaze: gaze, scale: Double(radius))
-        let lid = sleeping ? 0.0 : life.lid
+        let closeProgress: Double
+        if wakingFromDoze {
+            closeProgress = max(0, 1 - min(1, stateElapsed / 0.35))
+        } else if yawning {
+            closeProgress = min(1, max(0, (yawnProgress - 0.18) / 0.28))
+        } else {
+            closeProgress = sleepPose ? 1 : 0
+        }
+        let lid = min(1, max(0, life.lid * (1 - closeProgress)))
         let eyeWidth = 0.186 * Double(radius)
-        let eyeHeight = sleeping ? 0 : 0.412 * Double(radius) * (0.06 + 0.94 * lid)
+        let eyeHeight = closeProgress >= 0.999
+            ? 0
+            : 0.412 * Double(radius) * (0.06 + 0.94 * lid)
 
         for pose in poses {
             guard pose.depth > 0.02 else { continue }
@@ -447,6 +496,24 @@ public final class PetCanvasView: NSView {
             context.setFillColor(eyeColor)
             context.fillPath()
             context.restoreGState()
+        }
+
+        if yawning {
+            let mouthProgress = sin(min(1, max(0, (yawnProgress - 0.18) / 0.62)) * .pi)
+            if mouthProgress > 0 {
+                let mouthWidth = 7 + CGFloat(mouthProgress) * 7
+                let mouthHeight = 3 + CGFloat(mouthProgress) * 10
+                fillEllipse(
+                    context,
+                    rect: CGRect(
+                        x: center.x - mouthWidth / 2,
+                        y: center.y - 31 - CGFloat(mouthProgress) * 2,
+                        width: mouthWidth,
+                        height: mouthHeight
+                    ),
+                    color: theme.palette.shadow.cgColor()
+                )
+            }
         }
         context.restoreGState()
     }
@@ -484,8 +551,16 @@ public final class PetCanvasView: NSView {
             fillRect(context, CGRect(x: 145, y: 102, width: 43, height: 37), theme.palette.accent.cgColor())
             fillRect(context, CGRect(x: 164, y: 102, width: 5, height: 37), theme.palette.shadow.cgColor())
             fillRect(context, CGRect(x: 145, y: 119, width: 43, height: 5), theme.palette.shadow.cgColor())
-        case .sleeping, .dozing:
+        case .sleeping:
             drawSleepMarks(in: context)
+        case .collapsing:
+            let duration = stateAssetOverride != nil
+                ? max(0.25, theme.timings.dndCollapseDuration)
+                : max(0.25, theme.timings.collapseDuration)
+            let progress = min(1, max(0, stateElapsed / duration))
+            drawSleepMarks(in: context, alpha: CGFloat(progress))
+        case .yawning, .dozing, .wakingFromDoze:
+            break
         case .waking:
             drawSparkle(in: context)
         case .dragging, .miniPeek:
@@ -534,7 +609,9 @@ public final class PetCanvasView: NSView {
         }
     }
 
-    private func drawSleepMarks(in context: CGContext) {
+    private func drawSleepMarks(in context: CGContext, alpha: CGFloat = 1) {
+        context.saveGState()
+        context.setAlpha(alpha)
         let color = theme.palette.shadow.cgColor()
         fillRect(context, CGRect(x: 156, y: 24, width: 16, height: 4), color)
         fillRect(context, CGRect(x: 168, y: 28, width: 4, height: 12), color)
@@ -542,6 +619,7 @@ public final class PetCanvasView: NSView {
         fillRect(context, CGRect(x: 177, y: 44, width: 12, height: 4), color)
         fillRect(context, CGRect(x: 185, y: 48, width: 4, height: 10), color)
         fillRect(context, CGRect(x: 177, y: 54, width: 12, height: 4), color)
+        context.restoreGState()
     }
 
     private func drawSparkle(in context: CGContext) {

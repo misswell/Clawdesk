@@ -69,6 +69,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.cancelIdleAnimation(resetCycle: true)
             self?.petView.theme = model.preferences.theme
             self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
+            self?.updateStateAssetOverride()
         }.store(in: &cancellables)
         model.preferences.$idleVisualByTheme.sink { [weak self] _ in
             self?.cancelIdleAnimation(resetCycle: true)
@@ -76,6 +77,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$isMiniMode.sink { [weak self] enabled in
             self?.setMiniMode(enabled, animate: true)
+        }.store(in: &cancellables)
+        model.preferences.$doNotDisturb.sink { [weak self] _ in
+            self?.updateStateAssetOverride()
         }.store(in: &cancellables)
         model.preferences.$petScale.sink { [weak self] scale in
             self?.applyScale(scale, animate: true)
@@ -169,6 +173,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func apply(state: PetState) {
         guard !isDragging else { return }
+        updateStateAssetOverride(for: state)
         let wasResting = petView.petState == .idle || petView.petState == .miniIdle
         if state != .idle || !wasResting {
             cancelIdleAnimation(resetCycle: true)
@@ -183,6 +188,14 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         } else {
             petView.petState = state
         }
+    }
+
+    private func updateStateAssetOverride(for state: PetState? = nil) {
+        let logicalState = state ?? model.petState
+        let timings = model.preferences.theme.timings
+        petView.stateAssetOverride = model.preferences.doNotDisturb && logicalState == .collapsing
+            ? timings.dndSleepTransitionFile
+            : nil
     }
 
     private func beginDrag(at screenPoint: CGPoint) {
@@ -269,6 +282,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
                   activity: activity,
                   animations: model.preferences.theme.idleAnimations,
                   selectedIdleFile: selected,
+                  quietPeriod: model.preferences.theme.timings.mouseIdleTimeout,
                   randomIndex: { Int.random(in: 0..<$0) }
               ) else { return }
 

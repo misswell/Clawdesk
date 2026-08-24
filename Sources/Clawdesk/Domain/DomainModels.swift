@@ -11,9 +11,12 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     case notification
     case sweeping
     case carrying
+    case yawning
     case sleeping
     case dozing
+    case collapsing
     case waking
+    case wakingFromDoze = "waking-from-doze"
     case dragging
     case miniIdle = "mini-idle"
     case miniPeek = "mini-peek"
@@ -25,7 +28,7 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     public var isTransient: Bool {
         switch self {
         case .thinking, .error, .attention, .notification, .sweeping, .carrying,
-             .waking, .reactDouble, .reactFlail, .miniAlert, .miniHappy:
+             .yawning, .waking, .wakingFromDoze, .reactDouble, .reactFlail, .miniAlert, .miniHappy:
             return true
         default:
             return false
@@ -35,6 +38,15 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     public var isMini: Bool {
         switch self {
         case .miniIdle, .miniPeek, .miniAlert, .miniHappy:
+            return true
+        default:
+            return false
+        }
+    }
+
+    public var isSleepSequence: Bool {
+        switch self {
+        case .yawning, .dozing, .collapsing, .sleeping:
             return true
         default:
             return false
@@ -53,9 +65,12 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
         case .notification: return "Needs attention"
         case .sweeping: return "Compacting"
         case .carrying: return "Preparing"
+        case .yawning: return "Yawning"
         case .sleeping: return "Sleeping"
         case .dozing: return "Dozing"
+        case .collapsing: return "Falling asleep"
         case .waking: return "Waking"
+        case .wakingFromDoze: return "Waking"
         case .dragging: return "Dragging"
         case .miniIdle: return "Mini mode"
         case .miniPeek: return "Peeking"

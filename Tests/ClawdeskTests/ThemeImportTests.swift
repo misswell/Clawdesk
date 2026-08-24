@@ -106,6 +106,57 @@ final class ThemeImportTests: XCTestCase {
         XCTAssertEqual(preferences.theme.idleVisualFiles, ["idle.png", "look.apng", "blink.gif"])
     }
 
+    func testSleepTimingsAndFullSequenceStatesAreImported() throws {
+        let source = root.appendingPathComponent("sleep-theme", isDirectory: true)
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        let states = ["idle", "yawning", "dozing", "collapsing", "sleeping", "waking"]
+        let manifest: [String: Any] = [
+            "id": "sleep-theme",
+            "name": "Sleep Theme",
+            "sleepSequence": ["mode": "full"],
+            "states": Dictionary(uniqueKeysWithValues: states.map { ($0, "\($0).png") }),
+            "timings": [
+                "mouseSleepTimeout": 60_000,
+                "yawnDuration": 8_000,
+                "collapseDuration": 5_200,
+                "wakeDuration": 5_800,
+                "deepSleepTimeout": 600_000,
+                "dndSleepTransitionSvg": "dnd-transition.png",
+                "dndSleepTransitionDuration": 4_850,
+                "dndSkipYawn": true
+            ]
+        ]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: source.appendingPathComponent("theme.json"))
+        for state in states {
+            try Data("placeholder".utf8).write(to: source.appendingPathComponent("\(state).png"))
+        }
+        try Data("placeholder".utf8).write(to: source.appendingPathComponent("dnd-transition.png"))
+
+        let preferences = AppPreferences(defaults: defaults, homeDirectory: root)
+        try preferences.importTheme(from: source)
+
+        XCTAssertEqual(preferences.theme.timings.sleepMode, .full)
+        XCTAssertEqual(preferences.theme.timings.mouseSleepTimeout, 60, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.timings.yawnDuration, 8, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.timings.collapseDuration, 5.2, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.timings.wakeDuration, 5.8, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.timings.dndSleepTransitionFile, "dnd-transition.png")
+        XCTAssertEqual(preferences.theme.timings.dndSleepTransitionDuration, 4.85, accuracy: 0.001)
+        XCTAssertTrue(preferences.theme.timings.dndSkipYawn)
+        XCTAssertEqual(preferences.theme.assetURL(for: .collapsing)?.lastPathComponent, "collapsing.png")
+        XCTAssertEqual(
+            preferences.theme.assetURL(
+                for: .collapsing,
+                stateOverrideFile: preferences.theme.timings.dndSleepTransitionFile
+            )?.lastPathComponent,
+            "dnd-transition.png"
+        )
+        XCTAssertNotEqual(
+            preferences.theme.assetURL(for: .collapsing, stateOverrideFile: "../escape.png")?.lastPathComponent,
+            "escape.png"
+        )
+    }
+
     func testRejectsZipPathTraversalBeforeExtraction() throws {
         let archive = root.appendingPathComponent("unsafe.zip")
         let inner = root.appendingPathComponent("inner", isDirectory: true)
