@@ -93,6 +93,11 @@ public final class PetCanvasView: NSView {
 
     public override var acceptsFirstResponder: Bool { true }
 
+    /// The pet is the entire transparent backing surface. Incremental
+    /// AppKit clipping is useful for ordinary views, but it can preserve old
+    /// pixels when a new interaction state paints a smaller silhouette.
+    public override var wantsDefaultClipping: Bool { false }
+
     public override func updateTrackingAreas() {
         if let trackingArea { removeTrackingArea(trackingArea) }
         let area = NSTrackingArea(
@@ -152,6 +157,11 @@ public final class PetCanvasView: NSView {
         // canvas: the old interaction markers live outside many AppKit dirty
         // rects, so clearing only dirtyRect can leave a horizontal or vertical
         // remnant behind after hover/drag transitions.
+        // AppKit may already have installed a dirty-rect clip on the
+        // CGContext. Replace it with a clip to the whole pet canvas before
+        // clearing so the transparent backing surface is genuinely reset.
+        context.resetClip()
+        context.clip(to: bounds)
         context.clear(bounds)
         context.setShouldAntialias(true)
         context.translateBy(x: 0, y: bounds.height)
