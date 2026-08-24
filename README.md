@@ -12,10 +12,11 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.8 release adds upstream-style startup integration sync: explicitly
-enabled agents are remembered, previously managed configurations are repaired
-after launch, and unrelated agent config files are not created. Kimi's two
-profiles are repaired without cross-creating the other profile.
+The 0.1.9 release adds the upstream idle animation cycle: theme-provided idle
+animations play once after a quiet mouse period, then return to the selected
+resting visual and cancel immediately on interaction. It also includes the
+0.1.8 startup integration sync, which remembers explicitly enabled agents and
+repairs managed configurations without creating unrelated agent config files.
 
 The local bridge listens on `127.0.0.1` and writes its current port to
 `~/Library/Application Support/Clawdesk/runtime.json`.

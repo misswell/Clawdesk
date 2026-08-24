@@ -27,6 +27,48 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertEqual(clock.advance(to: 10.35), 0.25, accuracy: 0.0001)
     }
 
+    func testIdleAnimationCyclePlaysOnceAfterQuietPeriodAndSkipsSelectedRestingFile() {
+        let activity = Date(timeIntervalSince1970: 10_000)
+        let animations = [
+            ThemeIdleAnimation(file: "selected.gif", duration: 1),
+            ThemeIdleAnimation(file: "look.gif", duration: 6.5)
+        ]
+        var cycle = IdleAnimationCycle()
+
+        XCTAssertNil(cycle.choose(
+            now: activity.addingTimeInterval(19.9),
+            activity: activity,
+            animations: animations,
+            selectedIdleFile: "selected.gif",
+            randomIndex: { _ in 0 }
+        ))
+        let first = cycle.choose(
+            now: activity.addingTimeInterval(20),
+            activity: activity,
+            animations: animations,
+            selectedIdleFile: "selected.gif",
+            randomIndex: { _ in 0 }
+        )
+        XCTAssertEqual(first?.file, "look.gif")
+        XCTAssertNil(cycle.choose(
+            now: activity.addingTimeInterval(40),
+            activity: activity,
+            animations: animations,
+            selectedIdleFile: "selected.gif",
+            randomIndex: { _ in 0 }
+        ))
+
+        let nextActivity = activity.addingTimeInterval(41)
+        cycle.reset(for: nextActivity)
+        XCTAssertEqual(cycle.choose(
+            now: nextActivity.addingTimeInterval(20),
+            activity: nextActivity,
+            animations: animations,
+            selectedIdleFile: "selected.gif",
+            randomIndex: { _ in 0 }
+        )?.file, "look.gif")
+    }
+
     @MainActor
     func testScreenPointerLocationMovesIdleEyesThroughWindowCoordinates() {
         let viewFrame = NSRect(x: 0, y: 0, width: 240, height: 240)
@@ -138,6 +180,30 @@ final class PetInteractionTests: XCTestCase {
     }
 
     @MainActor
+    func testPartialRedrawClearsInteractionCornersOutsideDirtyRect() {
+        let frame = NSRect(x: 0, y: 0, width: 220, height: 220)
+        let theme = ThemeCatalog.theme(id: "pinch")
+        let view = PetCanvasView(frame: frame)
+        view.theme = theme
+        let image = makeBitmap(width: 220, height: 220)
+
+        paintLegacyCornerMarks(in: image, theme: theme)
+        XCTAssertGreaterThan(image.colorAt(x: 44, y: 65)?.alphaComponent ?? 0, 0.9)
+        XCTAssertGreaterThan(image.colorAt(x: 185, y: 75)?.alphaComponent ?? 0, 0.9)
+        view.petState = .idle
+        render(view, dirtyRect: NSRect(x: 96, y: 96, width: 28, height: 28), into: image)
+
+        XCTAssertFalse(
+            (image.colorAt(x: 44, y: 65)?.alphaComponent ?? 0) > 0.1,
+            "A partial redraw must clear the former upper-left drag marker"
+        )
+        XCTAssertFalse(
+            (image.colorAt(x: 185, y: 75)?.alphaComponent ?? 0) > 0.1,
+            "A partial redraw must clear the former upper-right hover marker"
+        )
+    }
+
+    @MainActor
     private func render(_ view: PetCanvasView) -> NSBitmapImageRep {
         let image = makeBitmap(width: 220, height: 220)
         render(view, into: image)
@@ -146,12 +212,32 @@ final class PetInteractionTests: XCTestCase {
 
     @MainActor
     private func render(_ view: PetCanvasView, into image: NSBitmapImageRep) {
+        render(view, dirtyRect: view.bounds, into: image)
+    }
+
+    @MainActor
+    private func render(_ view: PetCanvasView, dirtyRect: NSRect, into image: NSBitmapImageRep) {
         let graphicsContext = NSGraphicsContext(bitmapImageRep: image)!
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = graphicsContext
-        view.draw(view.bounds)
+        view.draw(dirtyRect)
         graphicsContext.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
+    }
+
+    @MainActor
+    private func paintLegacyCornerMarks(in image: NSBitmapImageRep, theme: ThemeDefinition) {
+        guard let data = image.bitmapData else { return }
+        let red = UInt8((theme.palette.highlight.red * 255).rounded())
+        let green = UInt8((theme.palette.highlight.green * 255).rounded())
+        let blue = UInt8((theme.palette.highlight.blue * 255).rounded())
+        for (x, y) in [(44, 65), (185, 75)] {
+            let offset = y * image.bytesPerRow + x * 4
+            data[offset] = red
+            data[offset + 1] = green
+            data[offset + 2] = blue
+            data[offset + 3] = 255
+        }
     }
 
     private func makeBitmap(width: Int, height: Int) -> NSBitmapImageRep {

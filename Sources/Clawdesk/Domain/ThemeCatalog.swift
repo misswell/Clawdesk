@@ -31,6 +31,17 @@ public struct PetPalette: Equatable, Sendable {
     }
 }
 
+public struct ThemeIdleAnimation: Equatable, Sendable {
+    public let file: String
+    /// Duration in seconds. Theme manifests express this value in ms.
+    public let duration: TimeInterval
+
+    public init(file: String, duration: TimeInterval) {
+        self.file = file
+        self.duration = min(60, max(0.25, duration.isFinite ? duration : 1.0))
+    }
+}
+
 public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let id: String
     public let displayName: String
@@ -39,6 +50,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let assetDirectory: URL?
     public let stateFiles: [String: String]
     public let idleVisualFiles: [String]
+    public let idleAnimations: [ThemeIdleAnimation]
     public let sounds: [String: String]
 
     public init(
@@ -49,6 +61,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         assetDirectory: URL? = nil,
         stateFiles: [String: String] = [:],
         idleVisualFiles: [String]? = nil,
+        idleAnimations: [ThemeIdleAnimation] = [],
         sounds: [String: String] = [:]
     ) {
         self.id = id
@@ -58,6 +71,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         self.assetDirectory = assetDirectory
         self.stateFiles = stateFiles
         self.sounds = sounds
+        self.idleAnimations = idleAnimations.filter { Self.isSafeRelativePath($0.file) }
         let declared = idleVisualFiles ?? stateFiles["idle"].map { [$0] } ?? []
         self.idleVisualFiles = declared.filter(Self.isSafeRelativePath)
     }

@@ -15,6 +15,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Codex official hook shape + feature flag | `HookInstaller` | Implemented |
 | Transparent floating pet window | `PetWindowController` | Implemented |
 | Low-power native animation loop | `PetCanvasView` | Implemented |
+| Idle animation cycle | `IdleAnimationCycle` + `PetWindowController` | Implemented: theme `idleAnimations` durations are parsed from milliseconds, one random animation plays after 20 seconds of mouse silence, and movement/state changes cancel it back to the selected idle visual |
 | Idle eye tracking, drag, mini mode, hover peek | `PetCanvasView` / `PetWindowController` | Implemented |
 | Sleep sequence (doze → sleep → wake) | `ClawdeskModel` | Implemented: 60s of mouse idle enters dozing, then sleeping after another 25s; mouse activity wakes through a waking transition |
 | Double tap / rapid four-tap reactions | `PetCanvasView` | Implemented |
