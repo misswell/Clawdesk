@@ -12,10 +12,10 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.7 release keeps the 0.1.6 interaction fix, clears transparent pet
-frames so hover/drag marks cannot leave corner artifacts, and adds native
-ZCode manual permission approval with a safe fallback to ZCode's own
-permission UI.
+The 0.1.8 release adds upstream-style startup integration sync: explicitly
+enabled agents are remembered, previously managed configurations are repaired
+after launch, and unrelated agent config files are not created. Kimi's two
+profiles are repaired without cross-creating the other profile.
 
 The local bridge listens on `127.0.0.1` and writes its current port to
 `~/Library/Application Support/Clawdesk/runtime.json`.

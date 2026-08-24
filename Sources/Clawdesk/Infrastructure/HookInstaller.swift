@@ -66,6 +66,17 @@ public final class HookInstaller {
         }
     }
 
+    /// Repairs an integration that is already owned by Clawdesk. Most
+    /// adapters are naturally existing-only because their managed marker lives
+    /// in the config they merge; Kimi needs a separate path to avoid creating
+    /// its legacy profile while repairing the modern profile.
+    public func repairExistingAgent(agentID: String, port: UInt16) throws -> HookInstallResult {
+        if agentID == "kimi-cli" {
+            return try repairKimiHooks()
+        }
+        return try install(agentID: agentID, port: port)
+    }
+
     public func uninstall(agentID: String) throws -> HookInstallResult {
         switch agentID {
         case "claude-code": return try uninstallClaudeHooks()

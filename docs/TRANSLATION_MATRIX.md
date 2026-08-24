@@ -35,7 +35,7 @@ Status legend:
 | zcode lifecycle + manual `PermissionRequest` approval | Done | `AdditionalHookAdapters` + `AgentEventAdapters` strict ZCode response |
 | opencode/mimocode, openclaw, hermes, pi, dsh | Done | `PluginHookAdapters` |
 | `context-usage.js`, `antigravity-*` | Partial | statusline quota for Claude; Antigravity context pending |
-| `integration-sync.js` | Partial | install-on-launch reconcile pending |
+| `integration-sync.js` | Done | startup reconciliation of explicitly enabled or previously managed integrations; ownership markers prevent unrelated config creation |
 
 ## Pet / rendering / themes / roam
 

@@ -47,6 +47,10 @@ public final class AppPreferences: ObservableObject {
     @Published public var collectClaudeUsage: Bool { didSet { persist() } }
     @Published public var autoCheckForUpdates: Bool { didSet { persist() } }
     @Published public var showQuotaRing: Bool { didSet { persist() } }
+    /// Agent integrations explicitly installed from Settings. Existing
+    /// managed configurations are still discovered at startup so upgrades
+    /// from versions before this preference remain repairable.
+    @Published public var enabledAgentIDs: Set<String> { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
@@ -83,6 +87,7 @@ public final class AppPreferences: ObservableObject {
         collectClaudeUsage = defaults.object(forKey: "collectClaudeUsage") as? Bool ?? false
         autoCheckForUpdates = defaults.object(forKey: "autoCheckForUpdates") as? Bool ?? true
         showQuotaRing = defaults.object(forKey: "showQuotaRing") as? Bool ?? true
+        enabledAgentIDs = Set(defaults.stringArray(forKey: "enabledAgentIDs") ?? [])
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
@@ -197,6 +202,7 @@ public final class AppPreferences: ObservableObject {
         defaults.set(collectClaudeUsage, forKey: "collectClaudeUsage")
         defaults.set(autoCheckForUpdates, forKey: "autoCheckForUpdates")
         defaults.set(showQuotaRing, forKey: "showQuotaRing")
+        defaults.set(Array(enabledAgentIDs).sorted(), forKey: "enabledAgentIDs")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")
