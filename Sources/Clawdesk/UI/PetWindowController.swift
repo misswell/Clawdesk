@@ -7,6 +7,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private let model: ClawdeskModel
     private let petView: PetCanvasView
     private let quotaRing: QuotaRingWindowController
+    private let sessionHUD: SessionHUDWindowController
     private var animationTimer: Timer?
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
@@ -29,6 +30,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     public init(model: ClawdeskModel) {
         self.model = model
         quotaRing = QuotaRingWindowController(model: model)
+        sessionHUD = SessionHUDWindowController(model: model)
         let base = 240.0 * model.preferences.petScale
         petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: base, height: base))
         let panel = NSPanel(
@@ -54,16 +56,26 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         petView.onDragBegan = { [weak self] point in self?.beginDrag(at: point) }
         petView.onDrag = { [weak self] point in self?.drag(to: point) }
         petView.onDragEnded = { [weak self] in self?.endDrag() }
+        petView.onClick = { [weak self] in self?.revealSessionHUD() }
         petView.onDoubleTap = { [weak self] in self?.showReaction(.reactDouble, duration: 1.3) }
         petView.onFlail = { [weak self] in self?.showReaction(.reactFlail, duration: 1.4) }
         petView.onContextMenu = { [weak self] _ in self?.makeContextMenu() }
         petView.onHoverChanged = { [weak self] hovering in self?.handleHover(hovering) }
+        sessionHUD.onSessionSelected = { [weak self] session in
+            _ = TerminalFocusService.focus(session)
+            self?.sessionHUD.hide()
+        }
+        sessionHUD.onOverflowSelected = { [weak self] in
+            self?.sessionHUD.hide()
+            self?.onDashboard?()
+        }
 
         model.$petState.sink { [weak self] state in
             self?.apply(state: state)
         }.store(in: &cancellables)
         model.$sessions.sink { [weak self] sessions in
             self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
+            self?.refreshSessionHUD()
         }.store(in: &cancellables)
         model.preferences.$selectedThemeID.sink { [weak self] _ in
             self?.cancelIdleAnimation(resetCycle: true)
@@ -154,6 +166,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         cancelIdleAnimation(resetCycle: true)
         dragAnchor = nil
         hoverRestoreTask?.cancel()
+        sessionHUD.stop()
         quotaRing.hide()
         close()
     }
@@ -163,6 +176,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         cancelIdleAnimation(resetCycle: true)
         petView.miniMode = enabled
         if enabled {
+            sessionHUD.hide()
             moveToMiniEdge(animated: animate)
             if model.petState == .idle { petView.petState = .miniIdle }
         } else {
@@ -201,6 +215,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func beginDrag(at screenPoint: CGPoint) {
         guard let window else { return }
         cancelIdleAnimation(resetCycle: true)
+        sessionHUD.hide()
         isDragging = true
         dragAnchor = PetDragAnchor(windowOrigin: window.frame.origin, pointerOrigin: screenPoint)
         petView.petState = .dragging
@@ -254,6 +269,21 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
                 self.apply(state: self.model.petState)
             }
         }
+    }
+
+    private func revealSessionHUD() {
+        guard !model.preferences.isMiniMode,
+              !isDragging,
+              let frame = window?.frame else { return }
+        sessionHUD.reveal(petWindowFrame: frame)
+    }
+
+    private func refreshSessionHUD() {
+        guard let frame = window?.frame else { return }
+        sessionHUD.update(
+            petWindowFrame: frame,
+            enabled: !model.preferences.isMiniMode && !isDragging
+        )
     }
 
     /// Replays one upstream theme-provided idle animation after a quiet mouse
@@ -345,6 +375,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         let target = NSPoint(x: frame.maxX - window.frame.width - 26, y: max(frame.minY + 30, window.frame.minY))
         window.setFrameOrigin(target)
         model.preferences.windowOrigin = target
+        sessionHUD.hide()
     }
 
     private func checkRoam() {
@@ -419,6 +450,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         } else if !isDragging {
             model.preferences.windowOrigin = target.origin
         }
+        refreshSessionHUD()
     }
 
     private func screenForWindow(_ window: NSWindow) -> NSScreen? {
@@ -489,6 +521,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     public func windowDidMove(_ notification: Notification) {
         guard !isDragging else { return }
         refreshQuotaRing()
+        refreshSessionHUD()
         guard !model.preferences.isMiniMode, !isRoaming else { return }
         model.preferences.windowOrigin = window?.frame.origin
     }

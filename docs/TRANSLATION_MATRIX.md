@@ -1,7 +1,7 @@
 # Upstream → Clawdesk translation matrix
 
 Working audit of the upstream `clawd-on-desk` implementation (`src/**`, `hooks/**`,
-baseline `e4961f25…`) translated module-by-module into native Swift Clawdesk.
+baseline `a7283581…`) translated module-by-module into native Swift Clawdesk.
 Status legend:
 
 - **Done** — semantics implemented in Clawdesk (native seam listed).
@@ -20,7 +20,7 @@ Status legend:
 | `state-account-quota.js` | Partial | `QuotaStore`; account-level persistence pending |
 | `subagent-lifecycle.js`, `server-windows-process-metadata.js` | Partial | subagent count mapping; Windows process metadata excluded |
 | `transcript-path.js`, `codex-monitor-callback.js`, `codex-official-activity.js`, `codex-assistant-output.js`, `codex-session-index.js`, `codex-user-input.js`, `codex-subagent-fields.js`, `codex-turn-id.js`, `codex-turn-fence.js`, `codex-originator.js` | Partial | `CodexLogMonitor` + adapters |
-| `session-alias.js`, `session-key.js`, `session-open-folder.js`, `session-recovery-loader.js`, `session-focus*.js`, `session-ipc.js`, `session-hud*.js` | Partial | Dashboard/Sessions menu focus; Session HUD pending |
+| `session-alias.js`, `session-key.js`, `session-open-folder.js`, `session-recovery-loader.js`, `session-focus*.js`, `session-ipc.js`, `session-hud*.js` | Partial | Dashboard/Sessions menu focus + native click-reveal Session HUD; pinning, hot-zone grace, and richer session metadata pending |
 | `session-automation-*.js`, `permission-automation-policy.js`, `permission-automation-confirmation*.js` | Partial | `PermissionPolicy` (fail-closed); per-session grants pending |
 | `bubble-format.js`, `bubble-policy.js`, `bubble-renderer.js`, `permission.js`, `preload-bubble.js` | Partial | `PermissionBubbleController` + suggestions |
 | `agent-gate.js`, `agent-installation-detector.js`, `agent-runtime-main.js`, `agent-display-name.js` | Partial | `AgentRegistry` / `HookInstaller` |

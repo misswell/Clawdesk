@@ -8,7 +8,7 @@ native implementation instead of embedding its Electron renderer.
 ## Upstream tracking
 
 - Upstream: `https://github.com/rullerzhou-afk/clawd-on-desk`
-- Baseline inspected: `e4961f2568d5fdb5e3365597e6b050fae76f61ae`
+- Baseline inspected: `a7283581f1d46421beba91ef10ffaa994bc0a52f`
 - State semantics: upstream `docs/guides/state-mapping.md`
 
 When upstream changes, update the adapter seams in this order:

@@ -66,6 +66,7 @@ public final class PetCanvasView: NSView {
     public var onDragBegan: ((CGPoint) -> Void)?
     public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnded: (() -> Void)?
+    public var onClick: (() -> Void)?
     public var onDoubleTap: (() -> Void)?
     public var onFlail: (() -> Void)?
     public var onContextMenu: ((NSPoint) -> NSMenu?)?
@@ -90,6 +91,8 @@ public final class PetCanvasView: NSView {
     private var assetCacheBytes = 0
     private var clickTimes: [Date] = []
     private var trackingArea: NSTrackingArea?
+    private var mouseDownScreenPoint: CGPoint?
+    private var didDragSinceMouseDown = false
 
     public override var acceptsFirstResponder: Bool { true }
 
@@ -328,16 +331,28 @@ public final class PetCanvasView: NSView {
             onDoubleTap?()
         }
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
+        mouseDownScreenPoint = screenPoint
+        didDragSinceMouseDown = false
         onDragBegan?(screenPoint)
     }
 
     public override func mouseDragged(with event: NSEvent) {
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
+        if let start = mouseDownScreenPoint {
+            let dx = screenPoint.x - start.x
+            let dy = screenPoint.y - start.y
+            didDragSinceMouseDown = didDragSinceMouseDown || (dx * dx + dy * dy) >= 16
+        }
         onDrag?(screenPoint)
     }
 
     public override func mouseUp(with event: NSEvent) {
         onDragEnded?()
+        if !didDragSinceMouseDown, event.clickCount == 1 {
+            onClick?()
+        }
+        mouseDownScreenPoint = nil
+        didDragSinceMouseDown = false
     }
 
     public override func rightMouseDown(with event: NSEvent) {
