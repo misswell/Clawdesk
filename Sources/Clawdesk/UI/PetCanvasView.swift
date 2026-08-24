@@ -6,7 +6,12 @@ import ImageIO
 public final class PetCanvasView: NSView {
     public var petState: PetState = .idle {
         didSet {
-            if oldValue != petState { needsDisplay = true }
+            guard oldValue != petState else { return }
+            if petState != .idle, petState != .miniIdle {
+                pointerOffset = .zero
+                pointerKnown = false
+            }
+            needsDisplay = true
         }
     }
 
@@ -16,6 +21,8 @@ public final class PetCanvasView: NSView {
             assetCacheOrder.removeAll()
             assetCacheBytes = 0
             animationClock.reset()
+            gazeMorph.reset()
+            pointerKnown = false
             needsDisplay = true
         }
     }
@@ -39,7 +46,10 @@ public final class PetCanvasView: NSView {
     }
 
     public var pointerOffset = CGPoint.zero {
-        didSet { needsDisplay = true }
+        didSet {
+            gazeMorph.setTarget(pointerOffset)
+            needsDisplay = true
+        }
     }
 
     public var onDragBegan: ((CGPoint) -> Void)?
@@ -52,6 +62,8 @@ public final class PetCanvasView: NSView {
 
     private var phase: CGFloat = 0
     private var animationClock = PetAnimationClock()
+    private var gazeMorph = BloubGazeMorph()
+    private var pointerKnown = false
     private var assetClock: TimeInterval { animationClock.time }
     private static let maxAssetDimension = 512
     private static let maxAnimationBytes = 64 * 1024 * 1024
@@ -102,17 +114,19 @@ public final class PetCanvasView: NSView {
     public func advanceFrame(at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         let delta = animationClock.advance(to: timestamp)
         phase += CGFloat(delta)
+        gazeMorph.advance(by: delta)
         if phase > 1_000 { phase = 0 }
         needsDisplay = true
     }
 
     public func setPointerLocation(_ point: NSPoint) {
-        guard theme.supportsEyeTracking, petState == .idle || petState == .miniIdle else {
+        guard theme.supportsEyeTracking, (petState == .idle || petState == .miniIdle) else {
             if pointerOffset != .zero { pointerOffset = .zero }
             return
         }
         let windowPoint = window?.convertFromScreen(NSRect(origin: point, size: .zero)).origin ?? point
         let local = convert(windowPoint, from: nil)
+        pointerKnown = true
         pointerOffset = PetPointerMapper.offset(for: local, in: bounds)
     }
 
@@ -126,9 +140,9 @@ public final class PetCanvasView: NSView {
         let scale = min(bounds.width / 220, bounds.height / 220) * (miniMode ? 0.86 : 1.0)
         let bob: CGFloat
         switch petState {
-        case .sleeping: bob = 0
         case .attention, .miniHappy: bob = sin(phase * 6) * 5
         case .error, .reactFlail: bob = sin(phase * 12) * 3
+        case .idle, .miniIdle, .sleeping, .dozing: bob = 0
         default: bob = sin(phase * 2) * 1.7
         }
         context.translateBy(x: bounds.midX, y: bounds.midY + bob)
@@ -140,7 +154,6 @@ public final class PetCanvasView: NSView {
             return
         }
 
-        drawShadow(in: context)
         drawBloub(in: context)
         drawStateOverlay(in: context)
         context.restoreGState()
@@ -300,10 +313,6 @@ public final class PetCanvasView: NSView {
         }
     }
 
-    private func drawShadow(in context: CGContext) {
-        fillEllipse(context, rect: CGRect(x: 40, y: 174, width: 140, height: 18), color: NSColor.black.withAlphaComponent(0.18).cgColor)
-    }
-
     private func fillRoundedRect(_ context: CGContext, _ rect: CGRect, radius: CGFloat, _ color: CGColor) {
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         context.addPath(path)
@@ -320,12 +329,7 @@ public final class PetCanvasView: NSView {
         let b: Double
         let c: Double
         let d: Double
-    }
-
-    private struct BloubGaze {
-        let yaw: Double
-        let pitch: Double
-        let roll: Double
+        let depth: Double
     }
 
     private static func bloubEyePoses(gaze: BloubGaze, scale: Double) -> [BloubEyePose] {
@@ -346,31 +350,42 @@ public final class PetCanvasView: NSView {
         (right, down) = spin(right, down, deg(gaze.roll))
         func build(_ side: Double) -> BloubEyePose {
             let (ef, er) = spin(f, right, deg(15.46 * side))
-            return BloubEyePose(x: ef.0 * scale, y: ef.1 * scale, a: er.0, b: er.1, c: down.0, d: down.1)
+            return BloubEyePose(
+                x: ef.0 * scale,
+                y: ef.1 * scale,
+                a: er.0,
+                b: er.1,
+                c: down.0,
+                d: down.1,
+                depth: ef.2
+            )
         }
         return [build(-1), build(1)]
     }
 
-    private static func bloubLid(time: TimeInterval) -> Double {
-        let cycle = time.truncatingRemainder(dividingBy: 4.4)
-        guard cycle < 0.18 else { return 1 }
-        if cycle < 0.08 { return max(0, 1 - cycle / 0.08) }
-        return min(1, (cycle - 0.08) / 0.10)
-    }
-
     private func drawBloub(in context: CGContext) {
-        let center = CGPoint(x: 110, y: 108)
         let radius: CGFloat = 74
         let bodyColor = theme.palette.body.cgColor()
         let eyeColor = NSColor.white.cgColor
         let sleeping = petState == .sleeping || petState == .dozing
+        let idleLike = petState == .idle || petState == .miniIdle
+        let life = BloubMotion.liveliness(
+            at: assetClock,
+            wander: idleLike && pointerKnown ? 0 : 1,
+            blink: !sleeping,
+            float: !sleeping
+        )
+        let center = CGPoint(
+            x: 110 + CGFloat(life.driftX) * radius,
+            y: 108 - CGFloat(life.driftY) * radius
+        )
         let shift: CGFloat = sleeping ? -14 : 0
 
         context.saveGState()
         context.translateBy(x: 0, y: shift)
 
         // Body: a perfect circle (the bloub rest silhouette), breathing faintly.
-        let breath: CGFloat = petState == .idle ? 1 + CGFloat(sin(assetClock * 1.8) * 0.006) : 1
+        let breath = CGFloat(life.breath)
         let bodyRect = CGRect(
             x: center.x - radius,
             y: center.y - radius * breath,
@@ -380,20 +395,26 @@ public final class PetCanvasView: NSView {
         fillEllipse(context, rect: bodyRect, color: bodyColor)
 
         // Eyes: two white capsules placed by the spherical head model.
-        let baseGaze = BloubGaze(yaw: 28.49, pitch: 28.62, roll: -13)
+        let baseGaze = idleLike && pointerKnown
+            ? BloubMotion.targetGaze(forPointerOffset: gazeMorph.value)
+            : BloubMotion.restGaze
         let gaze = BloubGaze(
-            yaw: baseGaze.yaw + Double(pointerOffset.x) * 2.5,
-            pitch: baseGaze.pitch + Double(pointerOffset.y) * 2.5,
-            roll: baseGaze.roll
+            yaw: baseGaze.yaw + life.dYaw,
+            pitch: baseGaze.pitch + life.dPitch,
+            roll: baseGaze.roll + life.dRoll
         )
         let poses = Self.bloubEyePoses(gaze: gaze, scale: Double(radius))
-        let lid = sleeping ? 0.0 : Self.bloubLid(time: assetClock)
+        let lid = sleeping ? 0.0 : life.lid
         let eyeWidth = 0.186 * Double(radius)
-        let eyeHeight = 0.412 * Double(radius) * (0.06 + 0.94 * lid)
+        let eyeHeight = sleeping ? 0 : 0.412 * Double(radius) * (0.06 + 0.94 * lid)
 
         for pose in poses {
+            guard pose.depth > 0.02 else { continue }
             let eyeX = center.x + CGFloat(pose.x)
             let eyeY = center.y - CGFloat(pose.y)
+            let visibility = min(1, max(0, pose.depth / 0.12))
+            context.saveGState()
+            context.setAlpha(CGFloat(visibility))
             if eyeHeight < 1.2 {
                 // Closed eye: rounded horizontal line.
                 fillRoundedRect(
@@ -402,6 +423,7 @@ public final class PetCanvasView: NSView {
                     radius: 2.5,
                     eyeColor
                 )
+                context.restoreGState()
                 continue
             }
             // Tangent frame, y-flipped into CoreGraphics' bottom-left space.
@@ -417,6 +439,7 @@ public final class PetCanvasView: NSView {
             context.addPath(path)
             context.setFillColor(eyeColor)
             context.fillPath()
+            context.restoreGState()
         }
         context.restoreGState()
     }
