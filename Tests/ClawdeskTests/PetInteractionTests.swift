@@ -89,4 +89,73 @@ final class PetInteractionTests: XCTestCase {
             ThemeCatalog.theme(id: "mint").palette.body
         )
     }
+
+    @MainActor
+    func testHoverAndDraggingStatesDoNotDrawLegacyCornerBars() {
+        let frame = NSRect(x: 0, y: 0, width: 220, height: 220)
+        let theme = ThemeCatalog.theme(id: "pinch")
+        let view = PetCanvasView(frame: frame)
+        view.theme = theme
+
+        view.petState = .miniPeek
+        let peek = render(view)
+        XCTAssertFalse(
+            isHighlightPixel(in: peek, x: 185, y: 72, theme: theme),
+            "Mini-mode hover must not draw the legacy upper-right bar"
+        )
+
+        view.petState = .dragging
+        let dragging = render(view)
+        XCTAssertFalse(
+            isHighlightPixel(in: dragging, x: 44, y: 65, theme: theme),
+            "Dragging must not draw the legacy upper-left bar"
+        )
+    }
+
+    @MainActor
+    private func render(_ view: PetCanvasView) -> NSBitmapImageRep {
+        let image = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 220,
+            pixelsHigh: 220,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bitmapFormat: [],
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )!
+        let graphicsContext = NSGraphicsContext(bitmapImageRep: image)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = graphicsContext
+        view.draw(view.bounds)
+        graphicsContext.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        return image
+    }
+
+    private func isHighlightPixel(
+        in image: NSBitmapImageRep,
+        x: Int,
+        y: Int,
+        theme: ThemeDefinition
+    ) -> Bool {
+        guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+            return false
+        }
+        let expected = theme.palette.highlight
+        let expectedColor = NSColor(
+            calibratedRed: expected.red,
+            green: expected.green,
+            blue: expected.blue,
+            alpha: 1
+        ).usingColorSpace(.deviceRGB)
+        guard let expectedColor else { return false }
+        return color.alphaComponent > 0.9
+            && abs(color.redComponent - expectedColor.redComponent) < 0.03
+            && abs(color.greenComponent - expectedColor.greenComponent) < 0.03
+            && abs(color.blueComponent - expectedColor.blueComponent) < 0.03
+    }
 }

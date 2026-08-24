@@ -12,6 +12,9 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
+The 0.1.6 release removes the legacy corner bars shown during mini-mode
+hover and pet dragging while keeping both interactions intact.
+
 The local bridge listens on `127.0.0.1` and writes its current port to
 `~/Library/Application Support/Clawdesk/runtime.json`.
 
