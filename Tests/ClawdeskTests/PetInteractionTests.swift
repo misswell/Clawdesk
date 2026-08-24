@@ -3,6 +3,51 @@ import XCTest
 @testable import Clawdesk
 
 final class PetInteractionTests: XCTestCase {
+    @MainActor
+    func testPetRenderTimerRunsDuringTrackingRunLoopMode() {
+        var fireCount = 0
+        let timer = PetTimerScheduler.schedule(interval: 0.001, repeats: true) {
+            fireCount += 1
+        }
+        defer { timer.invalidate() }
+
+        let deadline = Date(timeIntervalSinceNow: 0.25)
+        while fireCount == 0 && Date() < deadline {
+            RunLoop.main.run(mode: .eventTracking, before: Date(timeIntervalSinceNow: 0.01))
+        }
+
+        XCTAssertGreaterThan(fireCount, 0)
+    }
+
+    func testAnimationClockUsesElapsedTimeInsteadOfFixedFrameSteps() {
+        var clock = PetAnimationClock()
+
+        XCTAssertEqual(clock.advance(to: 10), 0, accuracy: 0.0001)
+        XCTAssertEqual(clock.advance(to: 10.1), 0.1, accuracy: 0.0001)
+        XCTAssertEqual(clock.advance(to: 10.35), 0.25, accuracy: 0.0001)
+    }
+
+    @MainActor
+    func testScreenPointerLocationMovesIdleEyesThroughWindowCoordinates() {
+        let viewFrame = NSRect(x: 0, y: 0, width: 240, height: 240)
+        let view = PetCanvasView(frame: viewFrame)
+        let panel = NSPanel(
+            contentRect: viewFrame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.setFrameOrigin(NSPoint(x: 500, y: 300))
+        panel.contentView = view
+        view.petState = .idle
+        view.theme = ThemeCatalog.theme(id: "pinch")
+
+        view.setPointerLocation(NSPoint(x: 720, y: 520))
+
+        XCTAssertGreaterThan(view.pointerOffset.x, 0)
+        XCTAssertGreaterThan(view.pointerOffset.y, 0)
+    }
+
     func testDragAnchorUsesStableScreenDelta() {
         let anchor = PetDragAnchor(
             windowOrigin: CGPoint(x: 100, y: 200),

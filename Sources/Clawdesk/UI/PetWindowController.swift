@@ -11,10 +11,6 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
     private var roamTimer: Timer?
-    private var animationTarget: MainTimerTarget?
-    private var pointerTarget: MainTimerTarget?
-    private var sleepTarget: MainTimerTarget?
-    private var roamTarget: MainTimerTarget?
     private var cancellables = Set<AnyCancellable>()
     private var isDragging = false
     private var dragAnchor: PetDragAnchor?
@@ -100,11 +96,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     public func start() {
         restorePosition()
         window?.orderFrontRegardless()
-        animationTarget = MainTimerTarget { [weak self] in
+        let animationFrequency = model.preferences.lowPowerAnimations ? 30.0 : 60.0
+        animationTimer = PetTimerScheduler.schedule(
+            interval: 1.0 / animationFrequency,
+            repeats: true
+        ) { [weak self] in
             guard let self, !self.isDragging else { return }
             self.petView.advanceFrame()
         }
-        pointerTarget = MainTimerTarget { [weak self] in
+        pointerTimer = PetTimerScheduler.schedule(
+            interval: 1.0 / 60.0,
+            repeats: true
+        ) { [weak self] in
             guard let self, let window = self.window else { return }
             guard !self.isDragging else { return }
             self.model.noteMouseActivity(at: NSEvent.mouseLocation)
@@ -112,18 +115,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self.petView.setPointerLocation(NSEvent.mouseLocation)
             if window.isVisible == false { window.orderFrontRegardless() }
         }
-        sleepTarget = MainTimerTarget { [weak self] in
+        sleepTimer = PetTimerScheduler.schedule(
+            interval: 5,
+            repeats: true
+        ) { [weak self] in
             self?.model.tickForMaintenance()
         }
-        roamTarget = MainTimerTarget { [weak self] in
+        roamTimer = PetTimerScheduler.schedule(
+            interval: 5,
+            repeats: true
+        ) { [weak self] in
             self?.checkRoam()
         }
-        let animationFrequency = model.preferences.lowPowerAnimations ? 8.0 : 18.0
-        let pointerFrequency = model.preferences.lowPowerAnimations ? 30.0 : 60.0
-        animationTimer = Timer.scheduledTimer(timeInterval: 1.0 / animationFrequency, target: animationTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
-        pointerTimer = Timer.scheduledTimer(timeInterval: 1.0 / pointerFrequency, target: pointerTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
-        sleepTimer = Timer.scheduledTimer(timeInterval: 5, target: sleepTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
-        roamTimer = Timer.scheduledTimer(timeInterval: 5, target: roamTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
     }
 
     public func stop() {
@@ -135,10 +138,6 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         pointerTimer = nil
         sleepTimer = nil
         roamTimer = nil
-        animationTarget = nil
-        pointerTarget = nil
-        sleepTarget = nil
-        roamTarget = nil
         dragAnchor = nil
         hoverRestoreTask?.cancel()
         quotaRing.hide()
@@ -416,19 +415,5 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         quotaRing.update(petWindowFrame: window.frame)
-    }
-}
-
-@MainActor
-private final class MainTimerTarget: NSObject {
-    private let handler: () -> Void
-
-    init(handler: @escaping () -> Void) {
-        self.handler = handler
-        super.init()
-    }
-
-    @objc func fire(_ timer: Timer) {
-        handler()
     }
 }
