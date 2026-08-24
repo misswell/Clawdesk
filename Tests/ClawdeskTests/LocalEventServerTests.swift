@@ -185,6 +185,84 @@ final class LocalEventServerTests: XCTestCase {
         XCTAssertEqual(suggestions?[2].decision, .allow)
     }
 
+    func testZCodePermissionUsesStrictHookSpecificOutput() async throws {
+        let server = LocalEventServer(preferredPort: 37_876)
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .permission(_, reply) = message else { return }
+            reply.resolve(.allow)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        let port = try await waitForServer(server)
+
+        let response = try curl(
+            port: port,
+            path: "/permission?event=PermissionRequest&agent=zcode&session_id=zcode:perm",
+            body: #"{"tool_name":"Bash","tool_input":{"command":"ls"}}"#
+        )
+
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(response.body.utf8)) as? [String: Any])
+        let output = try XCTUnwrap(json["hookSpecificOutput"] as? [String: Any])
+        XCTAssertEqual(output["hookEventName"] as? String, "PermissionRequest")
+        let decision = try XCTUnwrap(output["decision"] as? [String: Any])
+        XCTAssertEqual(decision["behavior"] as? String, "allow")
+        XCTAssertNil(json["approved"], "ZCode must not receive the generic Claude permission response")
+    }
+
+    func testHookQueryAgentIdentityCannotBeOverriddenByBody() async throws {
+        let server = LocalEventServer(preferredPort: 37_878)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .permission(event, reply) = message else { return }
+            recorder.record(event)
+            reply.resolve(.allow)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        let port = try await waitForServer(server)
+
+        let response = try curl(
+            port: port,
+            path: "/permission?event=PermissionRequest&agent=zcode&session_id=zcode:identity",
+            body: #"{"agent_id":"claude-code","tool_name":"Bash","tool_input":{"command":"ls"}}"#
+        )
+
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(recorder.value()?.agentID, "zcode")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(response.body.utf8)) as? [String: Any])
+        XCTAssertNotNil(json["hookSpecificOutput"])
+        XCTAssertNil(json["approved"])
+    }
+
+    func testZCodeUnknownToolFallsBackToNativePermissionUI() async throws {
+        let server = LocalEventServer(preferredPort: 37_877)
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case .event = message else { return }
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        let port = try await waitForServer(server)
+
+        let response = try curl(
+            port: port,
+            path: "/permission?event=PermissionRequest&agent=zcode&session_id=zcode:unknown",
+            body: #"{"tool_input":{"command":"ls"}}"#
+        )
+
+        XCTAssertEqual(response.status, 204)
+        XCTAssertTrue(response.body.isEmpty)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+    }
+
     func testOversizedRequestBodyIsRejectedInsteadOfBuffered() async throws {
         let server = LocalEventServer(preferredPort: 37_874)
         server.start()

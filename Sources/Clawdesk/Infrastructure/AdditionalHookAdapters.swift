@@ -72,9 +72,24 @@ extension HookInstaller {
         var settings = try readJSON(at: configURL)
         var hookMap = dictionaryAtPath(settings, keys: spec.hookPath)
         var changed = false
+        var permissionConflict = false
 
         for event in spec.events {
             var entries = hookMap[event] as? [Any] ?? []
+            if spec.agentID == "zcode", event == "PermissionRequest" {
+                let normalized = entries.compactMap { $0 as? [String: Any] }
+                if containsForeignHook(normalized) {
+                    let filtered = normalized.compactMap { removeClawdeskEntries(from: $0) }
+                    if filtered.isEmpty {
+                        hookMap.removeValue(forKey: event)
+                    } else {
+                        hookMap[event] = filtered
+                    }
+                    if !jsonValuesEqual(normalized, filtered) { changed = true }
+                    permissionConflict = true
+                    continue
+                }
+            }
             if !entries.contains(where: { containsClawdeskMarker($0) }) {
                 entries.append(spec.entry(for: event, hookScript: hookScript, port: port))
                 hookMap[event] = entries
@@ -88,11 +103,14 @@ extension HookInstaller {
         }
 
         let status = changed ? "installed" : "already installed"
+        let message = permissionConflict
+            ? "\(spec.displayName) hooks installed, but an existing foreign PermissionRequest hook was preserved and Clawdesk's blocking hook was not registered."
+            : "\(spec.displayName) hooks \(status) at \(configURL.path). Existing entries were preserved."
         return HookInstallResult(
             agentID: spec.agentID,
             configPath: configURL,
             changed: changed,
-            message: "\(spec.displayName) hooks \(status) at \(configURL.path). Existing entries were preserved."
+            message: message
         )
     }
 
@@ -380,6 +398,15 @@ extension HookInstaller {
         return false
     }
 
+    private func containsForeignHook(_ entries: [[String: Any]]) -> Bool {
+        entries
+            .compactMap { entry in
+                if let nested = entry["hooks"] as? [[String: Any]] { return nested }
+                return [entry]
+            }
+            .contains { !containsClawdeskMarker($0) }
+    }
+
     private func removeClawdeskEntries(from value: Any) -> Any? {
         if let dictionary = value as? [String: Any] {
             if dictionary.contains(where: { key, value in
@@ -515,7 +542,7 @@ private struct AgentHookSpec: Sendable {
             events = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "SubagentStop", "Notification", "PreCompact"]
         case "zcode":
             displayName = "ZCode"; relativeConfigPath = ".zcode/cli/config.json"; hookPath = ["hooks", "events"]; shape = .zcode
-            events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop"]
+            events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"]
         default:
             return nil
         }
@@ -540,7 +567,7 @@ private struct AgentHookSpec: Sendable {
                     "type": "process",
                     "command": "/bin/sh",
                     "args": [hookScript.path, event, agentID],
-                    "timeoutMs": event.lowercased().contains("permission") ? 540_000 : 5_000
+                    "timeoutMs": event.lowercased().contains("permission") ? 600_000 : 5_000
                 ]]
             ]
         case .nested:

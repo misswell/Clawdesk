@@ -1,11 +1,28 @@
 import Foundation
 
+public struct AgentPermissionHTTPResponse: Equatable, Sendable {
+    public let statusCode: Int
+    public let body: Data
+    public let contentType: String
+
+    public init(statusCode: Int = 200, body: Data = Data(), contentType: String = "application/json") {
+        self.statusCode = statusCode
+        self.body = body
+        self.contentType = contentType
+    }
+
+    public static let noContent = AgentPermissionHTTPResponse(statusCode: 204)
+}
+
 public struct AgentEventAdapterResult: Sendable {
     public let immediateNotification: Bool
     public let permissionSuspect: Bool
     public let permissionSuspectDelayMilliseconds: Int?
     public let permissionGateID: String?
     public let permissionGated: Bool
+    public let permissionEligible: Bool
+    public let permissionInput: String?
+    public let forwardsPermissionSuggestions: Bool
     public let isQuestionEvent: Bool
     public let question: QuestionPrompt?
     public let questionResolution: Bool
@@ -17,6 +34,9 @@ public struct AgentEventAdapterResult: Sendable {
         permissionSuspectDelayMilliseconds: Int? = nil,
         permissionGateID: String? = nil,
         permissionGated: Bool = false,
+        permissionEligible: Bool = true,
+        permissionInput: String? = nil,
+        forwardsPermissionSuggestions: Bool = true,
         isQuestionEvent: Bool = false,
         question: QuestionPrompt? = nil,
         questionResolution: Bool = false,
@@ -27,6 +47,9 @@ public struct AgentEventAdapterResult: Sendable {
         self.permissionSuspectDelayMilliseconds = permissionSuspectDelayMilliseconds
         self.permissionGateID = permissionGateID
         self.permissionGated = permissionGated
+        self.permissionEligible = permissionEligible
+        self.permissionInput = permissionInput
+        self.forwardsPermissionSuggestions = forwardsPermissionSuggestions
         self.isQuestionEvent = isQuestionEvent
         self.question = question
         self.questionResolution = questionResolution
@@ -46,6 +69,34 @@ public protocol AgentEventAdapter {
         query: [String: String],
         sessionID: String
     ) -> AgentEventAdapterResult
+
+    func permissionResponse(
+        for decision: PermissionDecision,
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse
+
+    func permissionFallbackResponse(
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse
+}
+
+public extension AgentEventAdapter {
+    func permissionResponse(
+        for decision: PermissionDecision,
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse {
+        standardPermissionResponse(for: decision)
+    }
+
+    func permissionFallbackResponse(
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse {
+        standardJSONResponse(["ok": true])
+    }
 }
 
 public struct DefaultAgentEventAdapter: AgentEventAdapter {
@@ -91,17 +142,64 @@ public struct DefaultAgentEventAdapter: AgentEventAdapter {
         let questionResolutionID = isQuestionResolution
             ? stringValue(object["call_id"] ?? object["callId"] ?? object["tool_call_id"] ?? object["toolCallId"] ?? object["question_call_id"])
             : nil
+        let isZCodePermission = agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "zcode"
+            && normalizedEvent.contains("permission")
+        let zcodeToolInput: Any = {
+            guard let candidate = object["tool_input"],
+                  candidate is [String: Any] || candidate is [Any] else {
+                return [String: Any]()
+            }
+            return candidate
+        }()
+        // ZCode's hook contract intentionally has no aliases here. The hook
+        // only sends tool_name/tool_input; accepting toolName/toolInput would
+        // make a direct caller look like a supported ZCode request when the
+        // native hook would have fallen back to its own permission UI.
+        let zcodeTool = stringValue(object["tool_name"]) ?? ""
+        let zcodePermissionEligible = !isZCodePermission || (
+            !zcodeTool.isEmpty && zcodeTool.lowercased() != "unknown"
+                && isZCodeToolInputWithinBudget(zcodeToolInput)
+        )
         return AgentEventAdapterResult(
             immediateNotification: immediate,
             permissionSuspect: suspect,
             permissionSuspectDelayMilliseconds: suspectDelay,
             permissionGateID: stringValue(object["tool_call_id"] ?? object["toolCallId"] ?? object["call_id"] ?? object["callId"]),
             permissionGated: gateOpen || gateClosed,
+            permissionEligible: zcodePermissionEligible,
+            permissionInput: isZCodePermission
+                ? compactJSONString(zcodeToolInput)
+                : nil,
+            forwardsPermissionSuggestions: !isZCodePermission,
             isQuestionEvent: isQuestionEvent,
             question: isQuestionEvent ? questionPrompt(from: object, sessionID: sessionID, agentID: agentID) : nil,
             questionResolution: isQuestionResolution,
             questionResolutionID: questionResolutionID
         )
+    }
+
+    public func permissionResponse(
+        for decision: PermissionDecision,
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse {
+        guard isZCodePermission(agentID: agentID, eventName: eventName) else {
+            return standardPermissionResponse(for: decision)
+        }
+        guard decision != .defer else { return .noContent }
+        return standardJSONResponse([
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": ["behavior": decision == .allow ? "allow" : "deny"]
+            ]
+        ])
+    }
+
+    public func permissionFallbackResponse(
+        agentID: String,
+        eventName: String
+    ) -> AgentPermissionHTTPResponse {
+        isZCodePermission(agentID: agentID, eventName: eventName) ? .noContent : standardJSONResponse(["ok": true])
     }
 
     private var suspectDelayMilliseconds: Int {
@@ -197,6 +295,35 @@ public struct DefaultAgentEventAdapter: AgentEventAdapter {
         return nil
     }
 
+    private func isZCodePermission(agentID: String, eventName: String) -> Bool {
+        agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "zcode"
+            && normalizeEventName(eventName).contains("permission")
+    }
+
+    private func compactJSONString(_ value: Any?) -> String? {
+        guard let value, JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+              data.count <= 8 * 1024 else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func isZCodeToolInputWithinBudget(_ value: Any?, depth: Int = 0) -> Bool {
+        guard let value else { return true }
+        guard depth <= 6 else { return false }
+        if let array = value as? [Any] {
+            return array.count <= 16 && array.allSatisfy {
+                isZCodeToolInputWithinBudget($0, depth: depth + 1)
+            }
+        }
+        if let object = value as? [String: Any] {
+            return object.count <= 32 && object.values.allSatisfy {
+                isZCodeToolInputWithinBudget($0, depth: depth + 1)
+            }
+        }
+        if let string = value as? String { return string.count <= 240 }
+        return true
+    }
+
     private func hasExplicitPermissionSignal(_ object: [String: Any]) -> Bool {
         let directKeys = [
             "permission_required", "permissionRequired", "requires_approval", "requiresApproval",
@@ -257,4 +384,18 @@ public struct DefaultAgentEventAdapter: AgentEventAdapter {
         return string.contains("wait") || string.contains("pend") || string.contains("request")
             || string.contains("require") || string.contains("need_approval") || string == "ask"
     }
+}
+
+private func standardPermissionResponse(for decision: PermissionDecision) -> AgentPermissionHTTPResponse {
+    standardJSONResponse([
+        "ok": true,
+        "decision": decision.rawValue,
+        "approved": decision == .allow,
+        "behavior": decision == .allow ? "allow" : decision == .deny ? "deny" : "ask"
+    ])
+}
+
+private func standardJSONResponse(_ object: [String: Any]) -> AgentPermissionHTTPResponse {
+    let data = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data("{}".utf8)
+    return AgentPermissionHTTPResponse(body: data)
 }

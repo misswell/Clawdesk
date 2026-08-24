@@ -92,4 +92,45 @@ final class AgentEventAdapterTests: XCTestCase {
         XCTAssertTrue(result.immediateNotification)
         XCTAssertFalse(result.permissionSuspect)
     }
+
+    func testZCodeRequiresCanonicalToolFieldsAndSuppressesSuggestions() {
+        let adapter = DefaultAgentEventAdapter(environment: [:])
+        let supported = adapter.adapt(
+            agentID: "zcode",
+            eventName: "PermissionRequest",
+            object: [
+                "tool_name": "Bash",
+                "tool_input": ["command": "ls"],
+                "permission_suggestions": [["label": "Allow"]]
+            ],
+            query: [:],
+            sessionID: "z"
+        )
+
+        XCTAssertTrue(supported.permissionEligible)
+        XCTAssertFalse(supported.forwardsPermissionSuggestions)
+        XCTAssertTrue(supported.permissionInput?.contains("command") == true)
+
+        let aliasOnly = adapter.adapt(
+            agentID: "zcode",
+            eventName: "PermissionRequest",
+            object: ["toolName": "Bash", "toolInput": ["command": "ls"]],
+            query: [:],
+            sessionID: "z"
+        )
+        XCTAssertFalse(aliasOnly.permissionEligible)
+    }
+
+    func testZCodeNoDecisionUsesEmptyHTTPResponse() {
+        let adapter = DefaultAgentEventAdapter(environment: [:])
+
+        XCTAssertEqual(
+            adapter.permissionResponse(for: .defer, agentID: "zcode", eventName: "PermissionRequest").statusCode,
+            204
+        )
+        XCTAssertEqual(
+            adapter.permissionFallbackResponse(agentID: "zcode", eventName: "PermissionRequest").statusCode,
+            204
+        )
+    }
 }

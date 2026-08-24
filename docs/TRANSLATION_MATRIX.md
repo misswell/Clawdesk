@@ -31,7 +31,8 @@ Status legend:
 | --- | --- | --- |
 | claude (hook/install/statusline/rate-limits/stop-disposition), `claude-hook-health.js`, `claude-hook-operations.js`, `claude-settings-watcher.js` | Done | `HookInstaller` + `ClaudeHookHealthMonitor` |
 | codex (hook/install/rate-limits/debug/remote-monitor) | Done | `HookInstaller` + `CodexLogMonitor` |
-| copilot, gemini, antigravity, cursor, codebuddy, workbuddy, qwen, zcode, codewhale, kiro, kimi, reasonix, qoder/qoderwork/qwenwork | Done | `AdditionalHookAdapters` |
+| copilot, gemini, antigravity, cursor, codebuddy, workbuddy, qwen, codewhale, kiro, kimi, reasonix, qoder/qoderwork/qwenwork | Done | `AdditionalHookAdapters` |
+| zcode lifecycle + manual `PermissionRequest` approval | Done | `AdditionalHookAdapters` + `AgentEventAdapters` strict ZCode response |
 | opencode/mimocode, openclaw, hermes, pi, dsh | Done | `PluginHookAdapters` |
 | `context-usage.js`, `antigravity-*` | Partial | statusline quota for Claude; Antigravity context pending |
 | `integration-sync.js` | Partial | install-on-launch reconcile pending |

@@ -148,12 +148,16 @@ public final class ClawdeskModel: ObservableObject {
                 resolvePermission(id: request.id, decision: .defer)
                 return
             }
+            let isZCode = request.agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "zcode"
             remoteNotifier.send(RemoteNotification(title: "Permission request", body: request.title, sessionTitle: request.agentID))
-            if preferences.permissionMode == .autoApprove {
+            // ZCode's native permission runner remains the owner of global
+            // and per-session automation. Clawdesk may still present its
+            // manual bubble (or remote approval) for a concrete request.
+            if !isZCode, preferences.permissionMode == .autoApprove {
                 resolvePermission(id: request.id, decision: .allow)
                 return
             }
-            if preferences.permissionAutomation != .off,
+            if !isZCode, preferences.permissionAutomation != .off,
                let decision = PermissionPolicy.decide(request: request, automation: preferences.permissionAutomation) {
                 resolvePermission(id: request.id, decision: decision)
                 return

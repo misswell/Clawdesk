@@ -29,7 +29,7 @@ public enum AgentRegistry {
         AgentDescriptor(id: "kiro-cli", displayName: "Kiro CLI", detail: "Agent config hook integration", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "kimi-cli", displayName: "Kimi Code CLI", detail: "TOML command hooks", permissionApproval: true),
         AgentDescriptor(id: "qwen-code", displayName: "Qwen Code", detail: "Lifecycle + permission hooks", permissionApproval: true),
-        AgentDescriptor(id: "zcode", displayName: "ZCode", detail: "State-only config hooks", permissionApproval: false, stateOnly: true),
+        AgentDescriptor(id: "zcode", displayName: "ZCode", detail: "State + manual permission hooks", permissionApproval: true),
         AgentDescriptor(id: "codewhale", displayName: "CodeWhale", detail: "State-only lifecycle hooks", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "opencode", displayName: "opencode", detail: "Plugin events + permission requests", permissionApproval: true),
         AgentDescriptor(id: "mimocode", displayName: "MiMo Code", detail: "opencode-family plugin", permissionApproval: true),

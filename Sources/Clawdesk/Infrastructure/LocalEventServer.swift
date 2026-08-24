@@ -355,18 +355,24 @@ public final class LocalEventServer: @unchecked Sendable {
         if let permission = event.permission {
             let reply = PermissionReply { [weak connection] decision in
                 guard let connection else { return }
-                let body: [String: Any] = [
-                    "ok": true,
-                    "decision": decision.rawValue,
-                    "approved": decision == .allow,
-                    "behavior": decision == .allow ? "allow" : decision == .deny ? "deny" : "ask"
-                ]
-                self.sendJSON(body, on: connection)
+                let response = self.eventAdapter.permissionResponse(
+                    for: decision,
+                    agentID: permission.agentID,
+                    eventName: event.eventName
+                )
+                self.send(response, on: connection)
             }
-            _ = permission
             onMessage?(.permission(event, reply))
         } else {
-            sendJSON(["ok": true], on: connection)
+            if request.path == "/permission" {
+                let response = eventAdapter.permissionFallbackResponse(
+                    agentID: event.agentID,
+                    eventName: event.eventName
+                )
+                send(response, on: connection)
+            } else {
+                sendJSON(["ok": true], on: connection)
+            }
             onMessage?(.event(event))
         }
     }
@@ -391,8 +397,13 @@ public final class LocalEventServer: @unchecked Sendable {
         let rawSessionID = string(["session_id", "sessionId", "session", "id"]) ?? query["session_id"] ?? query["sessionId"] ?? UUID().uuidString
         let remotePrefix = query["remote_prefix"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let sessionID = remotePrefix.isEmpty ? rawSessionID : "\(remotePrefix):\(rawSessionID)"
-        let agentID = string(["agent_id", "agentId", "source", "agent"]) ?? query["agent_id"] ?? query["agent"] ?? "custom"
-        let eventName = string(["event", "event_name", "eventName", "type", "name", "state"]) ?? fallbackEvent ?? "Notification"
+        let queryAgent = [query["agent_id"], query["agent"]]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        let agentID = queryAgent ?? string(["agent_id", "agentId", "source", "agent"]) ?? "custom"
+        let eventName = string(["event", "event_name", "eventName", "type", "name", "state"])
+            ?? fallbackEvent
+            ?? (forcePermission ? "PermissionRequest" : "Notification")
         let hint = string(["state", "pet_state", "petState"]).flatMap(normalizeState)
         let quotaObject = (object["rate_limits"] as? [String: Any])
             ?? ((object["quota"] as? [String: Any])?["rate_limits"] as? [String: Any])
@@ -415,9 +426,9 @@ public final class LocalEventServer: @unchecked Sendable {
             query: query,
             sessionID: sessionID
         )
-        let permissionRequired = (forcePermission && !adapterResult.isQuestionEvent)
+        let permissionRequired = adapterResult.permissionEligible && ((forcePermission && !adapterResult.isQuestionEvent)
             || (eventName.lowercased().contains("permission") && !adapterResult.isQuestionEvent)
-            || (object["permission"] != nil && !adapterResult.immediateNotification && !adapterResult.permissionSuspect)
+            || (object["permission"] != nil && !adapterResult.immediateNotification && !adapterResult.permissionSuspect))
         let permission: PermissionRequest?
         if permissionRequired {
             permission = PermissionRequest(
@@ -427,8 +438,10 @@ public final class LocalEventServer: @unchecked Sendable {
                 title: string(["title", "message", "description", "prompt", "tool_name", "toolName"]) ?? "Agent is waiting for permission",
                 action: string(["action", "permission_action"]),
                 command: string(["command", "cmd"]),
-                input: string(["input", "tool_input", "toolInput"]),
-                suggestions: permissionSuggestions(from: object)
+                input: string(["input", "tool_input", "toolInput"]) ?? adapterResult.permissionInput,
+                suggestions: adapterResult.forwardsPermissionSuggestions
+                    ? permissionSuggestions(from: object)
+                    : []
             )
         } else {
             permission = nil
@@ -545,6 +558,26 @@ public final class LocalEventServer: @unchecked Sendable {
     private func sendJSON(_ object: [String: Any], status: Int = 200, on connection: NWConnection) {
         let body = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
         sendBytes(body, contentType: "application/json", status: status, on: connection)
+    }
+
+    private func send(_ response: AgentPermissionHTTPResponse, on connection: NWConnection) {
+        guard response.statusCode != 204 else {
+            sendNoContent(on: connection)
+            return
+        }
+        sendBytes(
+            response.body,
+            contentType: response.contentType,
+            status: response.statusCode,
+            on: connection
+        )
+    }
+
+    private func sendNoContent(on connection: NWConnection) {
+        let header = "HTTP/1.1 204 No Content\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(header.utf8), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 
     private func sendBytes(_ body: Data, contentType: String, status: Int = 200, on connection: NWConnection) {

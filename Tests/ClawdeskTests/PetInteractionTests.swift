@@ -113,11 +113,52 @@ final class PetInteractionTests: XCTestCase {
     }
 
     @MainActor
+    func testInteractionStateRedrawClearsPreviousCornerMarks() {
+        let frame = NSRect(x: 0, y: 0, width: 220, height: 220)
+        let theme = ThemeCatalog.theme(id: "pinch")
+        let view = PetCanvasView(frame: frame)
+        view.theme = theme
+        let image = makeBitmap(width: 220, height: 220)
+
+        view.petState = .waking
+        render(view, into: image)
+        XCTAssertTrue(isHighlightPixel(in: image, x: 39, y: 54, theme: theme))
+        XCTAssertTrue(isHighlightPixel(in: image, x: 180, y: 75, theme: theme))
+
+        view.petState = .idle
+        render(view, into: image)
+        XCTAssertFalse(
+            isHighlightPixel(in: image, x: 39, y: 54, theme: theme),
+            "A transparent pet canvas must not retain the previous upper-left mark"
+        )
+        XCTAssertFalse(
+            isHighlightPixel(in: image, x: 180, y: 75, theme: theme),
+            "A transparent pet canvas must not retain the previous upper-right mark"
+        )
+    }
+
+    @MainActor
     private func render(_ view: PetCanvasView) -> NSBitmapImageRep {
-        let image = NSBitmapImageRep(
+        let image = makeBitmap(width: 220, height: 220)
+        render(view, into: image)
+        return image
+    }
+
+    @MainActor
+    private func render(_ view: PetCanvasView, into image: NSBitmapImageRep) {
+        let graphicsContext = NSGraphicsContext(bitmapImageRep: image)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = graphicsContext
+        view.draw(view.bounds)
+        graphicsContext.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private func makeBitmap(width: Int, height: Int) -> NSBitmapImageRep {
+        NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: 220,
-            pixelsHigh: 220,
+            pixelsWide: width,
+            pixelsHigh: height,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
@@ -127,13 +168,6 @@ final class PetInteractionTests: XCTestCase {
             bytesPerRow: 0,
             bitsPerPixel: 0
         )!
-        let graphicsContext = NSGraphicsContext(bitmapImageRep: image)!
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = graphicsContext
-        view.draw(view.bounds)
-        graphicsContext.flushGraphics()
-        NSGraphicsContext.restoreGraphicsState()
-        return image
     }
 
     private func isHighlightPixel(

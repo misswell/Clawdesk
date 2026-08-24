@@ -158,6 +158,15 @@ final class HookInstallerTests: XCTestCase {
 
         let installer = HookInstaller(homeDirectory: root)
         _ = try installer.install(agentID: "zcode", port: 37804)
+        let installed = try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as! [String: Any]
+        let installedEvents = ((installed["hooks"] as! [String: Any])["events"] as! [String: Any])
+        let permissionEntries = try XCTUnwrap(installedEvents["PermissionRequest"] as? [[String: Any]])
+        XCTAssertTrue(permissionEntries.contains { entry in
+            let hooks = entry["hooks"] as? [[String: Any]]
+            let hook = hooks?.first
+            return hook?["type"] as? String == "process"
+                && hook?["timeoutMs"] as? Int == 600_000
+        })
         let removed = try installer.uninstall(agentID: "zcode")
 
         XCTAssertTrue(removed.changed)
@@ -165,6 +174,50 @@ final class HookInstallerTests: XCTestCase {
         let events = ((restored["hooks"] as! [String: Any])["events"] as! [String: Any])["Stop"] as! [[String: Any]]
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(((events[0]["hooks"] as! [[String: Any]])[0]["command"] as? String), "echo keep-me")
+    }
+
+    func testZCodeForeignPermissionHookPreventsManagedBlockingHook() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-zcode-foreign-test-\(UUID().uuidString)")
+        let configURL = root.appendingPathComponent(".zcode/cli/config.json")
+        let initial: [String: Any] = [
+            "hooks": [
+                "events": [
+                    "PermissionRequest": [["hooks": [["type": "process", "command": "user-owned-permission", "args": []]]]]
+                ]
+            ]
+        ]
+        try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: initial).write(to: configURL)
+
+        let installer = HookInstaller(homeDirectory: root)
+        let result = try installer.install(agentID: "zcode", port: 37804)
+
+        XCTAssertTrue(result.message.contains("foreign PermissionRequest"))
+        let installed = try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as! [String: Any]
+        let events = ((installed["hooks"] as! [String: Any])["events"] as! [String: Any])
+        let permissionEntries = try XCTUnwrap(events["PermissionRequest"] as? [[String: Any]])
+        XCTAssertEqual(permissionEntries.count, 1)
+        let hook = try XCTUnwrap((permissionEntries[0]["hooks"] as? [[String: Any]])?.first)
+        XCTAssertEqual(hook["command"] as? String, "user-owned-permission")
+        XCTAssertFalse(containsClawdeskMarker(in: permissionEntries))
+    }
+
+    private func containsClawdeskMarker(in value: Any) -> Bool {
+        if let string = value as? String { return string.contains(HookInstaller.marker) }
+        if let dictionary = value as? [String: Any] {
+            return dictionary.values.contains { containsClawdeskMarker(in: $0) }
+        }
+        if let array = value as? [Any] {
+            return array.contains { containsClawdeskMarker(in: $0) }
+        }
+        return false
+    }
+
+    func testZCodeIsAdvertisedAsManualPermissionCapable() {
+        let descriptor = AgentRegistry.descriptor(for: "zcode")
+
+        XCTAssertEqual(descriptor?.permissionApproval, true)
+        XCTAssertEqual(descriptor?.stateOnly, false)
     }
 
     func testAllConfigAgentAdaptersHaveAnInstallPath() throws {

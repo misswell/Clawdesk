@@ -133,6 +133,11 @@ public final class PetCanvasView: NSView {
     public override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
+        // This is a transparent, borderless pet window. AppKit does not
+        // guarantee that pixels drawn by an earlier state disappear when a
+        // later state only paints a smaller shape, so clear the invalidated
+        // region before compositing the next frame.
+        context.clear(dirtyRect)
         context.setShouldAntialias(true)
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
