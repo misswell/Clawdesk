@@ -47,6 +47,8 @@ public final class AppPreferences: ObservableObject {
     @Published public var collectClaudeUsage: Bool { didSet { persist() } }
     @Published public var autoCheckForUpdates: Bool { didSet { persist() } }
     @Published public var showQuotaRing: Bool { didSet { persist() } }
+    @Published public var sessionHUDEnabled: Bool { didSet { persist() } }
+    @Published public var sessionHUDPinned: Bool { didSet { persist() } }
     /// Agent integrations explicitly installed from Settings. Existing
     /// managed configurations are still discovered at startup so upgrades
     /// from versions before this preference remain repairable.
@@ -87,6 +89,8 @@ public final class AppPreferences: ObservableObject {
         collectClaudeUsage = defaults.object(forKey: "collectClaudeUsage") as? Bool ?? false
         autoCheckForUpdates = defaults.object(forKey: "autoCheckForUpdates") as? Bool ?? true
         showQuotaRing = defaults.object(forKey: "showQuotaRing") as? Bool ?? true
+        sessionHUDEnabled = defaults.object(forKey: "sessionHUDEnabled") as? Bool ?? true
+        sessionHUDPinned = defaults.object(forKey: "sessionHUDPinned") as? Bool ?? false
         enabledAgentIDs = Set(defaults.stringArray(forKey: "enabledAgentIDs") ?? [])
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
@@ -202,6 +206,8 @@ public final class AppPreferences: ObservableObject {
         defaults.set(collectClaudeUsage, forKey: "collectClaudeUsage")
         defaults.set(autoCheckForUpdates, forKey: "autoCheckForUpdates")
         defaults.set(showQuotaRing, forKey: "showQuotaRing")
+        defaults.set(sessionHUDEnabled, forKey: "sessionHUDEnabled")
+        defaults.set(sessionHUDPinned, forKey: "sessionHUDPinned")
         defaults.set(Array(enabledAgentIDs).sorted(), forKey: "enabledAgentIDs")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
         if let windowOrigin {

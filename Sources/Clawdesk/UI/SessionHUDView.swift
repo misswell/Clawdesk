@@ -8,13 +8,40 @@ public final class SessionHUDView: NSView {
     public var rows = SessionHUDRows(sessions: []) {
         didSet { needsDisplay = true }
     }
+    public var isPinned = false {
+        didSet { needsDisplay = true }
+    }
 
     public var onSessionSelected: ((SessionSnapshot) -> Void)?
     public var onOverflowSelected: (() -> Void)?
+    public var onPinToggled: ((Bool) -> Void)?
+    public var onHoverChanged: ((Bool) -> Void)?
 
     private let cornerRadius: CGFloat = 14
+    private var trackingArea: NSTrackingArea?
 
     public override var isOpaque: Bool { false }
+
+    public override func updateTrackingAreas() {
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+        super.updateTrackingAreas()
+    }
+
+    public override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    public override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+    }
 
     public override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
@@ -34,6 +61,7 @@ public final class SessionHUDView: NSView {
         context.setStrokeColor(NSColor.separatorColor.withAlphaComponent(0.8).cgColor)
         context.setLineWidth(1)
         context.strokePath()
+        drawPin(in: context)
 
         let rowHeight = SessionHUDGeometry.rowHeight
         let top = bounds.maxY - SessionHUDGeometry.verticalPadding
@@ -70,6 +98,10 @@ public final class SessionHUDView: NSView {
 
     public override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if pinButtonRect.contains(point) {
+            onPinToggled?(!isPinned)
+            return
+        }
         let top = bounds.maxY - SessionHUDGeometry.verticalPadding
         let index = Int((top - point.y) / SessionHUDGeometry.rowHeight)
         if index >= 0, index < rows.sessions.count {
@@ -77,6 +109,23 @@ public final class SessionHUDView: NSView {
         } else if rows.overflowCount > 0, index == rows.sessions.count {
             onOverflowSelected?()
         }
+    }
+
+    private var pinButtonRect: CGRect {
+        CGRect(x: bounds.maxX - 28, y: bounds.maxY - 25, width: 16, height: 16)
+    }
+
+    private func drawPin(in context: CGContext) {
+        guard let image = NSImage(
+            systemSymbolName: isPinned ? "pin.fill" : "pin",
+            accessibilityDescription: nil
+        ) else { return }
+        image.draw(
+            in: pinButtonRect,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: isPinned ? 1 : 0.55
+        )
     }
 
     private func draw(session: SessionSnapshot, in rect: CGRect, context: CGContext) {
@@ -146,6 +195,11 @@ public final class SessionHUDWindowController {
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
     private var isRevealed = false
+    private var isEnabled = true
+    private var isPinned = false
+    private var petHovering = false
+    private var hudHovering = false
+    private var lastPetWindowFrame = NSRect.zero
 
     public var onSessionSelected: ((SessionSnapshot) -> Void)?
     public var onOverflowSelected: (() -> Void)?
@@ -155,24 +209,76 @@ public final class SessionHUDWindowController {
     }
 
     public func reveal(petWindowFrame: NSRect) {
+        lastPetWindowFrame = petWindowFrame
         isRevealed = true
-        update(petWindowFrame: petWindowFrame)
+        update(petWindowFrame: petWindowFrame, enabled: isEnabled)
         scheduleHide()
     }
 
+    public func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+        if !enabled {
+            hide()
+        } else {
+            refresh()
+        }
+    }
+
+    public func setPinned(_ pinned: Bool) {
+        isPinned = pinned
+        if pinned {
+            hideTask?.cancel()
+            hideTask = nil
+        }
+        refresh()
+        if !pinned { scheduleHide() }
+    }
+
+    public func setPetHover(_ hovering: Bool) {
+        petHovering = hovering
+        if hovering {
+            hideTask?.cancel()
+            hideTask = nil
+        } else {
+            scheduleHide()
+        }
+    }
+
+    private func setHUDHover(_ hovering: Bool) {
+        hudHovering = hovering
+        if hovering {
+            hideTask?.cancel()
+            hideTask = nil
+        } else {
+            scheduleHide()
+        }
+    }
+
     public func update(petWindowFrame: NSRect, enabled: Bool = true) {
-        guard isRevealed, enabled else {
+        lastPetWindowFrame = petWindowFrame
+        isEnabled = enabled
+        refresh()
+    }
+
+    private func refresh() {
+        let rows = SessionHUDGeometry.rows(from: model.sessions)
+        guard SessionHUDVisibility.shouldShow(
+            enabled: isEnabled,
+            pinned: isPinned,
+            revealed: isRevealed,
+            hasVisibleSessions: !rows.sessions.isEmpty
+        ), !lastPetWindowFrame.equalTo(.zero),
+        let screen = screen(for: lastPetWindowFrame) else {
             panel?.orderOut(nil)
             return
         }
-        let rows = SessionHUDGeometry.rows(from: model.sessions)
         let size = SessionHUDGeometry.contentSize(for: rows)
-        guard !size.equalTo(.zero), let screen = screen(for: petWindowFrame) else {
+        guard !size.equalTo(.zero) else {
             panel?.orderOut(nil)
             return
         }
         let frame = SessionHUDGeometry.frame(
-            for: petWindowFrame,
+            for: lastPetWindowFrame,
             workArea: screen.visibleFrame,
             contentSize: size
         )
@@ -184,6 +290,7 @@ public final class SessionHUDWindowController {
         view.frame = NSRect(origin: .zero, size: size)
         view.autoresizingMask = [.width, .height]
         view.rows = rows
+        view.isPinned = isPinned
         panel?.setContentSize(size)
         panel?.setFrame(frame, display: true)
         panel?.orderFrontRegardless()
@@ -213,6 +320,12 @@ public final class SessionHUDWindowController {
         view.onOverflowSelected = { [weak self] in
             self?.onOverflowSelected?()
         }
+        view.onPinToggled = { [weak self] pinned in
+            self?.model.preferences.sessionHUDPinned = pinned
+        }
+        view.onHoverChanged = { [weak self] hovering in
+            self?.setHUDHover(hovering)
+        }
         let newPanel = NSPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -232,10 +345,30 @@ public final class SessionHUDWindowController {
     }
 
     private func scheduleHide() {
+        guard isRevealed, !isPinned else { return }
         hideTask?.cancel()
         hideTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(6))
+            try? await Task.sleep(for: .seconds(SessionHUDVisibility.hideGrace))
             guard let self, !Task.isCancelled else { return }
+            let pointerInHotZone: Bool
+            if let panel = self.panel {
+                pointerInHotZone = SessionHUDVisibility.isInsideHotZone(
+                    NSEvent.mouseLocation,
+                    petFrame: self.lastPetWindowFrame,
+                    hudFrame: panel.frame
+                )
+            } else {
+                pointerInHotZone = false
+            }
+            guard !SessionHUDVisibility.shouldKeepVisible(
+                pinned: self.isPinned,
+                petHovering: self.petHovering,
+                hudHovering: self.hudHovering,
+                pointerInHotZone: pointerInHotZone
+            ) else {
+                self.scheduleHide()
+                return
+            }
             self.hide()
         }
     }
