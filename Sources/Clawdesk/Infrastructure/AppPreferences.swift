@@ -247,6 +247,11 @@ public final class AppPreferences: ObservableObject {
             shadow: color(paletteObject["shadow"], fallback: basePalette.shadow),
             highlight: color(paletteObject["highlight"], fallback: basePalette.highlight)
         )
+        let timings = themeTimings(
+            object["timings"] as? [String: Any],
+            sleepSequence: object["sleepSequence"] as? [String: Any],
+            directory: directory
+        )
 
         var stateFiles: [String: String] = [:]
         var idleVisualFiles: [String] = []
@@ -262,7 +267,7 @@ public final class AppPreferences: ObservableObject {
                     files = []
                 }
                 let validFiles = files.filter {
-                    isSafeRelativePath($0) && FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
+                    ThemeAssetPathPolicy.isSafeRelativePath($0) && FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
                 }
                 guard let file = validFiles.first else { continue }
                 let normalizedState = state.lowercased()
@@ -273,7 +278,7 @@ public final class AppPreferences: ObservableObject {
         if let animations = object["idleAnimations"] as? [[String: Any]] {
             for entry in animations {
                 guard let file = entry["file"] as? String,
-                      isSafeRelativePath(file),
+                      ThemeAssetPathPolicy.isSafeRelativePath(file),
                       FileManager.default.fileExists(atPath: directory.appendingPathComponent(file).path) else { continue }
                 let rawMilliseconds = (entry["duration"] as? NSNumber)?.doubleValue ?? 1_000
                 let milliseconds = min(60_000, max(250, rawMilliseconds.isFinite ? rawMilliseconds : 1_000))
@@ -286,7 +291,7 @@ public final class AppPreferences: ObservableObject {
         if let rawSounds = object["sounds"] as? [String: Any] {
             for (name, value) in rawSounds {
                 guard let file = value as? String,
-                      isSafeRelativePath(file),
+                      ThemeAssetPathPolicy.isSafeRelativePath(file),
                       FileManager.default.fileExists(atPath: directory.appendingPathComponent("sounds").appendingPathComponent(file).path) else { continue }
                 sounds[name] = file
             }
@@ -304,6 +309,7 @@ public final class AppPreferences: ObservableObject {
             stateFiles: stateFiles,
             idleVisualFiles: idleVisualFiles,
             idleAnimations: idleAnimations,
+            timings: timings,
             sounds: sounds
         )
     }
@@ -352,11 +358,6 @@ public final class AppPreferences: ObservableObject {
         return id.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) || $0 == "_" || $0 == "-" }
     }
 
-    private static func isSafeRelativePath(_ path: String) -> Bool {
-        guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\") else { return false }
-        return path.split(separator: "/").allSatisfy { $0 != ".." && $0 != "." }
-    }
-
     private static func color(_ value: Any?, fallback: RGBColor) -> RGBColor {
         if let values = value as? [NSNumber], values.count >= 3 {
             return RGBColor(red: values[0].doubleValue, green: values[1].doubleValue, blue: values[2].doubleValue)
@@ -378,5 +379,45 @@ public final class AppPreferences: ObservableObject {
             }
         }
         return fallback
+    }
+
+    private static func themeTimings(
+        _ object: [String: Any]?,
+        sleepSequence: [String: Any]?,
+        directory: URL
+    ) -> ThemeTimings {
+        let defaults = ThemeTimings.standard
+        func seconds(_ key: String, fallback: TimeInterval) -> TimeInterval {
+            guard let raw = object?[key] as? NSNumber else { return fallback }
+            let milliseconds = raw.doubleValue
+            guard milliseconds.isFinite else { return fallback }
+            return milliseconds / 1_000
+        }
+        let mode = (sleepSequence?["mode"] as? String)
+            .flatMap { ThemeSleepMode(rawValue: $0.lowercased()) }
+            ?? defaults.sleepMode
+        let dndTransitionFile: String?
+        if let raw = object?["dndSleepTransitionSvg"] as? String,
+           ThemeAssetPathPolicy.isSafeRelativePath(raw),
+           FileManager.default.fileExists(atPath: directory.appendingPathComponent(raw).path) {
+            dndTransitionFile = raw
+        } else {
+            dndTransitionFile = nil
+        }
+        return ThemeTimings(
+            mouseIdleTimeout: seconds("mouseIdleTimeout", fallback: defaults.mouseIdleTimeout),
+            mouseSleepTimeout: seconds("mouseSleepTimeout", fallback: defaults.mouseSleepTimeout),
+            yawnDuration: seconds("yawnDuration", fallback: defaults.yawnDuration),
+            collapseDuration: seconds("collapseDuration", fallback: defaults.collapseDuration),
+            wakeDuration: seconds("wakeDuration", fallback: defaults.wakeDuration),
+            deepSleepTimeout: seconds("deepSleepTimeout", fallback: defaults.deepSleepTimeout),
+            dndSleepTransitionFile: dndTransitionFile,
+            dndSleepTransitionDuration: seconds(
+                "dndSleepTransitionDuration",
+                fallback: defaults.dndSleepTransitionDuration
+            ),
+            sleepMode: mode,
+            dndSkipYawn: (object?["dndSkipYawn"] as? Bool) ?? false
+        )
     }
 }
