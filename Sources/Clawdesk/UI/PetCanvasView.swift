@@ -15,7 +15,7 @@ public final class PetCanvasView: NSView {
             assetCache.removeAll()
             assetCacheOrder.removeAll()
             assetCacheBytes = 0
-            assetClock = 0
+            animationClock.reset()
             needsDisplay = true
         }
     }
@@ -33,7 +33,7 @@ public final class PetCanvasView: NSView {
 
     public var idleVisualFile: String? {
         didSet {
-            assetClock = 0
+            animationClock.reset()
             needsDisplay = true
         }
     }
@@ -51,7 +51,8 @@ public final class PetCanvasView: NSView {
     public var onHoverChanged: ((Bool) -> Void)?
 
     private var phase: CGFloat = 0
-    private var assetClock: TimeInterval = 0
+    private var animationClock = PetAnimationClock()
+    private var assetClock: TimeInterval { animationClock.time }
     private static let maxAssetDimension = 512
     private static let maxAnimationBytes = 64 * 1024 * 1024
     private static let maxAssetCacheBytes = 96 * 1024 * 1024
@@ -98,11 +99,10 @@ public final class PetCanvasView: NSView {
         return x * x + y * y <= 1.08 ? self : nil
     }
 
-    public func advanceFrame() {
-        phase += 0.075
+    public func advanceFrame(at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        let delta = animationClock.advance(to: timestamp)
+        phase += CGFloat(delta)
         if phase > 1_000 { phase = 0 }
-        assetClock += 0.075
-        if assetClock > 86_400 { assetClock = 0 }
         needsDisplay = true
     }
 
