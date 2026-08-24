@@ -180,6 +180,15 @@ final class PetInteractionTests: XCTestCase {
         let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
         view.theme = theme
 
+        XCTAssertNil(
+            theme.assetURL(for: .miniPeek),
+            "Pointer hover must never resolve a theme interaction asset"
+        )
+        XCTAssertNil(
+            theme.assetURL(for: .dragging),
+            "Pointer dragging must never resolve a theme interaction asset"
+        )
+
         view.petState = .miniPeek
         XCTAssertFalse(hasOpaqueCornerPixel(in: render(view)), "Hover must not load a corner-mark asset")
 
@@ -234,6 +243,23 @@ final class PetInteractionTests: XCTestCase {
             (image.colorAt(x: 185, y: 75)?.alphaComponent ?? 0) > 0.1,
             "A partial redraw must clear the former upper-right hover marker"
         )
+    }
+
+    @MainActor
+    func testPetCanvasDoesNotExposeSystemFocusDecoration() {
+        let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
+        let panel = NSPanel(
+            contentRect: view.bounds,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.contentView = view
+
+        XCTAssertFalse(view.isOpaque)
+        XCTAssertEqual(view.focusRingType, .none)
+        XCTAssertFalse(panel.styleMask.contains(.resizable))
+        XCTAssertFalse(view.wantsLayer && (view.layer?.isOpaque ?? true))
     }
 
     @MainActor
