@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.10 release adds the upstream theme-driven sleep sequence: after the
+The 0.1.12 release adds a native Session HUD and the upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
@@ -61,6 +61,9 @@ not silently deny a request.
 Enable the read-only mobile companion in Settings to expose the token-gated
 LAN page and v1 WebSocket stream. The companion publishes sanitized session
 snapshots only; `/api/connection-info` intentionally never returns the token.
+Click the pet while sessions are active to reveal the low-overhead native HUD;
+click a session row to focus its terminal, or the overflow row to open the full
+Dashboard.
 
 ## Scope and upstream tracking
 
