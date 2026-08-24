@@ -4,6 +4,28 @@ import ImageIO
 
 @MainActor
 public final class PetCanvasView: NSView {
+    public override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureTransparentSurface()
+    }
+
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureTransparentSurface()
+    }
+
+    public override var isOpaque: Bool { false }
+
+    private func configureTransparentSurface() {
+        // A pet is a transparent compositing surface, not a focusable form
+        // control. A layer-backed surface plus an explicit focus-ring policy
+        // prevents AppKit from contributing edge pixels during mouseDown.
+        focusRingType = .none
+        wantsLayer = true
+        layer?.isOpaque = false
+        layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
     public var petState: PetState = .idle {
         didSet {
             guard oldValue != petState else { return }
@@ -147,6 +169,7 @@ public final class PetCanvasView: NSView {
     public func redrawImmediately() {
         needsDisplay = true
         display()
+        window?.displayIfNeeded()
     }
 
     public func setPointerLocation(_ point: NSPoint) {
@@ -174,7 +197,13 @@ public final class PetCanvasView: NSView {
         // clearing so the transparent backing surface is genuinely reset.
         context.resetClip()
         context.clip(to: bounds)
-        context.clear(bounds)
+        // Replace the complete transparent surface. `sourceOver` can leave
+        // old pixels in a buffered transparent window; copy + clear writes
+        // transparent pixels over the whole canvas before the next frame.
+        context.setBlendMode(.copy)
+        context.setFillColor(NSColor.clear.cgColor)
+        context.fill(bounds)
+        context.setBlendMode(.normal)
         context.setShouldAntialias(true)
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)

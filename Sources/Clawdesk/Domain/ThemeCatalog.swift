@@ -91,6 +91,10 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         idleVisualFile: String? = nil,
         stateOverrideFile: String? = nil
     ) -> URL? {
+        // Hover and dragging are pointer interaction states, not theme
+        // decorations. Refusing these assets at the theme seam prevents a
+        // legacy corner marker from being loaded by any renderer path.
+        guard !state.isPointerInteraction else { return nil }
         guard let assetDirectory else { return nil }
         if let stateOverrideFile, ThemeAssetPathPolicy.isSafeRelativePath(stateOverrideFile) {
             let url = assetDirectory.appendingPathComponent(stateOverrideFile)
@@ -119,6 +123,7 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     /// CoreGraphics fallback for every logical state, so it is considered
     /// capable even though it has no asset directory.
     public func hasVisualAsset(for state: PetState) -> Bool {
+        guard !state.isPointerInteraction else { return false }
         guard let assetDirectory else { return true }
         let candidates = [
             state.rawValue,
