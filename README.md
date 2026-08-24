@@ -12,13 +12,15 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.12 release adds a native Session HUD and the upstream theme-driven sleep sequence: after the
+The 0.1.13 release adds a native Session HUD and the upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
 theme timing values are honored without adding a continuously running web
 renderer. It also retains the 0.1.9 idle animation cycle and 0.1.8 startup
-integration sync.
+integration sync. The Session HUD can be disabled or pinned open, uses a small
+pet-to-HUD hot zone, and the transparent pet canvas clears interaction states
+without leaving the former hover/drag corner bars behind.
 
 The local bridge listens on `127.0.0.1` and writes its current port to
 `~/Library/Application Support/Clawdesk/runtime.json`.

@@ -19,6 +19,66 @@ final class SessionHUDTests: XCTestCase {
         XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 184))
     }
 
+    func testVisibilityRequiresEnabledAndVisibleSessionsUnlessDismissedByPinState() {
+        XCTAssertFalse(SessionHUDVisibility.shouldShow(
+            enabled: false,
+            pinned: true,
+            revealed: true,
+            hasVisibleSessions: true
+        ))
+        XCTAssertFalse(SessionHUDVisibility.shouldShow(
+            enabled: true,
+            pinned: false,
+            revealed: false,
+            hasVisibleSessions: true
+        ))
+        XCTAssertTrue(SessionHUDVisibility.shouldShow(
+            enabled: true,
+            pinned: false,
+            revealed: true,
+            hasVisibleSessions: true
+        ))
+        XCTAssertTrue(SessionHUDVisibility.shouldShow(
+            enabled: true,
+            pinned: true,
+            revealed: false,
+            hasVisibleSessions: true
+        ))
+        XCTAssertFalse(SessionHUDVisibility.shouldShow(
+            enabled: true,
+            pinned: true,
+            revealed: true,
+            hasVisibleSessions: false
+        ))
+    }
+
+    func testPetAndHUDHotZoneKeepsThePanelReachable() {
+        let pet = CGRect(x: 100, y: 100, width: 120, height: 120)
+        let hud = CGRect(x: 50, y: 220, width: 220, height: 100)
+
+        XCTAssertTrue(SessionHUDVisibility.isInsideHotZone(
+            CGPoint(x: 80, y: 150), petFrame: pet, hudFrame: hud
+        ))
+        XCTAssertTrue(SessionHUDVisibility.isInsideHotZone(
+            CGPoint(x: 40, y: 270), petFrame: pet, hudFrame: hud
+        ))
+        XCTAssertFalse(SessionHUDVisibility.isInsideHotZone(
+            CGPoint(x: 10, y: 10), petFrame: pet, hudFrame: hud
+        ))
+        XCTAssertTrue(SessionHUDVisibility.shouldKeepVisible(
+            pinned: false,
+            petHovering: false,
+            hudHovering: true,
+            pointerInHotZone: false
+        ))
+        XCTAssertTrue(SessionHUDVisibility.shouldKeepVisible(
+            pinned: false,
+            petHovering: false,
+            hudHovering: false,
+            pointerInHotZone: true
+        ))
+    }
+
     func testFrameUsesSpaceBelowPetAndFlipsAboveWhenNeeded() {
         let workArea = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let size = CGSize(width: 286, height: 100)

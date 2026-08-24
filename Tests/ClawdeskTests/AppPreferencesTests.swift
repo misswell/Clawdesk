@@ -52,6 +52,21 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(low.petScale, 0.4)
     }
 
+    func testSessionHUDDefaultsAndPersists() {
+        let suite = "clawdesk-session-hud-" + UUID().uuidString
+        let prefs = makePreferences(suite: suite)
+        XCTAssertTrue(prefs.sessionHUDEnabled)
+        XCTAssertFalse(prefs.sessionHUDPinned)
+
+        prefs.sessionHUDEnabled = false
+        prefs.sessionHUDPinned = true
+
+        let defaults = UserDefaults(suiteName: suite)!
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertFalse(reloaded.sessionHUDEnabled)
+        XCTAssertTrue(reloaded.sessionHUDPinned)
+    }
+
     func testPermissionAutomationDefaultsOffAndPersists() {
         let suite = "clawdesk-automation-\(UUID().uuidString)"
         let prefs = makePreferences(suite: suite)

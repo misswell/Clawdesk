@@ -14,6 +14,44 @@ public struct SessionHUDRows: Equatable, Sendable {
     }
 }
 
+public enum SessionHUDVisibility {
+    public static let hotZonePadding: CGFloat = 24
+    public static let hideGrace: TimeInterval = 0.5
+
+    public static func shouldShow(
+        enabled: Bool,
+        pinned: Bool,
+        revealed: Bool,
+        hasVisibleSessions: Bool
+    ) -> Bool {
+        enabled && hasVisibleSessions && (pinned || revealed)
+    }
+
+    public static func isInsideHotZone(
+        _ point: CGPoint,
+        petFrame: CGRect,
+        hudFrame: CGRect?,
+        padding: CGFloat = hotZonePadding
+    ) -> Bool {
+        contains(point, in: petFrame, padding: padding)
+            || (hudFrame.map { contains(point, in: $0, padding: padding) } ?? false)
+    }
+
+    public static func shouldKeepVisible(
+        pinned: Bool,
+        petHovering: Bool,
+        hudHovering: Bool,
+        pointerInHotZone: Bool
+    ) -> Bool {
+        pinned || petHovering || hudHovering || pointerInHotZone
+    }
+
+    private static func contains(_ point: CGPoint, in rect: CGRect, padding: CGFloat) -> Bool {
+        guard rect.width > 0, rect.height > 0 else { return false }
+        return rect.insetBy(dx: -max(0, padding), dy: -max(0, padding)).contains(point)
+    }
+}
+
 public enum SessionHUDGeometry {
     public static let maximumVisibleRows = 3
     public static let rowHeight: CGFloat = 42

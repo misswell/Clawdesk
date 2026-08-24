@@ -69,6 +69,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.sessionHUD.hide()
             self?.onDashboard?()
         }
+        sessionHUD.setEnabled(model.preferences.sessionHUDEnabled)
+        sessionHUD.setPinned(model.preferences.sessionHUDPinned)
 
         model.$petState.sink { [weak self] state in
             self?.apply(state: state)
@@ -101,6 +103,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$showQuotaRing.sink { [weak self] _ in
             self?.refreshQuotaRing()
+        }.store(in: &cancellables)
+        model.preferences.$sessionHUDEnabled.sink { [weak self] enabled in
+            self?.sessionHUD.setEnabled(enabled)
+            self?.refreshSessionHUD()
+        }.store(in: &cancellables)
+        model.preferences.$sessionHUDPinned.sink { [weak self] pinned in
+            self?.sessionHUD.setPinned(pinned)
+            self?.refreshSessionHUD()
+        }.store(in: &cancellables)
+        model.preferences.$language.sink { [weak self] _ in
+            self?.refreshSessionHUD()
         }.store(in: &cancellables)
     }
 
@@ -258,6 +271,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func handleHover(_ hovering: Bool) {
+        sessionHUD.setPetHover(hovering)
         guard model.preferences.isMiniMode, !isDragging else { return }
         hoverRestoreTask?.cancel()
         if hovering {
@@ -282,7 +296,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard let frame = window?.frame else { return }
         sessionHUD.update(
             petWindowFrame: frame,
-            enabled: !model.preferences.isMiniMode && !isDragging
+            enabled: model.preferences.sessionHUDEnabled
+                && !model.preferences.isMiniMode
+                && !isDragging
         )
     }
 
