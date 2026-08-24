@@ -1,7 +1,7 @@
 # Upstream parity map
 
 Source baseline: `e4961f2568d5fdb5e3365597e6b050fae76f61ae`
-Latest local upstream inspection: `fda7301c`
+Latest local upstream inspection: `a7283581`
 
 Clawdesk ports the behavior described by the upstream project while replacing
 Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework.
@@ -28,6 +28,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Permission automation policy (off / auto-tools / unattended) | `PermissionPolicy` + preferences | Implemented with fail-closed semantics: auto-tools auto-approves only clearly read-only tool names and defers the rest to the bubble; unattended denies unknown requests instead of guessing |
 | Sessions menu with terminal focus | pet/status menu + `TerminalFocusService` | Implemented: right-click and tray Sessions submenus list live sessions (debounced tray rebuild) and focus the owning terminal window |
 | Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for the registered Claude-compatible, JSON/TOML, and plugin adapters. Plugin identities, extension directories, and the Kiro managed agent use Clawdesk's own names (never the upstream product id), so the two integrations cannot collide or impersonate each other |
+| ZCode manual `PermissionRequest` approval | `AdditionalHookAdapters` + `AgentEventAdapters` | Implemented: the config adapter installs the blocking hook, Allow/Deny uses ZCode's strict `hookSpecificOutput` schema, and unknown/oversized tool input returns `204` so ZCode keeps its native permission UI |
 | Codex `request_user_input` | `DefaultAgentEventAdapter` + `CodexLogMonitor` + read-only card | Implemented: bounded question/options preview parsed in the adapter; answers stay in Codex and the matching output clears the card |
 | Gemini `AfterAgent` / `PreCompress` semantics | `EventStateMapper` | Implemented: AfterAgent returns idle; PreCompress is recorded without forcing sweeping |
 | Kimi legacy approval modes | `DefaultAgentEventAdapter` + Kimi TOML adapter | Implemented: explicit/suspect modes, persisted command flag, runtime env overrides (`CLAWD_KIMI_PERMISSION_MODE`, `CLAWD_KIMI_PERMISSION_IMMEDIATE`, `CLAWD_KIMI_PERMISSION_SUSPECT`, `CLAWD_KIMI_PERMISSION_SUSPECT_MS`, `CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION`), tunable suspect window, and per-session gate close ledger |

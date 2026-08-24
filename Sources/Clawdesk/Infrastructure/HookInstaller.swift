@@ -293,9 +293,16 @@ public final class HookInstaller {
         BODY=$(/usr/bin/cat)
         [ -z "$BODY" ] && BODY='{}'
         if [ "$ROUTE" = "permission" ]; then
-          printf '%s' "$BODY" | /usr/bin/curl --silent --show-error --max-time 540 --connect-timeout 1 \
-            -H 'Content-Type: application/json' --data-binary @- "$URL" 2>/dev/null || \
-            printf '%s' '{"behavior":"ask","approved":false}'
+          PERMISSION_TIMEOUT=540
+          [ "$AGENT" = "zcode" ] && PERMISSION_TIMEOUT=590
+          RESPONSE=$(printf '%s' "$BODY" | /usr/bin/curl --silent --show-error --max-time "$PERMISSION_TIMEOUT" --connect-timeout 1 \
+            -H 'Content-Type: application/json' --data-binary @- "$URL" 2>/dev/null)
+          if [ "$AGENT" = "zcode" ]; then
+            [ -z "$RESPONSE" ] && RESPONSE='{}'
+          elif [ -z "$RESPONSE" ]; then
+            RESPONSE='{"behavior":"ask","approved":false}'
+          fi
+          printf '%s' "$RESPONSE"
         else
           printf '%s' "$BODY" | /usr/bin/curl --silent --max-time 5 --connect-timeout 1 \
             -H 'Content-Type: application/json' --data-binary @- "$URL" >/dev/null 2>&1 || true
