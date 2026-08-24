@@ -19,6 +19,48 @@ final class SessionHUDTests: XCTestCase {
         XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 184))
     }
 
+    func testContextUsagePresentationUsesPercentageAndWarningThresholds() {
+        let neutral = ContextUsageFormatter.presentation(
+            for: ContextUsage(used: 62_000, limit: 100_000)
+        )
+        XCTAssertEqual(neutral?.label, "62%")
+        XCTAssertEqual(neutral?.severity, .neutral)
+
+        let warm = ContextUsageFormatter.presentation(
+            for: ContextUsage(used: 75_000, limit: 100_000)
+        )
+        XCTAssertEqual(warm?.label, "75%")
+        XCTAssertEqual(warm?.severity, .warm)
+
+        let hot = ContextUsageFormatter.presentation(
+            for: ContextUsage(used: 90_000, limit: 100_000)
+        )
+        XCTAssertEqual(hot?.label, "90%")
+        XCTAssertEqual(hot?.severity, .hot)
+    }
+
+    func testContextUsagePresentationFallsBackToCompactTokenCount() {
+        let thousands = ContextUsageFormatter.presentation(
+            for: ContextUsage(used: 12_500)
+        )
+        XCTAssertEqual(thousands?.label, "13k")
+        XCTAssertEqual(thousands?.severity, .neutral)
+
+        let millions = ContextUsageFormatter.presentation(
+            for: ContextUsage(used: 12_000_000)
+        )
+        XCTAssertEqual(millions?.label, "12m")
+        XCTAssertNil(ContextUsageFormatter.presentation(for: ContextUsage(used: 0)))
+    }
+
+    func testUsageChipRectStaysInsideSessionRow() {
+        let row = CGRect(x: 12, y: 4, width: 262, height: 38)
+        let chip = SessionHUDGeometry.usageChipRect(in: row, width: 44)
+
+        XCTAssertEqual(chip, CGRect(x: 230, y: 14, width: 44, height: 18))
+        XCTAssertTrue(row.contains(chip))
+    }
+
     func testVisibilityRequiresEnabledAndVisibleSessionsUnlessDismissedByPinState() {
         XCTAssertFalse(SessionHUDVisibility.shouldShow(
             enabled: false,

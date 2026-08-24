@@ -121,6 +121,8 @@ private struct GeneralSettingsView: View {
                 Toggle(model.preferences.text("Free roam"), isOn: $model.preferences.freeRoamEnabled)
                 Toggle(model.preferences.text("Show quota ring beside the pet"), isOn: $model.preferences.showQuotaRing)
                 Toggle(model.preferences.text("Show session HUD"), isOn: $model.preferences.sessionHUDEnabled)
+                Toggle(model.preferences.text("Show context usage in session HUD"), isOn: $model.preferences.sessionHUDShowContextUsage)
+                    .disabled(!model.preferences.sessionHUDEnabled)
                 Toggle(model.preferences.text("Keep session HUD open"), isOn: $model.preferences.sessionHUDPinned)
                     .disabled(!model.preferences.sessionHUDEnabled)
                 HStack {

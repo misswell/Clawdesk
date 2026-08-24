@@ -60,6 +60,23 @@ public enum SessionHUDGeometry {
     public static let verticalPadding: CGFloat = 8
     public static let petGap: CGFloat = 8
     public static let edgeMargin: CGFloat = 10
+    public static let usageChipHeight: CGFloat = 18
+    public static let usageChipMinWidth: CGFloat = 34
+    public static let usageChipGap: CGFloat = 6
+
+    public static func usageChipRect(
+        in rowRect: CGRect,
+        width: CGFloat,
+        rightInset: CGFloat = 0
+    ) -> CGRect {
+        let chipWidth = max(usageChipMinWidth, width)
+        return CGRect(
+            x: rowRect.maxX - max(0, rightInset) - chipWidth,
+            y: rowRect.midY - usageChipHeight / 2,
+            width: chipWidth,
+            height: usageChipHeight
+        )
+    }
 
     public static func rows(
         from sessions: [SessionSnapshot],
