@@ -94,9 +94,9 @@ public enum ThemeCatalog {
             id: "pinch",
             displayName: "Pinch",
             palette: PetPalette(
-                body: RGBColor(red: 0.95, green: 0.35, blue: 0.16),
+                body: RGBColor(red: 0.07, green: 0.07, blue: 0.08),
                 accent: RGBColor(red: 0.98, green: 0.62, blue: 0.18),
-                shadow: RGBColor(red: 0.46, green: 0.17, blue: 0.10),
+                shadow: RGBColor(red: 0.02, green: 0.02, blue: 0.03),
                 highlight: RGBColor(red: 1.0, green: 0.84, blue: 0.40)
             )
         ),
@@ -118,6 +118,46 @@ public enum ThemeCatalog {
                 accent: RGBColor(red: 0.29, green: 0.42, blue: 0.92),
                 shadow: RGBColor(red: 0.14, green: 0.23, blue: 0.50),
                 highlight: RGBColor(red: 0.86, green: 0.95, blue: 1.0)
+            )
+        ),
+        ThemeDefinition(
+            id: "rose",
+            displayName: "Rose",
+            palette: PetPalette(
+                body: RGBColor(red: 0.92, green: 0.28, blue: 0.48),
+                accent: RGBColor(red: 0.72, green: 0.08, blue: 0.28),
+                shadow: RGBColor(red: 0.38, green: 0.04, blue: 0.14),
+                highlight: RGBColor(red: 1.0, green: 0.72, blue: 0.82)
+            )
+        ),
+        ThemeDefinition(
+            id: "mint",
+            displayName: "Mint",
+            palette: PetPalette(
+                body: RGBColor(red: 0.20, green: 0.78, blue: 0.59),
+                accent: RGBColor(red: 0.04, green: 0.43, blue: 0.31),
+                shadow: RGBColor(red: 0.02, green: 0.24, blue: 0.17),
+                highlight: RGBColor(red: 0.72, green: 1.0, blue: 0.88)
+            )
+        ),
+        ThemeDefinition(
+            id: "violet",
+            displayName: "Violet",
+            palette: PetPalette(
+                body: RGBColor(red: 0.55, green: 0.34, blue: 0.90),
+                accent: RGBColor(red: 0.29, green: 0.12, blue: 0.62),
+                shadow: RGBColor(red: 0.15, green: 0.06, blue: 0.34),
+                highlight: RGBColor(red: 0.86, green: 0.76, blue: 1.0)
+            )
+        ),
+        ThemeDefinition(
+            id: "lemon",
+            displayName: "Lemon",
+            palette: PetPalette(
+                body: RGBColor(red: 0.96, green: 0.78, blue: 0.18),
+                accent: RGBColor(red: 0.64, green: 0.39, blue: 0.02),
+                shadow: RGBColor(red: 0.39, green: 0.22, blue: 0.01),
+                highlight: RGBColor(red: 1.0, green: 0.96, blue: 0.60)
             )
         )
     ]

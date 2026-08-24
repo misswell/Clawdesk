@@ -15,6 +15,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     private let instanceGuard = SingleInstanceGuard()
     private var cancellables = Set<AnyCancellable>()
     private var statusMenuRebuildTask: Task<Void, Never>?
+    private var updateCheckTask: Task<Void, Never>?
 
     public static func main() {
         let application = NSApplication.shared
@@ -58,27 +59,24 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
             self.settingsWindow.window?.title = self.model.preferences.text("Clawdesk Settings")
             self.dashboardWindow.window?.title = self.model.preferences.text("Clawdesk Dashboard")
         }.store(in: &cancellables)
+        model.preferences.$autoCheckForUpdates
+            .sink { [weak self] enabled in
+                self?.setAutomaticUpdateChecks(enabled)
+            }
+            .store(in: &cancellables)
         model.$sessions.sink { [weak self] _ in
             self?.scheduleStatusMenuRebuild()
         }.store(in: &cancellables)
         model.start()
         shortcuts.start()
         petWindow.start()
-        if model.preferences.autoCheckForUpdates {
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(2))
-                guard let self else { return }
-                await self.model.softwareUpdater.checkForUpdates()
-                if let release = self.model.softwareUpdater.state.availableRelease {
-                    self.presentUpdatePrompt(release)
-                }
-            }
-        }
+        setAutomaticUpdateChecks(model.preferences.autoCheckForUpdates)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
         model.stop()
         shortcuts.stop()
+        updateCheckTask?.cancel()
         petWindow.stop()
     }
 
@@ -181,6 +179,24 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         if alert.runModal() == .alertFirstButtonReturn {
             Task { @MainActor [weak self] in
                 await self?.model.softwareUpdater.downloadAndInstall()
+            }
+        }
+    }
+
+    private func setAutomaticUpdateChecks(_ enabled: Bool) {
+        updateCheckTask?.cancel()
+        updateCheckTask = nil
+        guard enabled else { return }
+
+        updateCheckTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            while let self, !Task.isCancelled {
+                guard self.model.preferences.autoCheckForUpdates else { return }
+                await self.model.softwareUpdater.checkForUpdates()
+                if let release = self.model.softwareUpdater.state.availableRelease {
+                    self.presentUpdatePrompt(release)
+                }
+                try? await Task.sleep(for: .seconds(6 * 60 * 60))
             }
         }
     }

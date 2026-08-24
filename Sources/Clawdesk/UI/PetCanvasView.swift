@@ -42,8 +42,8 @@ public final class PetCanvasView: NSView {
         didSet { needsDisplay = true }
     }
 
-    public var onDragBegan: (() -> Void)?
-    public var onDrag: ((CGSize) -> Void)?
+    public var onDragBegan: ((CGPoint) -> Void)?
+    public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnded: (() -> Void)?
     public var onDoubleTap: (() -> Void)?
     public var onFlail: (() -> Void)?
@@ -63,8 +63,6 @@ public final class PetCanvasView: NSView {
     private var assetCache: [String: AssetFrames] = [:]
     private var assetCacheOrder: [String] = []
     private var assetCacheBytes = 0
-    private var mouseDownPoint: NSPoint?
-    private var lastDragPoint: NSPoint?
     private var clickTimes: [Date] = []
     private var trackingArea: NSTrackingArea?
 
@@ -115,9 +113,7 @@ public final class PetCanvasView: NSView {
         }
         let windowPoint = window?.convertFromScreen(NSRect(origin: point, size: .zero)).origin ?? point
         let local = convert(windowPoint, from: nil)
-        let dx = (local.x - bounds.midX) / max(1, bounds.width * 0.20)
-        let dy = (local.y - bounds.midY) / max(1, bounds.height * 0.25)
-        pointerOffset = CGPoint(x: max(-5, min(5, dx * 5)), y: max(-4, min(4, dy * 4)))
+        pointerOffset = PetPointerMapper.offset(for: local, in: bounds)
     }
 
     public override func draw(_ dirtyRect: NSRect) {
@@ -284,22 +280,16 @@ public final class PetCanvasView: NSView {
             clickTimes.removeAll()
             onDoubleTap?()
         }
-        mouseDownPoint = convert(event.locationInWindow, from: nil)
-        lastDragPoint = mouseDownPoint
-        onDragBegan?()
+        let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
+        onDragBegan?(screenPoint)
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        guard let lastDragPoint else { return }
-        let delta = CGSize(width: point.x - lastDragPoint.x, height: point.y - lastDragPoint.y)
-        self.lastDragPoint = point
-        onDrag?(delta)
+        let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
+        onDrag?(screenPoint)
     }
 
     public override func mouseUp(with event: NSEvent) {
-        mouseDownPoint = nil
-        lastDragPoint = nil
         onDragEnded?()
     }
 
@@ -371,7 +361,7 @@ public final class PetCanvasView: NSView {
     private func drawBloub(in context: CGContext) {
         let center = CGPoint(x: 110, y: 108)
         let radius: CGFloat = 74
-        let bodyColor = NSColor(white: 0.07, alpha: 1).cgColor
+        let bodyColor = theme.palette.body.cgColor()
         let eyeColor = NSColor.white.cgColor
         let sleeping = petState == .sleeping || petState == .dozing
         let shift: CGFloat = sleeping ? -14 : 0
