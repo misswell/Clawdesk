@@ -95,6 +95,35 @@ final class LocalEventServerTests: XCTestCase {
         XCTAssertEqual(recorder.value()?.quota?.providerID, "test-unknown-agent")
     }
 
+    func testContextUsageParsesClaudeWindowTelemetryAsMetadataOnly() async throws {
+        let server = LocalEventServer(preferredPort: 37_879)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=ContextUpdate&agent=claude-code&session_id=context-1",
+            body: #"{"metadata_only":true,"context_window":{"current_usage":{"input_tokens":1200,"cache_read_input_tokens":100,"cache_creation_input_tokens":50},"context_window_size":200000,"used_percentage":13}}"#
+        )
+
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertTrue(recorder.value()?.metadataOnly == true)
+        let usage = try XCTUnwrap(recorder.value()?.contextUsage)
+        XCTAssertEqual(usage.used, 1_350, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(usage.limit), 200_000, accuracy: 0.001)
+        XCTAssertEqual(usage.percent, 13)
+        XCTAssertEqual(usage.source, "claude")
+    }
+
     func testKimiSuspectAndGateCloseStayNonBlocking() async throws {
         let server = LocalEventServer(preferredPort: 37_872)
         let recorder = EventRecorder()

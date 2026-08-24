@@ -394,14 +394,6 @@ public final class LocalEventServer: @unchecked Sendable {
             return nil
         }
 
-        func number(_ value: Any?) -> Double? {
-            if let value = value as? NSNumber { return value.doubleValue }
-            if let value = value as? Double { return value }
-            if let value = value as? Int { return Double(value) }
-            if let value = value as? String { return Double(value) }
-            return nil
-        }
-
         func bool(_ keys: [String]) -> Bool {
             for key in keys {
                 if let value = object[key] as? Bool { return value }
@@ -423,43 +415,7 @@ public final class LocalEventServer: @unchecked Sendable {
         let eventName = string(["event", "event_name", "eventName", "type", "name", "state"])
             ?? fallbackEvent
             ?? (forcePermission ? "PermissionRequest" : "Notification")
-        let contextUsage: ContextUsage? = {
-            let raw = object["context_usage"] ?? object["contextUsage"]
-            let values = raw as? [String: Any]
-            let window = object["context_window"] as? [String: Any]
-            let current = window?["current_usage"] as? [String: Any]
-            let usedFromComponents = current.map { usage -> Double? in
-                let keys = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]
-                var total = 0.0
-                for key in keys {
-                    guard let value = usage[key] else { continue }
-                    guard let number = number(value), number >= 0 else { return nil }
-                    total += number
-                }
-                return total > 0 ? total : nil
-            } ?? nil
-            let used = number(values?["used"])
-                ?? usedFromComponents
-                ?? number(window?["used"])
-            guard let used, used > 0 else { return nil }
-            let limit = number(values?["limit"])
-                ?? number(window?["context_window_size"])
-            let percent = number(values?["percent"])
-                ?? number(window?["used_percentage"])
-            let normalizedAgent = agentID.lowercased()
-            let source = string(["context_source", "contextSource"])
-                ?? (values?["source"] as? String)
-                ?? (normalizedAgent.contains("claude") ? "claude" : nil)
-                ?? (normalizedAgent.contains("codex") ? "codex" : nil)
-                ?? (normalizedAgent.contains("antigravity") ? "antigravity" : nil)
-                ?? (normalizedAgent.contains("opencode") ? "opencode" : nil)
-            return ContextUsage(
-                used: used,
-                limit: limit,
-                percent: percent.map { Int($0.rounded()) },
-                source: source
-            )
-        }()
+        let parsedContextUsage = parseContextUsage(from: object, agentID: agentID)
         let metadataOnly = bool(["metadata_only", "metadataOnly"])
         let hint = string(["state", "pet_state", "petState"]).flatMap(normalizeState)
         let quotaObject = (object["rate_limits"] as? [String: Any])
@@ -521,7 +477,7 @@ public final class LocalEventServer: @unchecked Sendable {
             permission: permission,
             question: adapterResult.question,
             quota: quota,
-            contextUsage: contextUsage,
+            contextUsage: parsedContextUsage,
             metadataOnly: metadataOnly,
             toolCallID: string(["tool_call_id", "toolCallId", "call_id", "callId"]),
             permissionSuspect: adapterResult.permissionSuspect,
@@ -530,6 +486,103 @@ public final class LocalEventServer: @unchecked Sendable {
             permissionGated: adapterResult.permissionGated,
             questionResolution: adapterResult.questionResolution,
             payload: payload
+        )
+    }
+
+    private static func number(_ value: Any?) -> Double? {
+        if let value = value as? NSNumber { return value.doubleValue }
+        if let value = value as? Double { return value }
+        if let value = value as? Int { return Double(value) }
+        if let value = value as? String { return Double(value) }
+        return nil
+    }
+
+    private static func stringValue(in object: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = object[key] as? String, !value.isEmpty { return value }
+            if let value = object[key] as? NSNumber { return value.stringValue }
+        }
+        return nil
+    }
+
+    private func parseContextUsage(from object: [String: Any], agentID: String) -> ContextUsage? {
+        let values: [String: Any]?
+        if let raw = object["context_usage"] {
+            values = raw as? [String: Any]
+        } else {
+            values = object["contextUsage"] as? [String: Any]
+        }
+        let window = object["context_window"] as? [String: Any]
+        var used: Double?
+        if let values, let rawUsed = values["used"] {
+            used = Self.number(rawUsed)
+        }
+
+        if used == nil, let current = window?["current_usage"] as? [String: Any] {
+            var total = 0.0
+            var foundComponent = false
+            var hasInvalidComponent = false
+            for key in ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] {
+                guard let value = current[key] else { continue }
+                guard let amount = Self.number(value), amount >= 0 else {
+                    hasInvalidComponent = true
+                    break
+                }
+                foundComponent = true
+                total += amount
+            }
+            if !hasInvalidComponent, foundComponent, total > 0 {
+                used = total
+            }
+        }
+
+        if used == nil, let rawUsed = window?["used"] {
+            used = Self.number(rawUsed)
+        }
+        guard let used, used > 0 else { return nil }
+
+        var limit: Double?
+        if let values, let rawLimit = values["limit"] {
+            limit = Self.number(rawLimit)
+        } else {
+            limit = nil
+        }
+        if limit == nil, let rawLimit = window?["context_window_size"] {
+            limit = Self.number(rawLimit)
+        }
+
+        var percent: Double?
+        if let values, let rawPercent = values["percent"] {
+            percent = Self.number(rawPercent)
+        } else {
+            percent = nil
+        }
+        if percent == nil, let rawPercent = window?["used_percentage"] {
+            percent = Self.number(rawPercent)
+        }
+
+        var source = Self.stringValue(in: object, keys: ["context_source", "contextSource"])
+        if source == nil, let values {
+            source = Self.stringValue(in: values, keys: ["source"])
+        }
+        if source == nil {
+            let normalizedAgent = agentID.lowercased()
+            if normalizedAgent.contains("claude") {
+                source = "claude"
+            } else if normalizedAgent.contains("codex") {
+                source = "codex"
+            } else if normalizedAgent.contains("antigravity") {
+                source = "antigravity"
+            } else if normalizedAgent.contains("opencode") {
+                source = "opencode"
+            }
+        }
+
+        return ContextUsage(
+            used: used,
+            limit: limit,
+            percent: percent.map { Int($0.rounded()) },
+            source: source
         )
     }
 
