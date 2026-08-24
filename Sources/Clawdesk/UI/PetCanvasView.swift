@@ -135,9 +135,11 @@ public final class PetCanvasView: NSView {
         context.saveGState()
         // This is a transparent, borderless pet window. AppKit does not
         // guarantee that pixels drawn by an earlier state disappear when a
-        // later state only paints a smaller shape, so clear the invalidated
-        // region before compositing the next frame.
-        context.clear(dirtyRect)
+        // later state only paints a smaller shape. Clear the full transparent
+        // canvas: the old interaction markers live outside many AppKit dirty
+        // rects, so clearing only dirtyRect can leave a horizontal or vertical
+        // remnant behind after hover/drag transitions.
+        context.clear(bounds)
         context.setShouldAntialias(true)
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
@@ -486,6 +488,10 @@ public final class PetCanvasView: NSView {
             drawSleepMarks(in: context)
         case .waking:
             drawSparkle(in: context)
+        case .dragging, .miniPeek:
+            // Dragging and mini-hover are interaction states, not decorations.
+            // In particular, do not resurrect the old corner bar markers here.
+            break
         default:
             break
         }

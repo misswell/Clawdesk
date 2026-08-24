@@ -11,6 +11,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
     private var roamTimer: Timer?
+    private var idleAnimationTask: Task<Void, Never>?
+    private var idleAnimationCycle = IdleAnimationCycle()
     private var cancellables = Set<AnyCancellable>()
     private var isDragging = false
     private var dragAnchor: PetDragAnchor?
@@ -64,10 +66,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
         }.store(in: &cancellables)
         model.preferences.$selectedThemeID.sink { [weak self] _ in
+            self?.cancelIdleAnimation(resetCycle: true)
             self?.petView.theme = model.preferences.theme
             self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
         }.store(in: &cancellables)
         model.preferences.$idleVisualByTheme.sink { [weak self] _ in
+            self?.cancelIdleAnimation(resetCycle: true)
             self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
         }.store(in: &cancellables)
         model.preferences.$isMiniMode.sink { [weak self] enabled in
@@ -110,7 +114,11 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         ) { [weak self] in
             guard let self, let window = self.window else { return }
             guard !self.isDragging else { return }
+            let previousActivity = self.model.lastPointerActivity
             self.model.noteMouseActivity(at: NSEvent.mouseLocation)
+            if self.model.lastPointerActivity != previousActivity {
+                self.cancelIdleAnimation(resetCycle: true)
+            }
             guard self.petView.petState == .idle || self.petView.petState == .miniIdle else { return }
             self.petView.setPointerLocation(NSEvent.mouseLocation)
             if window.isVisible == false { window.orderFrontRegardless() }
@@ -120,6 +128,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             repeats: true
         ) { [weak self] in
             self?.model.tickForMaintenance()
+            self?.tickIdleAnimation()
         }
         roamTimer = PetTimerScheduler.schedule(
             interval: 5,
@@ -138,6 +147,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         pointerTimer = nil
         sleepTimer = nil
         roamTimer = nil
+        cancelIdleAnimation(resetCycle: true)
         dragAnchor = nil
         hoverRestoreTask?.cancel()
         quotaRing.hide()
@@ -146,6 +156,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     public func setMiniMode(_ enabled: Bool, animate: Bool) {
         guard window != nil else { return }
+        cancelIdleAnimation(resetCycle: true)
         petView.miniMode = enabled
         if enabled {
             moveToMiniEdge(animated: animate)
@@ -158,6 +169,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func apply(state: PetState) {
         guard !isDragging else { return }
+        let wasResting = petView.petState == .idle || petView.petState == .miniIdle
+        if state != .idle || !wasResting {
+            cancelIdleAnimation(resetCycle: true)
+        }
         if model.preferences.isMiniMode {
             switch state {
             case .notification: petView.petState = .miniAlert
@@ -172,6 +187,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func beginDrag(at screenPoint: CGPoint) {
         guard let window else { return }
+        cancelIdleAnimation(resetCycle: true)
         isDragging = true
         dragAnchor = PetDragAnchor(windowOrigin: window.frame.origin, pointerOrigin: screenPoint)
         petView.petState = .dragging
@@ -224,6 +240,60 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
                 guard let self, !Task.isCancelled else { return }
                 self.apply(state: self.model.petState)
             }
+        }
+    }
+
+    /// Replays one upstream theme-provided idle animation after a quiet mouse
+    /// period, then returns to the user-selected resting visual. The check is
+    /// intentionally on the five-second maintenance cadence so the idle path
+    /// remains cheap while the animation itself still advances on the render
+    /// timer. Pointer movement cancels the replay immediately in the pointer
+    /// timer above.
+    private func tickIdleAnimation() {
+        guard !model.preferences.isMiniMode,
+              !model.preferences.doNotDisturb,
+              !isDragging,
+              model.petState == .idle else {
+            cancelIdleAnimation(resetCycle: false)
+            return
+        }
+
+        let activity = model.lastPointerActivity
+        if idleAnimationCycle.activity != activity {
+            cancelIdleAnimation(resetCycle: true)
+        }
+        let selected = model.preferences.selectedIdleVisual(for: model.preferences.theme)
+        guard idleAnimationTask == nil,
+              let animation = idleAnimationCycle.choose(
+                  now: .now,
+                  activity: activity,
+                  animations: model.preferences.theme.idleAnimations,
+                  selectedIdleFile: selected,
+                  randomIndex: { Int.random(in: 0..<$0) }
+              ) else { return }
+
+        petView.idleVisualFile = animation.file
+        let duration = animation.duration
+        idleAnimationTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(max(250, Int(duration * 1_000))))
+            guard let self, !Task.isCancelled else { return }
+            guard self.model.petState == .idle,
+                  !self.model.preferences.isMiniMode,
+                  self.model.lastPointerActivity == activity else {
+                self.idleAnimationTask = nil
+                return
+            }
+            self.petView.idleVisualFile = self.model.preferences.selectedIdleVisual(for: self.model.preferences.theme)
+            self.idleAnimationTask = nil
+        }
+    }
+
+    private func cancelIdleAnimation(resetCycle: Bool) {
+        idleAnimationTask?.cancel()
+        idleAnimationTask = nil
+        if resetCycle {
+            idleAnimationCycle.reset(for: model.lastPointerActivity)
+            petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
         }
     }
 

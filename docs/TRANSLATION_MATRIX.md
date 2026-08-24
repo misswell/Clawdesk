@@ -41,7 +41,7 @@ Status legend:
 
 | Upstream | Status | Clawdesk seam |
 | --- | --- | --- |
-| `renderer.js`, `animation-cycle.js`, `mini.js`, `tick.js`, `test-reaction.js`, `text-scale.js`, `size-utils.js` | Partial | `PetCanvasView` + `PetWindowController`; animation-cycle parity pending |
+| `renderer.js`, `animation-cycle.js`, `mini.js`, `tick.js`, `test-reaction.js`, `text-scale.js`, `size-utils.js` | Partial | `PetCanvasView` + `PetWindowController`; low-power idle random animation cycle is implemented, full SVG timeline/mini transition parity pending |
 | `theme-loader.js`, `theme-runtime.js`, `theme-metadata.js`, `theme-context.js`, `theme-sanitizer.js`, `theme-schema.js`, `theme-variants.js`, `theme-fade-sequencer.js`, `theme-assets-cache.js`, `theme-importer` | Partial | `AppPreferences` importer + `PetCanvasView` caching |
 | `idle-visual.js`, `pet-customization-catalog.js`, `settings-tab-anim-overrides.js`, `settings-anim-overrides-merge.js` | Partial | idle visual selection done; overrides pending |
 | `pet-geometry-main.js`, `pet-window-runtime.js`, `floating-window-runtime.js`, `topmost-runtime.js`, `window-opacity-transition.js`, `display-edge.js`, `drag-position.js`, `work-area.js`, `visible-margins.js` | Partial | window controller covers subset |

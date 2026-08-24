@@ -250,6 +250,7 @@ public final class AppPreferences: ObservableObject {
 
         var stateFiles: [String: String] = [:]
         var idleVisualFiles: [String] = []
+        var idleAnimations: [ThemeIdleAnimation] = []
         if let states = object["states"] as? [String: Any] {
             for (state, value) in states {
                 let files: [String]
@@ -270,12 +271,15 @@ public final class AppPreferences: ObservableObject {
             }
         }
         if let animations = object["idleAnimations"] as? [[String: Any]] {
-            idleVisualFiles.append(contentsOf: animations.compactMap { entry in
+            for entry in animations {
                 guard let file = entry["file"] as? String,
                       isSafeRelativePath(file),
-                      FileManager.default.fileExists(atPath: directory.appendingPathComponent(file).path) else { return nil }
-                return file
-            })
+                      FileManager.default.fileExists(atPath: directory.appendingPathComponent(file).path) else { continue }
+                let rawMilliseconds = (entry["duration"] as? NSNumber)?.doubleValue ?? 1_000
+                let milliseconds = min(60_000, max(250, rawMilliseconds.isFinite ? rawMilliseconds : 1_000))
+                idleAnimations.append(ThemeIdleAnimation(file: file, duration: milliseconds / 1_000))
+                idleVisualFiles.append(file)
+            }
         }
         idleVisualFiles = Array(NSOrderedSet(array: idleVisualFiles)) as? [String] ?? idleVisualFiles
         var sounds: [String: String] = [:]
@@ -299,6 +303,7 @@ public final class AppPreferences: ObservableObject {
             assetDirectory: directory,
             stateFiles: stateFiles,
             idleVisualFiles: idleVisualFiles,
+            idleAnimations: idleAnimations,
             sounds: sounds
         )
     }

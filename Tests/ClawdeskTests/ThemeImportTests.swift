@@ -80,6 +80,32 @@ final class ThemeImportTests: XCTestCase {
         XCTAssertEqual(reloaded.selectedIdleVisual(for: reloaded.theme), "idle-reading.png")
     }
 
+    func testIdleAnimationsPreserveManifestDurationsWithSafeBounds() throws {
+        let source = root.appendingPathComponent("idle-animations", isDirectory: true)
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        let manifest: [String: Any] = [
+            "id": "idle-animations",
+            "name": "Idle Animations",
+            "states": ["idle": "idle.png"],
+            "idleAnimations": [
+                ["file": "look.apng", "duration": 6_500],
+                ["file": "blink.gif", "duration": 10]
+            ]
+        ]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: source.appendingPathComponent("theme.json"))
+        for file in ["idle.png", "look.apng", "blink.gif"] {
+            try Data("placeholder".utf8).write(to: source.appendingPathComponent(file))
+        }
+
+        let preferences = AppPreferences(defaults: defaults, homeDirectory: root)
+        try preferences.importTheme(from: source)
+
+        XCTAssertEqual(preferences.theme.idleAnimations.map(\.file), ["look.apng", "blink.gif"])
+        XCTAssertEqual(preferences.theme.idleAnimations[0].duration, 6.5, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.idleAnimations[1].duration, 0.25, accuracy: 0.001)
+        XCTAssertEqual(preferences.theme.idleVisualFiles, ["idle.png", "look.apng", "blink.gif"])
+    }
+
     func testRejectsZipPathTraversalBeforeExtraction() throws {
         let archive = root.appendingPathComponent("unsafe.zip")
         let inner = root.appendingPathComponent("inner", isDirectory: true)
