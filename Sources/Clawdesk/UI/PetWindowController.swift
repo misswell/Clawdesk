@@ -17,6 +17,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var roamTarget: MainTimerTarget?
     private var cancellables = Set<AnyCancellable>()
     private var isDragging = false
+    private var dragAnchor: PetDragAnchor?
     private var isRoaming = false
     private var hoverRestoreTask: Task<Void, Never>?
     private var nextRoamDate = Date.distantPast
@@ -52,8 +53,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
         petView.theme = model.preferences.theme
         petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
-        petView.onDragBegan = { [weak self] in self?.beginDrag() }
-        petView.onDrag = { [weak self] delta in self?.drag(by: delta) }
+        petView.onDragBegan = { [weak self] point in self?.beginDrag(at: point) }
+        petView.onDrag = { [weak self] point in self?.drag(to: point) }
         petView.onDragEnded = { [weak self] in self?.endDrag() }
         petView.onDoubleTap = { [weak self] in self?.showReaction(.reactDouble, duration: 1.3) }
         petView.onFlail = { [weak self] in self?.showReaction(.reactFlail, duration: 1.4) }
@@ -100,10 +101,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         restorePosition()
         window?.orderFrontRegardless()
         animationTarget = MainTimerTarget { [weak self] in
-            self?.petView.advanceFrame()
+            guard let self, !self.isDragging else { return }
+            self.petView.advanceFrame()
         }
         pointerTarget = MainTimerTarget { [weak self] in
             guard let self, let window = self.window else { return }
+            guard !self.isDragging else { return }
             self.model.noteMouseActivity(at: NSEvent.mouseLocation)
             guard self.petView.petState == .idle || self.petView.petState == .miniIdle else { return }
             self.petView.setPointerLocation(NSEvent.mouseLocation)
@@ -116,7 +119,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.checkRoam()
         }
         let animationFrequency = model.preferences.lowPowerAnimations ? 8.0 : 18.0
-        let pointerFrequency = model.preferences.lowPowerAnimations ? 12.0 : 24.0
+        let pointerFrequency = model.preferences.lowPowerAnimations ? 30.0 : 60.0
         animationTimer = Timer.scheduledTimer(timeInterval: 1.0 / animationFrequency, target: animationTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
         pointerTimer = Timer.scheduledTimer(timeInterval: 1.0 / pointerFrequency, target: pointerTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
         sleepTimer = Timer.scheduledTimer(timeInterval: 5, target: sleepTarget!, selector: #selector(MainTimerTarget.fire(_:)), userInfo: nil, repeats: true)
@@ -136,6 +139,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         pointerTarget = nil
         sleepTarget = nil
         roamTarget = nil
+        dragAnchor = nil
         hoverRestoreTask?.cancel()
         quotaRing.hide()
         close()
@@ -167,27 +171,30 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func beginDrag() {
+    private func beginDrag(at screenPoint: CGPoint) {
+        guard let window else { return }
         isDragging = true
+        dragAnchor = PetDragAnchor(windowOrigin: window.frame.origin, pointerOrigin: screenPoint)
         petView.petState = .dragging
-        window?.invalidateCursorRects(for: petView)
+        window.invalidateCursorRects(for: petView)
     }
 
-    private func drag(by delta: CGSize) {
-        guard let window else { return }
-        let origin = window.frame.origin
-        window.setFrameOrigin(NSPoint(x: origin.x + delta.width, y: origin.y + delta.height))
+    private func drag(to screenPoint: CGPoint) {
+        guard let window, let dragAnchor else { return }
+        window.setFrameOrigin(dragAnchor.windowOrigin(for: screenPoint))
     }
 
     private func endDrag() {
         guard isDragging else { return }
         isDragging = false
+        dragAnchor = nil
         if shouldEnterMiniMode {
             model.preferences.isMiniMode = true
         } else {
             model.preferences.windowOrigin = window?.frame.origin
             petView.petState = model.petState
         }
+        refreshQuotaRing()
     }
 
     private var shouldEnterMiniMode: Bool {
@@ -397,6 +404,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     @objc private func quit() { onQuit?() ?? NSApp.terminate(nil) }
 
     public func windowDidMove(_ notification: Notification) {
+        guard !isDragging else { return }
         refreshQuotaRing()
         guard !model.preferences.isMiniMode, !isRoaming else { return }
         model.preferences.windowOrigin = window?.frame.origin
