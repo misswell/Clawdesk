@@ -218,6 +218,10 @@ final class PetInteractionTests: XCTestCase {
     @MainActor
     private func render(_ view: PetCanvasView, dirtyRect: NSRect, into image: NSBitmapImageRep) {
         let graphicsContext = NSGraphicsContext(bitmapImageRep: image)!
+        // AppKit clips an NSView's drawing context to the invalidated region.
+        // Keep the bitmap harness faithful to that behavior so stale pixels
+        // outside dirtyRect cannot be hidden by an unrestricted test context.
+        graphicsContext.cgContext.clip(to: dirtyRect)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = graphicsContext
         view.draw(dirtyRect)
