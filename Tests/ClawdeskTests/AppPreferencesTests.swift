@@ -57,14 +57,17 @@ final class AppPreferencesTests: XCTestCase {
         let prefs = makePreferences(suite: suite)
         XCTAssertTrue(prefs.sessionHUDEnabled)
         XCTAssertFalse(prefs.sessionHUDPinned)
+        XCTAssertTrue(prefs.sessionHUDShowContextUsage)
 
         prefs.sessionHUDEnabled = false
         prefs.sessionHUDPinned = true
+        prefs.sessionHUDShowContextUsage = false
 
         let defaults = UserDefaults(suiteName: suite)!
         let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
         XCTAssertFalse(reloaded.sessionHUDEnabled)
         XCTAssertTrue(reloaded.sessionHUDPinned)
+        XCTAssertFalse(reloaded.sessionHUDShowContextUsage)
     }
 
     func testPermissionAutomationDefaultsOffAndPersists() {

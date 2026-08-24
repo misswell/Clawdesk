@@ -11,6 +11,9 @@ public final class SessionHUDView: NSView {
     public var isPinned = false {
         didSet { needsDisplay = true }
     }
+    public var showContextUsage = true {
+        didSet { needsDisplay = true }
+    }
 
     public var onSessionSelected: ((SessionSnapshot) -> Void)?
     public var onOverflowSelected: (() -> Void)?
@@ -73,7 +76,12 @@ public final class SessionHUDView: NSView {
                 width: bounds.width - SessionHUDGeometry.horizontalPadding * 2,
                 height: rowHeight - 4
             )
-            draw(session: session, in: rowRect, context: context)
+            draw(
+                session: session,
+                in: rowRect,
+                rightInset: index == 0 ? 28 : 0,
+                context: context
+            )
         }
 
         if rows.overflowCount > 0 {
@@ -128,30 +136,95 @@ public final class SessionHUDView: NSView {
         )
     }
 
-    private func draw(session: SessionSnapshot, in rect: CGRect, context: CGContext) {
+    private func draw(
+        session: SessionSnapshot,
+        in rect: CGRect,
+        rightInset: CGFloat,
+        context: CGContext
+    ) {
         let dotRect = CGRect(x: rect.minX + 4, y: rect.midY - 5, width: 10, height: 10)
         context.setFillColor(color(for: session.state).cgColor)
         context.fillEllipse(in: dotRect)
 
-        let title = clipped(
-            session.title.isEmpty ? session.agentID : session.title,
-            maximumLength: 30
+        let titleFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let textX = dotRect.maxX + 8
+        let usage = showContextUsage
+            ? ContextUsageFormatter.presentation(for: session.contextUsage)
+            : nil
+        let usageRect: CGRect?
+        if let usage {
+            let chipFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
+            let measured = (usage.label as NSString).size(withAttributes: [.font: chipFont]).width
+            let chipWidth = max(
+                SessionHUDGeometry.usageChipMinWidth,
+                ceil(measured) + SessionHUDGeometry.usageChipGap * 2
+            )
+            let chipRect = SessionHUDGeometry.usageChipRect(
+                in: rect,
+                width: chipWidth,
+                rightInset: rightInset
+            )
+            drawUsageChip(usage, in: chipRect, context: context)
+            usageRect = chipRect
+        } else {
+            usageRect = nil
+        }
+
+        let titleMaximumX = usageRect?.minX ?? rect.maxX - rightInset
+        let title = clippedToWidth(
+            (session.title.isEmpty ? session.agentID : session.title) + " · " + session.state.displayName,
+            maximumWidth: max(20, titleMaximumX - SessionHUDGeometry.usageChipGap - textX),
+            font: titleFont
         )
-        let detail = clipped(
+        let detailFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        let detail = clippedToWidth(
             session.folder ?? session.lastEvent,
-            maximumLength: 36
+            maximumWidth: max(20, titleMaximumX - SessionHUDGeometry.usageChipGap - textX),
+            font: detailFont
         )
         drawText(
-            title + " · " + session.state.displayName,
-            at: NSPoint(x: dotRect.maxX + 8, y: rect.midY + 1),
-            font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+            title,
+            at: NSPoint(x: textX, y: rect.midY + 1),
+            font: titleFont,
             color: .labelColor
         )
         drawText(
             detail,
-            at: NSPoint(x: dotRect.maxX + 8, y: rect.midY - 13),
-            font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+            at: NSPoint(x: textX, y: rect.midY - 13),
+            font: detailFont,
             color: .secondaryLabelColor
+        )
+    }
+
+    private func drawUsageChip(
+        _ presentation: ContextUsagePresentation,
+        in rect: CGRect,
+        context: CGContext
+    ) {
+        let color: NSColor
+        switch presentation.severity {
+        case .neutral: color = .controlAccentColor
+        case .warm: color = .systemOrange
+        case .hot: color = .systemRed
+        }
+        let path = CGPath(
+            roundedRect: rect,
+            cornerWidth: rect.height / 2,
+            cornerHeight: rect.height / 2,
+            transform: nil
+        )
+        context.addPath(path)
+        context.setFillColor(color.withAlphaComponent(0.18).cgColor)
+        context.fillPath()
+        context.addPath(path)
+        context.setStrokeColor(color.withAlphaComponent(0.42).cgColor)
+        context.setLineWidth(0.75)
+        context.strokePath()
+        drawText(
+            presentation.label,
+            at: NSPoint(x: rect.minX + SessionHUDGeometry.usageChipGap, y: rect.minY + 3),
+            font: NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold),
+            color: color
         )
     }
 
@@ -170,10 +243,22 @@ public final class SessionHUDView: NSView {
         )
     }
 
-    private func clipped(_ value: String, maximumLength: Int) -> String {
+    private func clippedToWidth(_ value: String, maximumWidth: CGFloat, font: NSFont) -> String {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard normalized.count > maximumLength else { return normalized }
-        return String(normalized.prefix(maximumLength - 1)) + "…"
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        guard (normalized as NSString).size(withAttributes: attributes).width > maximumWidth else {
+            return normalized
+        }
+
+        var prefix = ""
+        for character in normalized {
+            let candidate = prefix + String(character) + "…"
+            if (candidate as NSString).size(withAttributes: attributes).width > maximumWidth {
+                break
+            }
+            prefix.append(character)
+        }
+        return prefix.isEmpty ? "…" : prefix + "…"
     }
 
     private func color(for state: PetState) -> NSColor {
@@ -197,6 +282,7 @@ public final class SessionHUDWindowController {
     private var isRevealed = false
     private var isEnabled = true
     private var isPinned = false
+    private var showContextUsage = true
     private var petHovering = false
     private var hudHovering = false
     private var lastPetWindowFrame = NSRect.zero
@@ -232,6 +318,11 @@ public final class SessionHUDWindowController {
         }
         refresh()
         if !pinned { scheduleHide() }
+    }
+
+    public func setShowContextUsage(_ show: Bool) {
+        showContextUsage = show
+        refresh()
     }
 
     public func setPetHover(_ hovering: Bool) {
@@ -291,6 +382,7 @@ public final class SessionHUDWindowController {
         view.autoresizingMask = [.width, .height]
         view.rows = rows
         view.isPinned = isPinned
+        view.showContextUsage = showContextUsage
         panel?.setContentSize(size)
         panel?.setFrame(frame, display: true)
         panel?.orderFrontRegardless()

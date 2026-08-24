@@ -71,6 +71,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
         sessionHUD.setEnabled(model.preferences.sessionHUDEnabled)
         sessionHUD.setPinned(model.preferences.sessionHUDPinned)
+        sessionHUD.setShowContextUsage(model.preferences.sessionHUDShowContextUsage)
 
         model.$petState.sink { [weak self] state in
             self?.apply(state: state)
@@ -110,6 +111,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$sessionHUDPinned.sink { [weak self] pinned in
             self?.sessionHUD.setPinned(pinned)
+            self?.refreshSessionHUD()
+        }.store(in: &cancellables)
+        model.preferences.$sessionHUDShowContextUsage.sink { [weak self] show in
+            self?.sessionHUD.setShowContextUsage(show)
             self?.refreshSessionHUD()
         }.store(in: &cancellables)
         model.preferences.$language.sink { [weak self] _ in
