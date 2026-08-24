@@ -370,7 +370,27 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     private func apply(_ event: AgentEvent) {
-        resetSleepSequence()
+        let normalizedEvent = event.eventName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+        let metadataOnly = event.metadataOnly || normalizedEvent == "quotaupdate"
+        if !metadataOnly { resetSleepSequence() }
+        if let quota = event.quota {
+            quotaReports = quotaStore.apply(quota)
+        }
+        if let contextUsage = event.contextUsage,
+           let transition = sessionStore.updateContextUsage(
+               sessionID: event.sessionID,
+               usage: contextUsage
+           ) {
+            sessions = transition.sessions
+        }
+        if metadataOnly {
+            publishSnapshot(state: petState, sessions: sessions)
+            return
+        }
         if let question = event.question {
             pendingQuestions.removeAll { $0.id == question.id }
             pendingQuestions.append(question)
@@ -386,13 +406,6 @@ public final class ClawdeskModel: ObservableObject {
         }
         if event.permissionGated {
             closeKimiGate(for: event)
-        }
-        if let quota = event.quota {
-            quotaReports = quotaStore.apply(quota)
-        }
-        if event.eventName.lowercased().replacingOccurrences(of: "_", with: "") == "quotaupdate" {
-            publishSnapshot(state: petState, sessions: sessions)
-            return
         }
         let transition = sessionStore.apply(event)
         sessions = transition.sessions

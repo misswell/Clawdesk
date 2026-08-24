@@ -155,6 +155,39 @@ final class PetInteractionTests: XCTestCase {
     }
 
     @MainActor
+    func testInteractionStatesDoNotRenderThemeInteractionAssets() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk-interaction-assets-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let asset = makeBitmap(width: 16, height: 16)
+        paintCornerAsset(in: asset, theme: ThemeCatalog.theme(id: "pinch"))
+        let assetURL = directory.appendingPathComponent("interaction.png")
+        try XCTUnwrap(asset.representation(using: .png, properties: [:])).write(to: assetURL)
+
+        let baseTheme = ThemeCatalog.theme(id: "pinch")
+        let theme = ThemeDefinition(
+            id: "interaction-asset-test",
+            displayName: "Interaction asset test",
+            palette: baseTheme.palette,
+            assetDirectory: directory,
+            stateFiles: [
+                "mini-peek": "interaction.png",
+                "dragging": "interaction.png"
+            ]
+        )
+        let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
+        view.theme = theme
+
+        view.petState = .miniPeek
+        XCTAssertFalse(hasOpaqueCornerPixel(in: render(view)), "Hover must not load a corner-mark asset")
+
+        view.petState = .dragging
+        XCTAssertFalse(hasOpaqueCornerPixel(in: render(view)), "Dragging must not load a corner-mark asset")
+    }
+
+    @MainActor
     func testInteractionStateRedrawClearsPreviousCornerMarks() {
         let frame = NSRect(x: 0, y: 0, width: 220, height: 220)
         let theme = ThemeCatalog.theme(id: "pinch")
@@ -242,6 +275,33 @@ final class PetInteractionTests: XCTestCase {
             data[offset + 2] = blue
             data[offset + 3] = 255
         }
+    }
+
+    private func paintCornerAsset(in image: NSBitmapImageRep, theme: ThemeDefinition) {
+        guard let data = image.bitmapData else { return }
+        let red = UInt8((theme.palette.highlight.red * 255).rounded())
+        let green = UInt8((theme.palette.highlight.green * 255).rounded())
+        let blue = UInt8((theme.palette.highlight.blue * 255).rounded())
+        for y in 0..<16 {
+            for x in 0..<16 {
+                let offset = y * image.bytesPerRow + x * 4
+                data[offset] = red
+                data[offset + 1] = green
+                data[offset + 2] = blue
+                data[offset + 3] = 255
+            }
+        }
+    }
+
+    private func hasOpaqueCornerPixel(in image: NSBitmapImageRep) -> Bool {
+        for y in 10..<45 {
+            for x in 10..<45 {
+                if (image.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.8 {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     private func makeBitmap(width: Int, height: Int) -> NSBitmapImageRep {
