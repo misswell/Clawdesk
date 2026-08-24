@@ -394,6 +394,25 @@ public final class LocalEventServer: @unchecked Sendable {
             return nil
         }
 
+        func number(_ value: Any?) -> Double? {
+            if let value = value as? NSNumber { return value.doubleValue }
+            if let value = value as? Double { return value }
+            if let value = value as? Int { return Double(value) }
+            if let value = value as? String { return Double(value) }
+            return nil
+        }
+
+        func bool(_ keys: [String]) -> Bool {
+            for key in keys {
+                if let value = object[key] as? Bool { return value }
+                if let value = object[key] as? NSNumber { return value.boolValue }
+                if let value = object[key] as? String {
+                    if value.lowercased() == "true" || value == "1" { return true }
+                }
+            }
+            return false
+        }
+
         let rawSessionID = string(["session_id", "sessionId", "session", "id"]) ?? query["session_id"] ?? query["sessionId"] ?? UUID().uuidString
         let remotePrefix = query["remote_prefix"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let sessionID = remotePrefix.isEmpty ? rawSessionID : "\(remotePrefix):\(rawSessionID)"
@@ -404,6 +423,44 @@ public final class LocalEventServer: @unchecked Sendable {
         let eventName = string(["event", "event_name", "eventName", "type", "name", "state"])
             ?? fallbackEvent
             ?? (forcePermission ? "PermissionRequest" : "Notification")
+        let contextUsage: ContextUsage? = {
+            let raw = object["context_usage"] ?? object["contextUsage"]
+            let values = raw as? [String: Any]
+            let window = object["context_window"] as? [String: Any]
+            let current = window?["current_usage"] as? [String: Any]
+            let usedFromComponents = current.map { usage -> Double? in
+                let keys = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]
+                var total = 0.0
+                for key in keys {
+                    guard let value = usage[key] else { continue }
+                    guard let number = number(value), number >= 0 else { return nil }
+                    total += number
+                }
+                return total > 0 ? total : nil
+            } ?? nil
+            let used = number(values?["used"])
+                ?? usedFromComponents
+                ?? number(window?["used"])
+            guard let used, used > 0 else { return nil }
+            let limit = number(values?["limit"])
+                ?? number(window?["context_window_size"])
+            let percent = number(values?["percent"])
+                ?? number(window?["used_percentage"])
+            let normalizedAgent = agentID.lowercased()
+            let source = string(["context_source", "contextSource"])
+                ?? (values?["source"] as? String)
+                ?? (normalizedAgent.contains("claude") ? "claude" : nil)
+                ?? (normalizedAgent.contains("codex") ? "codex" : nil)
+                ?? (normalizedAgent.contains("antigravity") ? "antigravity" : nil)
+                ?? (normalizedAgent.contains("opencode") ? "opencode" : nil)
+            return ContextUsage(
+                used: used,
+                limit: limit,
+                percent: percent.map { Int($0.rounded()) },
+                source: source
+            )
+        }()
+        let metadataOnly = bool(["metadata_only", "metadataOnly"])
         let hint = string(["state", "pet_state", "petState"]).flatMap(normalizeState)
         let quotaObject = (object["rate_limits"] as? [String: Any])
             ?? ((object["quota"] as? [String: Any])?["rate_limits"] as? [String: Any])
@@ -464,6 +521,8 @@ public final class LocalEventServer: @unchecked Sendable {
             permission: permission,
             question: adapterResult.question,
             quota: quota,
+            contextUsage: contextUsage,
+            metadataOnly: metadataOnly,
             toolCallID: string(["tool_call_id", "toolCallId", "call_id", "callId"]),
             permissionSuspect: adapterResult.permissionSuspect,
             permissionSuspectDelayMilliseconds: adapterResult.permissionSuspectDelayMilliseconds,

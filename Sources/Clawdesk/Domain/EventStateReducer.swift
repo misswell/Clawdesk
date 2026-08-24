@@ -106,7 +106,8 @@ public final class SessionStore {
             lastEvent: event.eventName,
             lastActivity: event.timestamp,
             terminalPID: event.terminalPID ?? existing?.terminalPID,
-            recentEvents: recent
+            recentEvents: recent,
+            contextUsage: event.contextUsage ?? existing?.contextUsage
         )
         sessionsByID[event.sessionID] = snapshot
 
@@ -121,6 +122,18 @@ public final class SessionStore {
         guard var session = sessionsByID[sessionID] else { return nil }
         session.subagentCount = max(0, count)
         if count > 0 { session.state = .juggling }
+        sessionsByID[sessionID] = session
+        return StateTransition(state: aggregateState(), sessions: sessions)
+    }
+
+    /// Applies statusline/context telemetry to an existing session without
+    /// touching its lifecycle timestamp, recent-event history, or state.
+    /// Unknown sessions are ignored so a late statusline cannot resurrect a
+    /// completed session as a ghost HUD row.
+    public func updateContextUsage(sessionID: String, usage: ContextUsage) -> StateTransition? {
+        guard var session = sessionsByID[sessionID] else { return nil }
+        guard session.contextUsage != usage else { return nil }
+        session.contextUsage = usage
         sessionsByID[sessionID] = session
         return StateTransition(state: aggregateState(), sessions: sessions)
     }

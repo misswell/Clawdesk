@@ -140,6 +140,15 @@ public final class PetCanvasView: NSView {
         needsDisplay = true
     }
 
+    /// Flush a state transition before a transparent panel is moved or
+    /// another interaction event arrives. This keeps stale pixels out of the
+    /// window backing surface instead of waiting for AppKit's next run-loop
+    /// display pass.
+    public func redrawImmediately() {
+        needsDisplay = true
+        display()
+    }
+
     public func setPointerLocation(_ point: NSPoint) {
         guard theme.supportsEyeTracking, (petState == .idle || petState == .miniIdle) else {
             if pointerOffset != .zero { pointerOffset = .zero }
@@ -182,7 +191,7 @@ public final class PetCanvasView: NSView {
         context.scaleBy(x: scale, y: scale)
         context.translateBy(x: -110, y: -110)
 
-        if drawCustomAsset(in: context) {
+        if !petState.isPointerInteraction, drawCustomAsset(in: context) {
             context.restoreGState()
             return
         }
@@ -544,6 +553,7 @@ public final class PetCanvasView: NSView {
     }
 
     private func drawStateOverlay(in context: CGContext) {
+        guard !petState.isPointerInteraction else { return }
         switch petState {
         case .thinking:
             drawThoughtBubble(in: context)

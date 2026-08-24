@@ -44,6 +44,18 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Pointer interaction states do not have an accessory of their own.
+    /// Keeping this explicit prevents a theme's optional interaction artwork
+    /// from reintroducing the old corner bars.
+    public var isPointerInteraction: Bool {
+        switch self {
+        case .dragging, .miniPeek:
+            return true
+        default:
+            return false
+        }
+    }
+
     public var isSleepSequence: Bool {
         switch self {
         case .yawning, .dozing, .collapsing, .sleeping:
@@ -177,6 +189,8 @@ public struct AgentEvent: Equatable, Sendable {
     public var permission: PermissionRequest?
     public var question: QuestionPrompt?
     public var quota: QuotaReport?
+    public var contextUsage: ContextUsage?
+    public var metadataOnly: Bool
     public var toolCallID: String?
     public var permissionSuspect: Bool
     public var permissionSuspectDelayMilliseconds: Int?
@@ -199,6 +213,8 @@ public struct AgentEvent: Equatable, Sendable {
         permission: PermissionRequest? = nil,
         question: QuestionPrompt? = nil,
         quota: QuotaReport? = nil,
+        contextUsage: ContextUsage? = nil,
+        metadataOnly: Bool = false,
         toolCallID: String? = nil,
         permissionSuspect: Bool = false,
         permissionSuspectDelayMilliseconds: Int? = nil,
@@ -220,6 +236,8 @@ public struct AgentEvent: Equatable, Sendable {
         self.permission = permission
         self.question = question
         self.quota = quota
+        self.contextUsage = contextUsage
+        self.metadataOnly = metadataOnly
         self.toolCallID = toolCallID
         self.permissionSuspect = permissionSuspect
         self.permissionSuspectDelayMilliseconds = permissionSuspectDelayMilliseconds
@@ -279,6 +297,40 @@ public struct PermissionSuggestion: Equatable, Sendable, Identifiable {
     }
 }
 
+/// Per-session context-window telemetry. It is deliberately separate from
+/// account quota: context usage belongs to one running session and may be
+/// refreshed by a statusline without changing the session lifecycle.
+public struct ContextUsage: Equatable, Sendable {
+    public let used: Double
+    public let limit: Double?
+    public let percent: Int?
+    public let source: String?
+
+    public init(
+        used: Double,
+        limit: Double? = nil,
+        percent: Int? = nil,
+        source: String? = nil
+    ) {
+        let normalizedUsed = max(0, used.isFinite ? used : 0)
+        let normalizedLimit = limit.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        self.used = normalizedUsed
+        self.limit = normalizedLimit
+        let calculated = normalizedLimit.map { Int((normalizedUsed / $0 * 100).rounded()) }
+        let normalizedPercent = percent ?? calculated
+        self.percent = normalizedPercent.map { min(100, max(0, $0)) }
+        self.source = source
+    }
+
+    public var wireObject: [String: Any] {
+        var object: [String: Any] = ["used": used]
+        if let limit { object["limit"] = limit }
+        if let percent { object["percent"] = percent }
+        if let source { object["source"] = source }
+        return object
+    }
+}
+
 public struct SessionSnapshot: Equatable, Sendable, Identifiable {
     public let id: String
     public var agentID: String
@@ -290,6 +342,7 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
     public var lastActivity: Date
     public var terminalPID: Int?
     public var recentEvents: [String]
+    public var contextUsage: ContextUsage?
 
     public init(
         id: String,
@@ -301,7 +354,8 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
         lastEvent: String,
         lastActivity: Date = .now,
         terminalPID: Int? = nil,
-        recentEvents: [String] = []
+        recentEvents: [String] = [],
+        contextUsage: ContextUsage? = nil
     ) {
         self.id = id
         self.agentID = agentID
@@ -313,6 +367,7 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
         self.lastActivity = lastActivity
         self.terminalPID = terminalPID
         self.recentEvents = recentEvents
+        self.contextUsage = contextUsage
     }
 }
 

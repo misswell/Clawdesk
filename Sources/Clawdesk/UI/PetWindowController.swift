@@ -191,10 +191,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         if enabled {
             sessionHUD.hide()
             moveToMiniEdge(animated: animate)
-            if model.petState == .idle { petView.petState = .miniIdle }
+            if model.petState == .idle { setPetVisualState(.miniIdle) }
         } else {
             moveBackFromMini()
-            petView.petState = model.petState
+            setPetVisualState(model.petState)
         }
     }
 
@@ -207,14 +207,20 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
         if model.preferences.isMiniMode {
             switch state {
-            case .notification: petView.petState = .miniAlert
-            case .attention: petView.petState = .miniHappy
-            case .idle: petView.petState = .miniIdle
-            default: petView.petState = state
+            case .notification: setPetVisualState(.miniAlert)
+            case .attention: setPetVisualState(.miniHappy)
+            case .idle: setPetVisualState(.miniIdle)
+            default: setPetVisualState(state)
             }
         } else {
-            petView.petState = state
+            setPetVisualState(state)
         }
+    }
+
+    private func setPetVisualState(_ state: PetState) {
+        guard petView.petState != state else { return }
+        petView.petState = state
+        petView.redrawImmediately()
     }
 
     private func updateStateAssetOverride(for state: PetState? = nil) {
@@ -231,7 +237,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         sessionHUD.hide()
         isDragging = true
         dragAnchor = PetDragAnchor(windowOrigin: window.frame.origin, pointerOrigin: screenPoint)
-        petView.petState = .dragging
+        setPetVisualState(.dragging)
         window.invalidateCursorRects(for: petView)
     }
 
@@ -248,7 +254,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             model.preferences.isMiniMode = true
         } else {
             model.preferences.windowOrigin = window?.frame.origin
-            petView.petState = model.petState
+            setPetVisualState(model.petState)
         }
         refreshQuotaRing()
     }
@@ -260,9 +266,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func showReaction(_ state: PetState, duration: Double) {
         guard !isDragging else { return }
-        petView.petState = model.preferences.isMiniMode
+        setPetVisualState(model.preferences.isMiniMode
             ? (state == .reactDouble ? .miniHappy : .miniAlert)
-            : state
+            : state)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             guard let self, !Task.isCancelled else { return }
@@ -275,7 +281,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard model.preferences.isMiniMode, !isDragging else { return }
         hoverRestoreTask?.cancel()
         if hovering {
-            petView.petState = .miniPeek
+            setPetVisualState(.miniPeek)
         } else {
             hoverRestoreTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
