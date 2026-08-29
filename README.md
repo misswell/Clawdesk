@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.19 release keeps the native Session HUD and upstream theme-driven sleep sequence: after the
+The 0.1.20 release keeps the native Session HUD and upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
