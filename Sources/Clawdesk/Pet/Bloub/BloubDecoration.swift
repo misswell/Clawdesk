@@ -360,7 +360,7 @@ public enum BloubDecor {
             return BloubArcSeed(
                 a: 1.3 + random.next() * 0.1,
                 k: 0.05 + random.next() * 0.4,
-                tilt: (indexValue / CGFloat(6)) * .pi + random.next() * 0.5,
+                tilt: (indexValue / CGFloat(6)) * CGFloat.pi + random.next() * 0.5,
                 speed: 3 + random.next() * 0.7,
                 phase: random.next() * .pi * 2,
                 sweep: 0.6 + random.next() * 0.25,
