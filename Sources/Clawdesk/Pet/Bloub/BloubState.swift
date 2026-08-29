@@ -470,7 +470,7 @@ public enum BloubStates {
             // The eyes race around the sphere ~3x faster than the silhouette.
             pose.gaze = BloubGaze(
                 yaw: BloubMotion.restGaze.yaw + sin(t * 6.5) * 65 * (1 - back),
-                pitch: -4 + back * 32,
+                pitch: CGFloat(-4) + back * CGFloat(32),
                 roll: -13
             )
             pose.eyes = .pair(0.18, 0.34 + back * 0.07)
