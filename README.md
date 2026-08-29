@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.17 release keeps the native Session HUD and upstream theme-driven sleep sequence: after the
+The 0.1.18 release keeps the native Session HUD and upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
@@ -24,8 +24,9 @@ without leaving the former hover/drag corner bars behind. Pointer interaction
 states also ignore optional theme interaction artwork and flush the transparent
 canvas immediately, so hover and drag cannot reintroduce corner-line artifacts.
 Pointer interaction assets are now rejected at the theme boundary, and the
-transparent pet surface disables AppKit focus decoration and replaces its
-entire backing surface on each transition, preventing stale upper-corner lines.
+transparent pet surface disables AppKit focus decoration, uses direct
+view-backed drawing, and replaces its entire backing surface on each
+transition, preventing stale upper-corner lines during hover and drag.
 The HUD can show per-session context-window usage as a compact percentage chip
 (with token-count fallback), refreshed by Claude's status-line metadata without
 changing session lifecycle state; the display can be disabled independently in

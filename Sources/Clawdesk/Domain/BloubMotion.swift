@@ -149,9 +149,11 @@ public struct BloubLiveliness: Equatable, Sendable {
     }
 }
 
-/// An allocation-free, ease-out morph for continuously changing pointer
-/// targets. Calling `setTarget` starts from the currently rendered value, so a
-/// fast cursor never causes the eyes to step backward to an older target.
+/// An allocation-free, ease-out morph for continuously changing targets.
+///
+/// Superseded in the renderer by `BloubEngine.setLook`, which performs the
+/// same catch-up-from-current-value semantics inside the engine; kept for
+/// non-engine callers that need the same behaviour standalone.
 public struct BloubGazeMorph: Equatable, Sendable {
     public private(set) var target: CGPoint
 

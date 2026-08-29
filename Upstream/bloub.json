@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/jeremy-prt/bloub",
+  "branch": "main",
+  "lastSyncedCommit": "b4bb3c1b5f93c7b87a2e8d620f667c4093d97749",
+  "syncedAt": "2026-08-29",
+  "role": "pet appearance and motion language",
+  "license": "MIT (source code only; the recreated avatar's visual design rights are NOT covered — see Upstream/COMPATIBILITY.md)",
+  "tracking": [
+    "States and pose definitions (src/bot/states.ts)",
+    "Geometry and radial profiles (src/bot/shape.ts, src/bot/profiles.ts)",
+    "Morphing engine and transition continuity (src/bot/engine.ts)",
+    "Spherical eye model and blink (src/bot/face.ts)",
+    "Decoration catalogue: rings, particles, comet, notification (src/bot/decor.ts)",
+    "Deterministic PRNG and easing curves (src/bot/math.ts)"
+  ]
+}
