@@ -356,14 +356,15 @@ public enum BloubDecor {
     public static let rings: [BloubArcSeed] = {
         var random = BloubRandom(seed: 0xa11ce)
         return (0..<6).map { index in
-            BloubArcSeed(
+            let indexValue = CGFloat(index)
+            return BloubArcSeed(
                 a: 1.3 + random.next() * 0.1,
                 k: 0.05 + random.next() * 0.4,
-                tilt: (CGFloat(index) / 6) * .pi + random.next() * 0.5,
+                tilt: (indexValue / CGFloat(6)) * .pi + random.next() * 0.5,
                 speed: 3 + random.next() * 0.7,
                 phase: random.next() * .pi * 2,
                 sweep: 0.6 + random.next() * 0.25,
-                hue: (CGFloat(index) * 360) / 6 + random.next() * 30,
+                hue: (indexValue * CGFloat(360)) / CGFloat(6) + random.next() * 30,
                 hueSpan: 60 + random.next() * 60,
                 width: 0.05 + random.next() * 0.012,
                 cx: 0,
@@ -419,7 +420,7 @@ public enum BloubDecor {
 
     private static let particleTable: [(birth: CGFloat, angle: CGFloat, rho: CGFloat)] = {
         var random = BloubRandom(seed: 0xbeef)
-        return (0..<5).map { index in
+        return (0..<5).map { (index: Int) -> (birth: CGFloat, angle: CGFloat, rho: CGFloat) in
             (
                 birth: CGFloat(index) * 0.2,
                 angle: random.next() * .pi * 2,
@@ -433,15 +434,16 @@ public enum BloubDecor {
     public static let cometRibbons: [BloubArcSeed] = {
         var random = BloubRandom(seed: 0xc0e7)
         return (0..<4).map { index in
-            let d = CGFloat(index) - 1.5
+            let indexValue = CGFloat(index)
+            let d = indexValue - 1.5
             return BloubArcSeed(
                 a: 0.85 * (1 + d * 0.03),
                 k: (0.15 / 0.85) * (1 + d * 0.16),
                 tilt: (34 * .pi) / 180 + d * 0.035,
-                speed: 210 / 360,
-                phase: -CGFloat(index) * 0.045 + random.next() * 0.012,
+                speed: CGFloat(210) / CGFloat(360),
+                phase: -indexValue * 0.045 + random.next() * 0.012,
                 sweep: 0.34,
-                hue: CGFloat(index) * 85 + random.next() * 20,
+                hue: indexValue * CGFloat(85) + random.next() * 20,
                 hueSpan: 80,
                 width: 0.095,
                 cx: 0,
