@@ -81,6 +81,39 @@ private struct GeneralSettingsView: View {
                         .font(.caption.monospacedDigit())
                         .frame(width: 46, alignment: .trailing)
                 }
+                Picker(model.preferences.text("Body shape"), selection: Binding(
+                    get: { model.preferences.bloubAppearance.shapeID },
+                    set: { model.preferences.bloubAppearance.shapeID = $0 }
+                )) {
+                    ForEach(BloubShapeID.allCases, id: \.rawValue) { shape in
+                        Text(shape.displayName).tag(shape.rawValue)
+                    }
+                }
+                Picker(model.preferences.text("Body color"), selection: Binding(
+                    get: { model.preferences.bloubAppearance.colorID },
+                    set: { model.preferences.bloubAppearance.colorID = $0 }
+                )) {
+                    ForEach(BloubColorID.allCases, id: \.rawValue) { color in
+                        HStack {
+                            Circle()
+                                .fill(color.hex.map {
+                                    Color(red: Double(($0 >> 16) & 0xff) / 255,
+                                          green: Double(($0 >> 8) & 0xff) / 255,
+                                          blue: Double($0 & 0xff) / 255)
+                                } ?? Color(nsColor: .controlAccentColor))
+                                .frame(width: 10, height: 10)
+                            Text(color.displayName)
+                        }.tag(color.rawValue)
+                    }
+                }
+                Picker(model.preferences.text("Rest expression"), selection: Binding(
+                    get: { model.preferences.bloubAppearance.expressionID ?? BloubExpressionID.neutral.rawValue },
+                    set: { model.preferences.bloubAppearance.expressionID = $0 }
+                )) {
+                    ForEach(BloubExpressionID.allCases, id: \.rawValue) { expression in
+                        Text(expression.displayName).tag(expression.rawValue)
+                    }
+                }
                 HStack {
                     Button(model.preferences.text("Import theme…")) {
                         let panel = NSOpenPanel()

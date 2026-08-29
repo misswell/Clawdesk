@@ -29,6 +29,11 @@ let package = Package(
             name: "ClawdeskTests",
             dependencies: ["Clawdesk", "ClawdeskUpdater"],
             path: "Tests/ClawdeskTests"
+        ),
+        .testTarget(
+            name: "BloubTests",
+            dependencies: ["Clawdesk"],
+            path: "Tests/Bloub"
         )
     ]
 )

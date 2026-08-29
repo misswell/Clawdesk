@@ -1,11 +1,12 @@
 # Third-party notices
 
-## bloub (pet character model)
+## bloub (pet engine and character model)
 
-The Clawdesk desktop pet renders the **bloub** character: a filled round body
-with two spherical white eyes that track the pointer, blink, and close when
-asleep. The geometry (radial silhouette, spherical eye placement, eye tilt,
-and blink timing) is ported from:
+The Clawdesk desktop pet is driven by a native Swift port of the **bloub**
+engine: a single shape morphing through 14 measured states, spherical white
+eyes that track the pointer and blink, orbit rings, burst particles, comet
+ribbons and a notification badge. The states, radial geometry, spherical eye
+model, decoration catalogue and deterministic timing are ported from:
 
 https://github.com/jeremy-prt/bloub
 
@@ -34,3 +35,8 @@ Licensed under the MIT License:
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
+>
+> Scope note: the upstream README states that the MIT license covers the
+> repository's source code only; the recreated avatar's visual design itself
+> is not licensed under it. See `Upstream/COMPATIBILITY.md` for how Clawdesk
+> separates the code license from avatar visual design rights.

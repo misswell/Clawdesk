@@ -56,6 +56,8 @@ public final class AppPreferences: ObservableObject {
     @Published public var enabledAgentIDs: Set<String> { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
+    /// Bloub customizer choices (body shape, colour, resting expression).
+    @Published public var bloubAppearance: BloubAppearance { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
 
     public let customThemesDirectory: URL
@@ -95,6 +97,12 @@ public final class AppPreferences: ObservableObject {
         sessionHUDShowContextUsage = defaults.object(forKey: "sessionHUDShowContextUsage") as? Bool ?? true
         enabledAgentIDs = Set(defaults.stringArray(forKey: "enabledAgentIDs") ?? [])
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
+        if let data = defaults.data(forKey: "bloubAppearance"),
+           let decoded = try? JSONDecoder().decode(BloubAppearance.self, from: data) {
+            bloubAppearance = decoded
+        } else {
+            bloubAppearance = .standard
+        }
         if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
         } else {
@@ -213,6 +221,9 @@ public final class AppPreferences: ObservableObject {
         defaults.set(sessionHUDShowContextUsage, forKey: "sessionHUDShowContextUsage")
         defaults.set(Array(enabledAgentIDs).sorted(), forKey: "enabledAgentIDs")
         defaults.set(idleVisualByTheme, forKey: "idleVisualByTheme")
+        if let data = try? JSONEncoder().encode(bloubAppearance) {
+            defaults.set(data, forKey: "bloubAppearance")
+        }
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")
             defaults.set(windowOrigin.y, forKey: "windowY")

@@ -52,6 +52,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         panel.title = "Clawdesk"
 
         petView.theme = model.preferences.theme
+        petView.bloubAppearance = model.preferences.bloubAppearance
         petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
         petView.onDragBegan = { [weak self] point in self?.beginDrag(at: point) }
         petView.onDrag = { [weak self] point in self?.drag(to: point) }
@@ -85,6 +86,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.petView.theme = model.preferences.theme
             self?.petView.idleVisualFile = model.preferences.selectedIdleVisual(for: model.preferences.theme)
             self?.updateStateAssetOverride()
+        }.store(in: &cancellables)
+        model.preferences.$bloubAppearance.sink { [weak self] appearance in
+            self?.petView.bloubAppearance = appearance
         }.store(in: &cancellables)
         model.preferences.$idleVisualByTheme.sink { [weak self] _ in
             self?.cancelIdleAnimation(resetCycle: true)

@@ -2,8 +2,25 @@ import AppKit
 import Foundation
 import ImageIO
 
+private extension BloubRGB {
+    var cgColor: CGColor {
+        CGColor(red: red, green: green, blue: blue, alpha: 1)
+    }
+}
+
+private extension CGPath {
+    func transformed(_ transform: CGAffineTransform) -> CGPath {
+        var mutable = transform
+        return copy(using: &mutable) ?? self
+    }
+}
+
 @MainActor
 public final class PetCanvasView: NSView {
+    /// Ball radius at rest, in points, matching the long-standing 220x220
+    /// logical canvas.
+    private static let bloubRadius: CGFloat = 74
+
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         configureTransparentSurface()
@@ -18,21 +35,22 @@ public final class PetCanvasView: NSView {
 
     private func configureTransparentSurface() {
         // A pet is a transparent compositing surface, not a focusable form
-        // control. A layer-backed surface plus an explicit focus-ring policy
-        // prevents AppKit from contributing edge pixels during mouseDown.
+        // control. Keep it view-backed: a layer-backed transparent surface can
+        // carry old interaction pixels when AppKit moves the panel or redraws
+        // only a dirty region. The direct NSView backing is cheap at this
+        // canvas size and lets the full-canvas clear below reach the actual
+        // window backing store.
         focusRingType = .none
-        wantsLayer = true
-        layer?.isOpaque = false
-        layer?.backgroundColor = NSColor.clear.cgColor
+        wantsLayer = false
     }
 
     public var petState: PetState = .idle {
         didSet {
             guard oldValue != petState else { return }
-            stateElapsed = 0
+            syncBloubState()
             if petState != .idle, petState != .miniIdle {
-                pointerOffset = .zero
                 pointerKnown = false
+                updateBloubLook()
             }
             needsDisplay = true
         }
@@ -44,8 +62,26 @@ public final class PetCanvasView: NSView {
             assetCacheOrder.removeAll()
             assetCacheBytes = 0
             animationClock.reset()
-            gazeMorph.reset()
+            // The clock jump must not drag the engine through a phantom
+            // transition: rewind it onto the mapped state at the new zero.
+            bloubEngine.reset(
+                BloubStateMapper.state(for: petState, subagentCount: subagentCount),
+                at: 0
+            )
+            bloubEngine.rewindCustomization(at: 0)
+            lookActive = false
             pointerKnown = false
+            needsDisplay = true
+        }
+    }
+
+    /// Bloub appearance chosen in Settings (shape, colour, resting
+    /// expression). Appearance is decoupled from the agent state: it changes
+    /// what the pet looks like, `petState` decides what it does.
+    public var bloubAppearance: BloubAppearance = .standard {
+        didSet {
+            guard oldValue != bloubAppearance else { return }
+            applyAppearance()
             needsDisplay = true
         }
     }
@@ -58,12 +94,14 @@ public final class PetCanvasView: NSView {
     /// Zero is used for the two-session working tier and intentionally falls
     /// back to the single-subagent visual.
     public var subagentCount = 0 {
-        didSet { needsDisplay = true }
+        didSet {
+            syncBloubState()
+            needsDisplay = true
+        }
     }
 
     public var idleVisualFile: String? {
         didSet {
-            animationClock.reset()
             needsDisplay = true
         }
     }
@@ -73,14 +111,13 @@ public final class PetCanvasView: NSView {
     /// do not depend on an artwork-specific state name.
     public var stateAssetOverride: String? {
         didSet {
-            animationClock.reset()
             needsDisplay = true
         }
     }
 
     public var pointerOffset = CGPoint.zero {
         didSet {
-            gazeMorph.setTarget(pointerOffset)
+            updateBloubLook()
             needsDisplay = true
         }
     }
@@ -94,12 +131,14 @@ public final class PetCanvasView: NSView {
     public var onContextMenu: ((NSPoint) -> NSMenu?)?
     public var onHoverChanged: ((Bool) -> Void)?
 
-    private var phase: CGFloat = 0
-    private var stateElapsed: TimeInterval = 0
+    /// Owns the whole bloub motion language. It never touches a clock: the
+    /// canvas feeds it the shared animation time, and all inputs (state
+    /// changes, look targets) enter through timestamped setters.
+    private var bloubEngine = BloubEngine(radius: PetCanvasView.bloubRadius)
+    private var lookActive = false
     private var animationClock = PetAnimationClock()
-    private var gazeMorph = BloubGazeMorph()
-    private var pointerKnown = false
     private var assetClock: TimeInterval { animationClock.time }
+    private var pointerKnown = false
     private static let maxAssetDimension = 512
     private static let maxAnimationBytes = 64 * 1024 * 1024
     private static let maxAssetCacheBytes = 96 * 1024 * 1024
@@ -123,6 +162,54 @@ public final class PetCanvasView: NSView {
     /// pixels when a new interaction state paints a smaller silhouette.
     public override var wantsDefaultClipping: Bool { false }
 
+    private var viewScale: CGFloat {
+        min(bounds.width / 220, bounds.height / 220) * (miniMode ? 0.86 : 1)
+    }
+
+    /// Keeps the engine's state in step with the mapped pet state. The agent
+    /// runtime only ever speaks `PetState`; the bloub vocabulary stays behind
+    /// the mapper seam.
+    private func syncBloubState() {
+        bloubEngine.setState(
+            BloubStateMapper.state(for: petState, subagentCount: subagentCount),
+            at: assetClock
+        )
+    }
+
+    /// Pushes the customizer choices into the engine as timestamped inputs:
+    /// the shape and the resting expression both glide there on the morph
+    /// curve instead of jumping.
+    private func applyAppearance() {
+        bloubEngine.setShape(bloubAppearance.shape.profile, at: assetClock)
+        bloubEngine.setExpression(bloubAppearance.expression, at: assetClock)
+    }
+
+    /// Pointer tracking is an idle-state affordance: the engine blends the
+    /// absolute look target over the pose's own gaze, so expressive states
+    /// simply stop feeding targets and recover theirs.
+    private func updateBloubLook() {
+        let tracking = theme.supportsEyeTracking
+            && (petState == .idle || petState == .miniIdle)
+            && pointerKnown
+        if tracking {
+            let gaze = BloubMotion.targetGaze(forPointerOffset: pointerOffset)
+            bloubEngine.setLook(
+                BloubLook(
+                    yaw: CGFloat(gaze.yaw),
+                    pitch: CGFloat(gaze.pitch),
+                    mix: 1,
+                    spin: 0,
+                    wander: 0
+                ),
+                at: assetClock
+            )
+            lookActive = true
+        } else if lookActive {
+            bloubEngine.setLook(nil, at: assetClock)
+            lookActive = false
+        }
+    }
+
     public override func updateTrackingAreas() {
         if let trackingArea { removeTrackingArea(trackingArea) }
         let area = NSTrackingArea(
@@ -144,21 +231,26 @@ public final class PetCanvasView: NSView {
         onHoverChanged?(false)
     }
 
+    /// Hit testing follows the current morphing silhouette instead of a fixed
+    /// rectangle: transparent areas let clicks pass through, and the body —
+    /// wherever its edge currently is — stays clickable and draggable.
     public override func hitTest(_ point: NSPoint) -> NSView? {
-        let center = NSPoint(x: bounds.midX, y: bounds.midY + bounds.height * 0.04)
-        let radiusX = max(1, bounds.width * (miniMode ? 0.24 : 0.38))
-        let radiusY = max(1, bounds.height * (miniMode ? 0.30 : 0.40))
-        let x = (point.x - center.x) / radiusX
-        let y = (point.y - center.y) / radiusY
-        return x * x + y * y <= 1.08 ? self : nil
+        let scale = viewScale
+        guard scale > 0 else { return nil }
+        // View coordinates are y-up; engine coordinates are y-down and centred
+        // on the ball.
+        let enginePoint = CGPoint(
+            x: (point.x - bounds.midX) / scale,
+            y: (bounds.midY - point.y) / scale
+        )
+        let body = bloubEngine.sample(at: assetClock).bodyPath()
+        return body.contains(enginePoint) ? self : nil
     }
 
     public func advanceFrame(at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
-        let delta = animationClock.advance(to: timestamp)
-        phase += CGFloat(delta)
-        stateElapsed += delta
-        gazeMorph.advance(by: delta)
-        if phase > 1_000 { phase = 0 }
+        // The engine samples at absolute clock time, so the delta itself needs
+        // no further bookkeeping; keeping the clock monotonic is enough.
+        animationClock.advance(to: timestamp)
         needsDisplay = true
     }
 
@@ -208,25 +300,12 @@ public final class PetCanvasView: NSView {
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
 
-        let scale = min(bounds.width / 220, bounds.height / 220) * (miniMode ? 0.86 : 1.0)
-        let bob: CGFloat
-        switch petState {
-        case .attention, .miniHappy: bob = sin(phase * 6) * 5
-        case .error, .reactFlail: bob = sin(phase * 12) * 3
-        case .idle, .miniIdle, .yawning, .dozing, .collapsing, .sleeping, .wakingFromDoze: bob = 0
-        default: bob = sin(phase * 2) * 1.7
-        }
-        context.translateBy(x: bounds.midX, y: bounds.midY + bob)
-        context.scaleBy(x: scale, y: scale)
-        context.translateBy(x: -110, y: -110)
-
         if !petState.isPointerInteraction, drawCustomAsset(in: context) {
             context.restoreGState()
             return
         }
 
-        drawBloub(in: context)
-        drawStateOverlay(in: context)
+        drawBloubFrame(in: context)
         context.restoreGState()
     }
 
@@ -250,8 +329,13 @@ public final class PetCanvasView: NSView {
             width: width * ratio,
             height: height * ratio
         )
+        context.saveGState()
+        context.translateBy(x: bounds.midX, y: bounds.midY)
+        context.scaleBy(x: viewScale, y: viewScale)
+        context.translateBy(x: -110, y: -110)
         context.interpolationQuality = .none
         context.draw(frame, in: target)
+        context.restoreGState()
         return true
     }
 
@@ -329,18 +413,6 @@ public final class PetCanvasView: NSView {
         return animation
     }
 
-    private func currentFrame(in animation: AssetFrames) -> CGImage {
-        guard animation.frames.count > 1 else { return animation.frames[0] }
-        let total = animation.durations.reduce(0, +)
-        guard total > 0 else { return animation.frames[Int(assetClock * 12) % animation.frames.count] }
-        var remaining = assetClock.truncatingRemainder(dividingBy: total)
-        for (index, duration) in animation.durations.enumerated() {
-            if remaining < duration { return animation.frames[index] }
-            remaining -= duration
-        }
-        return animation.frames.last ?? animation.frames[0]
-    }
-
     private static func frameDuration(source: CGImageSource, index: Int) -> TimeInterval {
         guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] else { return 0.08 }
         let dictionaries = [
@@ -354,6 +426,18 @@ public final class PetCanvasView: NSView {
             }
         }
         return 0.08
+    }
+
+    private func currentFrame(in animation: AssetFrames) -> CGImage {
+        guard animation.frames.count > 1 else { return animation.frames[0] }
+        let total = animation.durations.reduce(0, +)
+        guard total > 0 else { return animation.frames[Int(assetClock * 12) % animation.frames.count] }
+        var remaining = assetClock.truncatingRemainder(dividingBy: total)
+        for (index, duration) in animation.durations.enumerated() {
+            if remaining < duration { return animation.frames[index] }
+            remaining -= duration
+        }
+        return animation.frames.last ?? animation.frames[0]
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -400,317 +484,156 @@ public final class PetCanvasView: NSView {
         }
     }
 
-    private func fillRoundedRect(_ context: CGContext, _ rect: CGRect, radius: CGFloat, _ color: CGColor) {
-        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-        context.addPath(path)
-        context.setFillColor(color)
-        context.fillPath()
-    }
+    // MARK: - bloub frame renderer (engine output -> Core Graphics)
 
-    // MARK: - bloub pet (MIT, jeremy-prt/bloub; ported from its radial/eye model)
-
-    private struct BloubEyePose {
-        let x: Double
-        let y: Double
-        let a: Double
-        let b: Double
-        let c: Double
-        let d: Double
-        let depth: Double
-    }
-
-    private static func bloubEyePoses(gaze: BloubGaze, scale: Double) -> [BloubEyePose] {
-        func spin(_ u: (Double, Double, Double), _ v: (Double, Double, Double), _ angle: Double) -> ((Double, Double, Double), (Double, Double, Double)) {
-            let c = cos(angle)
-            let s = sin(angle)
-            return (
-                (u.0 * c + v.0 * s, u.1 * c + v.1 * s, u.2 * c + v.2 * s),
-                (v.0 * c - u.0 * s, v.1 * c - u.1 * s, v.2 * c - u.2 * s)
-            )
-        }
-        func deg(_ d: Double) -> Double { d * .pi / 180 }
-        var f: (Double, Double, Double) = (0, 0, 1)
-        var right: (Double, Double, Double) = (1, 0, 0)
-        var down: (Double, Double, Double) = (0, 1, 0)
-        (f, right) = spin(f, right, deg(gaze.yaw))
-        (down, f) = spin(down, f, deg(gaze.pitch))
-        (right, down) = spin(right, down, deg(gaze.roll))
-        func build(_ side: Double) -> BloubEyePose {
-            let (ef, er) = spin(f, right, deg(15.46 * side))
-            return BloubEyePose(
-                x: ef.0 * scale,
-                y: ef.1 * scale,
-                a: er.0,
-                b: er.1,
-                c: down.0,
-                d: down.1,
-                depth: ef.2
-            )
-        }
-        return [build(-1), build(1)]
-    }
-
-    private func drawBloub(in context: CGContext) {
-        let radius: CGFloat = 74
-        let bodyColor = theme.palette.body.cgColor()
-        let eyeColor = NSColor.white.cgColor
-        let dozing = petState == .dozing
-        let sleeping = petState == .sleeping
-        let yawning = petState == .yawning
-        let collapsing = petState == .collapsing
-        let wakingFromDoze = petState == .wakingFromDoze
-        let idleLike = petState == .idle || petState == .miniIdle
-        let yawnProgress = yawning
-            ? min(1, max(0, stateElapsed / max(0.25, theme.timings.yawnDuration)))
-            : 0
-        let collapseDuration = stateAssetOverride != nil
-            ? max(0.25, theme.timings.dndCollapseDuration)
-            : max(0.25, theme.timings.collapseDuration)
-        let collapseProgress = collapsing
-            ? min(1, max(0, stateElapsed / collapseDuration))
-            : 0
-        let sleepPose = dozing || sleeping || collapsing
-        let life = BloubMotion.liveliness(
-            at: assetClock,
-            wander: idleLike && pointerKnown ? 0 : (sleepPose || yawning ? 0 : 1),
-            blink: !sleepPose && !wakingFromDoze,
-            float: !sleepPose && !yawning && !wakingFromDoze
+    private func drawBloubFrame(in context: CGContext) {
+        let frame = bloubEngine.sample(at: assetClock)
+        // A customizer colour overrides the theme palette; "theme" defers to it.
+        let bodyColor = bloubAppearance.bodyColor ?? BloubRGB(
+            red: theme.palette.body.red,
+            green: theme.palette.body.green,
+            blue: theme.palette.body.blue
         )
-        let yawnWave = sin(yawnProgress * .pi)
-        let bodyScaleX = 1 + yawnWave * 0.05 + collapseProgress * 0.26
-        let bodyScaleY = 1 + yawnWave * 0.10 - collapseProgress * 0.34
-        let sleepBreath = (dozing || sleeping)
-            ? 1 + sin((stateElapsed / 4) * .pi * 2) * 0.018
-            : 1
-        let center = CGPoint(
-            x: 110 + CGFloat(life.driftX) * radius,
-            y: 108 - CGFloat(life.driftY) * radius - collapseProgress * 6 + yawnProgress * 1.5
+        let palette = BloubPalette(
+            body: bodyColor,
+            eye: BloubRGB(red: 1, green: 1, blue: 1),
+            notification: BloubDecor.notifColor
         )
-        let shift: CGFloat = (dozing || sleeping ? -14 : 0) - collapseProgress * 2
-
         context.saveGState()
-        context.translateBy(x: 0, y: shift)
+        context.translateBy(x: bounds.midX, y: bounds.midY)
+        context.scaleBy(x: viewScale, y: viewScale)
+        // The canvas flip leaves a y-up space; the engine speaks y-down, so
+        // flip once more around the ball centre. Engine geometry can then be
+        // drawn verbatim — no per-component sign tracking.
+        context.scaleBy(x: 1, y: -1)
 
-        // The bloub rest silhouette is round; sleep transitions deliberately
-        // squash or stretch that same shape instead of swapping in a heavy
-        // animation timeline.
-        let breath = CGFloat(life.breath * sleepBreath)
-        let bodyRect = CGRect(
-            x: center.x - radius * CGFloat(bodyScaleX),
-            y: center.y - radius * CGFloat(bodyScaleY) * breath,
-            width: radius * 2 * CGFloat(bodyScaleX),
-            height: radius * 2 * CGFloat(bodyScaleY) * breath
-        )
-        fillEllipse(context, rect: bodyRect, color: bodyColor)
-
-        // Eyes: two white capsules placed by the spherical head model.
-        let baseGaze = idleLike && pointerKnown
-            ? BloubMotion.targetGaze(forPointerOffset: gazeMorph.value)
-            : BloubMotion.restGaze
-        let gaze = BloubGaze(
-            yaw: baseGaze.yaw + life.dYaw,
-            pitch: baseGaze.pitch + life.dPitch,
-            roll: baseGaze.roll + life.dRoll
-        )
-        let poses = Self.bloubEyePoses(gaze: gaze, scale: Double(radius))
-        let closeProgress: Double
-        if wakingFromDoze {
-            closeProgress = max(0, 1 - min(1, stateElapsed / 0.35))
-        } else if yawning {
-            closeProgress = min(1, max(0, (yawnProgress - 0.18) / 0.28))
-        } else {
-            closeProgress = sleepPose ? 1 : 0
+        // Orbit depth: back half of every arc first, so the body occludes it.
+        for arc in frame.arcs {
+            strokeArc(context, arc, polylines: arc.back)
         }
-        let lid = min(1, max(0, life.lid * (1 - closeProgress)))
-        let eyeWidth = 0.186 * Double(radius)
-        let eyeHeight = closeProgress >= 0.999
-            ? 0
-            : 0.412 * Double(radius) * (0.06 + 0.94 * lid)
 
-        for pose in poses {
-            guard pose.depth > 0.02 else { continue }
-            let eyeX = center.x + CGFloat(pose.x)
-            let eyeY = center.y - CGFloat(pose.y)
-            let visibility = min(1, max(0, pose.depth / 0.12))
-            context.saveGState()
-            context.setAlpha(CGFloat(visibility))
-            if eyeHeight < 1.2 {
-                // Closed eye: rounded horizontal line.
-                fillRoundedRect(
-                    context,
-                    CGRect(x: eyeX - CGFloat(eyeWidth) * 0.85, y: eyeY - 2.5, width: CGFloat(eyeWidth) * 1.7, height: 5),
-                    radius: 2.5,
-                    eyeColor
-                )
-                context.restoreGState()
-                continue
-            }
-            // Tangent frame, y-flipped into CoreGraphics' bottom-left space.
-            var transform = CGAffineTransform(
-                a: pose.a * eyeWidth,
-                b: -pose.b * eyeWidth,
-                c: pose.c * eyeHeight,
-                d: -pose.d * eyeHeight,
-                tx: eyeX,
-                ty: eyeY
-            )
-            let path = CGPath(ellipseIn: CGRect(x: -0.5, y: -0.5, width: 1, height: 1), transform: &transform)
-            context.addPath(path)
-            context.setFillColor(eyeColor)
+        if frame.dotsBehind {
+            drawDots(context, frame.dots, palette: palette)
+        }
+
+        // Body with the notification notch subtracted (even-odd), so the
+        // badge appears to bite into the silhouette.
+        let bodyPath = frame.bodyPath()
+        context.setAlpha(frame.body.opacity)
+        context.addPath(bodyPath)
+        if let notch = frame.notch {
+            context.addPath(CGPath(
+                ellipseIn: CGRect(
+                    x: notch.center.x - notch.radius,
+                    y: notch.center.y - notch.radius,
+                    width: notch.radius * 2,
+                    height: notch.radius * 2
+                ),
+                transform: nil
+            ))
+            context.setFillColor(palette.body.cgColor)
+            context.fillPath(using: .evenOdd)
+        } else {
+            context.setFillColor(palette.body.cgColor)
             context.fillPath()
+        }
+        context.setAlpha(1)
+
+        // Eyes: paper capsules clipped to the body path. Clipping is what
+        // trims them automatically when they slide against the silhouette —
+        // no extra border logic, matching the masked-hole behaviour upstream.
+        if !frame.eyes.isEmpty {
+            context.saveGState()
+            context.addPath(bodyPath)
+            context.clip()
+            for eye in frame.eyes {
+                let shape = BloubPaths.capsule(
+                    width: eye.capsuleWidth,
+                    height: eye.capsuleHeight
+                ).transformed(eye.transform)
+                context.setAlpha(eye.alpha)
+                context.setFillColor(palette.eye.cgColor)
+                context.addPath(shape)
+                context.fillPath()
+            }
             context.restoreGState()
         }
 
-        if yawning {
-            let mouthProgress = sin(min(1, max(0, (yawnProgress - 0.18) / 0.62)) * .pi)
-            if mouthProgress > 0 {
-                let mouthWidth = 7 + CGFloat(mouthProgress) * 7
-                let mouthHeight = 3 + CGFloat(mouthProgress) * 10
-                fillEllipse(
-                    context,
-                    rect: CGRect(
-                        x: center.x - mouthWidth / 2,
-                        y: center.y - 31 - CGFloat(mouthProgress) * 2,
-                        width: mouthWidth,
-                        height: mouthHeight
-                    ),
-                    color: theme.palette.shadow.cgColor()
-                )
-            }
+        if !frame.dotsBehind {
+            drawDots(context, frame.dots, palette: palette)
+        }
+
+        if let badge = frame.notification {
+            context.setFillColor(palette.notification.cgColor)
+            context.fillEllipse(in: CGRect(
+                x: badge.center.x - badge.radius,
+                y: badge.center.y - badge.radius,
+                width: badge.radius * 2,
+                height: badge.radius * 2
+            ))
+        }
+
+        for arc in frame.arcs {
+            strokeArc(context, arc, polylines: arc.front)
         }
         context.restoreGState()
     }
 
-    private func drawStateOverlay(in context: CGContext) {
-        guard !petState.isPointerInteraction else { return }
-        switch petState {
-        case .thinking:
-            drawThoughtBubble(in: context)
-        case .typing:
-            fillRect(context, CGRect(x: 78, y: 45, width: 64, height: 22), NSColor(white: 0.12, alpha: 1).cgColor)
-            for index in 0..<5 {
-                fillRect(context, CGRect(x: 84 + CGFloat(index) * 10, y: 51, width: 6, height: 5), NSColor.white.cgColor)
+    private func drawDots(_ context: CGContext, _ dots: [BloubDot], palette: BloubPalette) {
+        for dot in dots {
+            // Depth haze fades a particle into the background; on a
+            // transparent window that blend is an alpha fade.
+            let alpha = dot.opacity * (dot.depth ?? 1)
+            guard alpha > 0.004 else { continue }
+            context.setAlpha(CGFloat(alpha))
+            context.setFillColor(palette.body.cgColor)
+            if let drop = dot.drop {
+                let transform = CGAffineTransform(
+                    translationX: dot.position.x,
+                    y: dot.position.y
+                ).rotated(by: CGFloat(dot.dropRotation) * .pi / 180)
+                let shape = BloubPaths.polygon(drop).transformed(transform)
+                context.addPath(shape)
+                context.fillPath()
+            } else {
+                context.fillEllipse(in: CGRect(
+                    x: dot.position.x - dot.radius,
+                    y: dot.position.y - dot.radius,
+                    width: dot.radius * 2,
+                    height: dot.radius * 2
+                ))
             }
-        case .building:
-            fillRect(context, CGRect(x: 168, y: 42, width: 24, height: 24), theme.palette.highlight.cgColor())
-            fillRect(context, CGRect(x: 176, y: 48, width: 8, height: 12), theme.palette.shadow.cgColor())
-        case .juggling:
-            drawJugglingOverlay(in: context)
-        case .error, .reactFlail:
-            fillRect(context, CGRect(x: 76, y: 36, width: 42, height: 7), NSColor.systemRed.cgColor)
-            fillRect(context, CGRect(x: 94, y: 18, width: 7, height: 43), NSColor.systemRed.cgColor)
-        case .attention, .miniHappy:
-            for x in stride(from: 35, through: 180, by: 29) {
-                let y = 30 + CGFloat((Int(x) / 29) % 3) * 13
-                fillRect(context, CGRect(x: CGFloat(x), y: y, width: 7, height: 7), theme.palette.highlight.cgColor())
-            }
-        case .notification, .miniAlert:
-            fillEllipse(context, rect: CGRect(x: 145, y: 18, width: 46, height: 39), color: NSColor.white.cgColor)
-            fillRect(context, CGRect(x: 166, y: 26, width: 6, height: 17), NSColor.systemRed.cgColor)
-            fillRect(context, CGRect(x: 166, y: 47, width: 6, height: 5), NSColor.systemRed.cgColor)
-        case .sweeping:
-            fillRect(context, CGRect(x: 154, y: 46, width: 8, height: 80), theme.palette.shadow.cgColor())
-            fillRect(context, CGRect(x: 148, y: 40, width: 28, height: 10), theme.palette.highlight.cgColor())
-        case .carrying:
-            fillRect(context, CGRect(x: 145, y: 102, width: 43, height: 37), theme.palette.accent.cgColor())
-            fillRect(context, CGRect(x: 164, y: 102, width: 5, height: 37), theme.palette.shadow.cgColor())
-            fillRect(context, CGRect(x: 145, y: 119, width: 43, height: 5), theme.palette.shadow.cgColor())
-        case .sleeping:
-            drawSleepMarks(in: context)
-        case .collapsing:
-            let duration = stateAssetOverride != nil
-                ? max(0.25, theme.timings.dndCollapseDuration)
-                : max(0.25, theme.timings.collapseDuration)
-            let progress = min(1, max(0, stateElapsed / duration))
-            drawSleepMarks(in: context, alpha: CGFloat(progress))
-        case .yawning, .dozing, .wakingFromDoze:
-            break
-        case .waking:
-            drawSparkle(in: context)
-        case .dragging, .miniPeek:
-            // Dragging and mini-hover are interaction states, not decorations.
-            // In particular, do not resurrect the old corner bar markers here.
-            break
-        default:
-            break
         }
+        context.setAlpha(1)
     }
 
-    private func drawThoughtBubble(in context: CGContext) {
-        fillEllipse(context, rect: CGRect(x: 146, y: 16, width: 52, height: 40), color: NSColor.white.cgColor)
-        fillEllipse(context, rect: CGRect(x: 134, y: 50, width: 12, height: 12), color: NSColor.white.cgColor)
-        fillEllipse(context, rect: CGRect(x: 124, y: 62, width: 8, height: 8), color: NSColor.white.cgColor)
-        for index in 0..<3 {
-            fillRect(context, CGRect(x: 158 + CGFloat(index) * 10, y: 31, width: 5, height: 5), theme.palette.accent.cgColor())
+    /// One arc stroke: mask the gradient with the stroked path so each ring
+    /// keeps bloub's hue gradient along its trace.
+    private func strokeArc(_ context: CGContext, _ arc: BloubArc, polylines: [[CGPoint]]) {
+        guard arc.opacity > 0.004 else { return }
+        let colors = arc.gradientStops.map { stop in
+            CGColor(red: stop.red, green: stop.green, blue: stop.blue, alpha: 1)
         }
-    }
-
-    private func drawJugglingOverlay(in context: CGContext) {
-        let isTierTwo = subagentCount >= 2
-        if theme.id != "pinch", isTierTwo {
-            // Calico and Cloudling use the conducting pose for 2+ live
-            // subagents, while Clawd uses the three-ball tier below.
-            fillRect(context, CGRect(x: 104, y: 22, width: 6, height: 56), theme.palette.shadow.cgColor())
-            fillRect(context, CGRect(x: 92, y: 20, width: 30, height: 6), theme.palette.highlight.cgColor())
-            fillEllipse(context, rect: CGRect(x: 60, y: 35, width: 14, height: 14), color: theme.palette.accent.cgColor())
-            fillEllipse(context, rect: CGRect(x: 151, y: 35, width: 14, height: 14), color: theme.palette.accent.cgColor())
-            return
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors as CFArray,
+            locations: [0, 0.5, 1]
+        ) else { return }
+        for points in polylines where points.count > 1 {
+            context.saveGState()
+            context.setAlpha(CGFloat(arc.opacity))
+            context.setLineWidth(arc.width)
+            context.setLineCap(.round)
+            context.addPath(BloubPaths.polyline(points))
+            context.replacePathWithStrokedPath()
+            context.clip()
+            context.drawLinearGradient(
+                gradient,
+                start: arc.gradientStart,
+                end: arc.gradientEnd,
+                options: []
+            )
+            context.restoreGState()
         }
-        if isTierTwo {
-            for (index, position) in [(0, CGPoint(x: 55, y: 42)), (1, CGPoint(x: 107, y: 28)), (2, CGPoint(x: 160, y: 42))] {
-                let color = index == 1 ? theme.palette.highlight.cgColor() : theme.palette.accent.cgColor()
-                fillEllipse(context, rect: CGRect(x: position.x, y: position.y, width: 14, height: 14), color: color)
-            }
-        } else {
-            // The one-subagent / two-session tier is a compact headphones
-            // cue, visually distinct from the 2+ juggling tier.
-            context.setStrokeColor(theme.palette.accent.cgColor())
-            context.setLineWidth(6)
-            context.addArc(center: CGPoint(x: 110, y: 43), radius: 28, startAngle: .pi, endAngle: 0, clockwise: false)
-            context.strokePath()
-            fillRect(context, CGRect(x: 77, y: 42, width: 8, height: 20), theme.palette.accent.cgColor())
-            fillRect(context, CGRect(x: 135, y: 42, width: 8, height: 20), theme.palette.accent.cgColor())
-        }
-    }
-
-    private func drawSleepMarks(in context: CGContext, alpha: CGFloat = 1) {
-        context.saveGState()
-        context.setAlpha(alpha)
-        let color = theme.palette.shadow.cgColor()
-        fillRect(context, CGRect(x: 156, y: 24, width: 16, height: 4), color)
-        fillRect(context, CGRect(x: 168, y: 28, width: 4, height: 12), color)
-        fillRect(context, CGRect(x: 168, y: 36, width: 14, height: 4), color)
-        fillRect(context, CGRect(x: 177, y: 44, width: 12, height: 4), color)
-        fillRect(context, CGRect(x: 185, y: 48, width: 4, height: 10), color)
-        fillRect(context, CGRect(x: 177, y: 54, width: 12, height: 4), color)
-        context.restoreGState()
-    }
-
-    private func drawSparkle(in context: CGContext) {
-        let color = theme.palette.highlight.cgColor()
-        fillRect(context, CGRect(x: 36, y: 42, width: 5, height: 24), color)
-        fillRect(context, CGRect(x: 27, y: 51, width: 23, height: 5), color)
-        fillRect(context, CGRect(x: 177, y: 64, width: 5, height: 22), color)
-        fillRect(context, CGRect(x: 168, y: 73, width: 23, height: 5), color)
-    }
-
-    private func cgColor(_ color: RGBColor) -> CGColor {
-        NSColor(calibratedRed: color.red, green: color.green, blue: color.blue, alpha: 1).cgColor
-    }
-
-    private func fillRect(_ context: CGContext, _ rect: CGRect, _ color: CGColor) {
-        context.setFillColor(color)
-        context.fill(rect)
-    }
-
-    private func fillEllipse(_ context: CGContext, rect: CGRect, color: CGColor) {
-        context.setFillColor(color)
-        context.fillEllipse(in: rect)
-    }
-}
-
-private extension RGBColor {
-    func cgColor() -> CGColor {
-        NSColor(calibratedRed: red, green: green, blue: blue, alpha: 1).cgColor
     }
 }

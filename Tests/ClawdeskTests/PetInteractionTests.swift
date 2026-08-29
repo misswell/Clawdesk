@@ -197,28 +197,68 @@ final class PetInteractionTests: XCTestCase {
     }
 
     @MainActor
-    func testInteractionStateRedrawClearsPreviousCornerMarks() {
+    func testStateTransitionRedrawClearsPreviousDecorations() {
         let frame = NSRect(x: 0, y: 0, width: 220, height: 220)
-        let theme = ThemeCatalog.theme(id: "pinch")
         let view = PetCanvasView(frame: frame)
-        view.theme = theme
+        view.theme = ThemeCatalog.theme(id: "pinch")
+        // Prime the animation clock (the first advance only anchors it), then
+        // take the resting reference.
+        view.advanceFrame(at: 0)
+        view.advanceFrame(at: 1.0)
+        let idleReference = render(view)
         let image = makeBitmap(width: 220, height: 220)
 
+        // Waking maps to the swirl transition: its rings paint beyond the
+        // resting silhouette.
         view.petState = .waking
+        view.advanceFrame(at: 1.1)
         render(view, into: image)
-        XCTAssertTrue(isHighlightPixel(in: image, x: 39, y: 54, theme: theme))
-        XCTAssertTrue(isHighlightPixel(in: image, x: 180, y: 75, theme: theme))
+        XCTAssertTrue(
+            paintsBeyondReference(image, reference: idleReference),
+            "The wake transition must actually draw its rings"
+        )
 
+        // Back to rest, past the cross-fade: every pixel the resting pet
+        // leaves transparent must be transparent again — anywhere on the
+        // canvas, not just inside the AppKit dirty rect. A 3 px tolerance
+        // around the reference absorbs the breathing/drifting edge.
         view.petState = .idle
+        view.advanceFrame(at: 2.0)
         render(view, into: image)
-        XCTAssertFalse(
-            isHighlightPixel(in: image, x: 39, y: 54, theme: theme),
-            "A transparent pet canvas must not retain the previous upper-left mark"
+        var retained: [String] = []
+        for y in stride(from: 0, to: 220, by: 2) {
+            for x in stride(from: 0, to: 220, by: 2) {
+                if isTransparent(in: idleReference, x: x, y: y, margin: 3),
+                   (image.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.1 {
+                    retained.append("(\(x), \(y))")
+                }
+            }
+        }
+        XCTAssertTrue(
+            retained.isEmpty,
+            "A transparent pet canvas must not retain previous-state pixels: \(retained.prefix(8))"
         )
-        XCTAssertFalse(
-            isHighlightPixel(in: image, x: 180, y: 75, theme: theme),
-            "A transparent pet canvas must not retain the previous upper-right mark"
-        )
+    }
+
+    /// True when the pixel and a `margin` neighbourhood around it are all
+    /// transparent in the reference, i.e. truly outside the resting pet.
+    @MainActor
+    private func isTransparent(
+        in image: NSBitmapImageRep,
+        x: Int,
+        y: Int,
+        margin: Int
+    ) -> Bool {
+        for dy in -margin...margin {
+            for dx in -margin...margin {
+                let px = min(max(x + dx, 0), 219)
+                let py = min(max(y + dy, 0), 219)
+                if (image.colorAt(x: px, y: py)?.alphaComponent ?? 0) > 0.1 {
+                    return false
+                }
+            }
+        }
+        return true
     }
 
     @MainActor
@@ -260,6 +300,18 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertEqual(view.focusRingType, .none)
         XCTAssertFalse(panel.styleMask.contains(.resizable))
         XCTAssertFalse(view.wantsLayer && (view.layer?.isOpaque ?? true))
+    }
+
+    @MainActor
+    func testPetCanvasUsesDirectTransparentBacking() {
+        let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
+
+        XCTAssertFalse(
+            view.wantsLayer,
+            "A transparent pet must not retain interaction pixels in a layer-backed contents buffer"
+        )
+        XCTAssertFalse(view.isOpaque)
+        XCTAssertEqual(view.focusRingType, .none)
     }
 
     @MainActor
@@ -323,6 +375,22 @@ final class PetInteractionTests: XCTestCase {
         for y in 10..<45 {
             for x in 10..<45 {
                 if (image.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.8 {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// True when `image` paints an opaque pixel the reference leaves
+    /// transparent, i.e. decoration reaches beyond the resting silhouette.
+    @MainActor
+    private func paintsBeyondReference(_ image: NSBitmapImageRep, reference: NSBitmapImageRep) -> Bool {
+        for y in stride(from: 0, to: 220, by: 2) {
+            for x in stride(from: 0, to: 220, by: 2) {
+                let referenceAlpha = reference.colorAt(x: x, y: y)?.alphaComponent ?? 0
+                let alpha = image.colorAt(x: x, y: y)?.alphaComponent ?? 0
+                if referenceAlpha <= 0.1, alpha > 0.1 {
                     return true
                 }
             }
