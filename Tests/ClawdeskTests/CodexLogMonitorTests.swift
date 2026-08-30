@@ -72,4 +72,39 @@ final class CodexLogMonitorTests: XCTestCase {
         XCTAssertEqual(question.questions.first?.options.map(\.label), ["Focused", "Broad"])
         XCTAssertEqual(events.last?.toolCallID, "call_123")
     }
+
+    func testTrackingIsBoundedToTheMostRecentRolloutFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-bounded-files-\(UUID().uuidString)")
+        let directory = root.appendingPathComponent(".codex/sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for index in 0..<160 {
+            let file = directory.appendingPathComponent("rollout-\(index).jsonl")
+            try Data("{}\n".utf8).write(to: file)
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date.now.addingTimeInterval(TimeInterval(index))],
+                ofItemAtPath: file.path
+            )
+        }
+
+        let monitor = CodexLogMonitor(homeDirectory: root)
+        monitor.scanOnce()
+
+        XCTAssertEqual(monitor.trackedFileCount, 128)
+    }
+
+    func testOversizedIncompleteRecordIsDiscardedInsteadOfRetained() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-bounded-partial-\(UUID().uuidString)")
+        let directory = root.appendingPathComponent(".codex/sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("rollout-oversized.jsonl")
+        try Data(repeating: 0x61, count: 600 * 1024).write(to: file)
+
+        let monitor = CodexLogMonitor(homeDirectory: root)
+        monitor.scanOnce()
+        XCTAssertLessThanOrEqual(monitor.bufferedPartialByteCount, 512 * 1024)
+        monitor.scanOnce()
+        XCTAssertLessThanOrEqual(monitor.bufferedPartialByteCount, 512 * 1024)
+        monitor.scanOnce()
+        XCTAssertEqual(monitor.bufferedPartialByteCount, 0)
+    }
 }

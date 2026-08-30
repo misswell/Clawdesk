@@ -25,6 +25,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var hoverRestoreTask: Task<Void, Never>?
     private var nextRoamDate = Date.distantPast
     private let roamFence = RoamFenceCoordinator()
+    private var isStarted = false
 
     public var onSettings: (() -> Void)?
     public var onDashboard: (() -> Void)?
@@ -129,6 +130,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         model.preferences.$language.sink { [weak self] _ in
             self?.refreshSessionHUD()
         }.store(in: &cancellables)
+        model.preferences.$lowPowerAnimations.dropFirst().sink { [weak self] _ in
+            self?.restartAnimationTimer()
+            self?.restartPointerTimer()
+        }.store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) {
@@ -141,31 +146,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func start() {
+        guard !isStarted else { return }
+        isStarted = true
         restorePosition()
         window?.orderFrontRegardless()
         restartAnimationTimer()
-        model.preferences.$lowPowerAnimations.sink { [weak self] _ in
-            self?.restartAnimationTimer()
-        }.store(in: &cancellables)
-        pointerTimer = PetTimerScheduler.schedule(
-            interval: 1.0 / 60.0,
-            repeats: true
-        ) { [weak self] in
-            guard let self, let window = self.window else { return }
-            guard !self.isDragging else { return }
-            let previousActivity = self.model.lastPointerActivity
-            self.model.noteMouseActivity(at: NSEvent.mouseLocation)
-            if self.model.lastPointerActivity != previousActivity {
-                self.cancelIdleAnimation(resetCycle: true)
-            }
-            // Hover peek is itself a pointer-over state: keep feeding the
-            // gaze so the eyes come to the front while hovered.
-            guard self.petView.petState == .idle
-                || self.petView.petState == .miniIdle
-                || self.petView.petState == .miniPeek else { return }
-            self.petView.setPointerLocation(NSEvent.mouseLocation)
-            if window.isVisible == false { window.orderFrontRegardless() }
-        }
+        restartPointerTimer()
         sleepTimer = PetTimerScheduler.schedule(
             interval: 5,
             repeats: true
@@ -204,6 +190,27 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    private func restartPointerTimer() {
+        pointerTimer?.invalidate()
+        let frequency = PetTimerScheduler.pointerFrequency(lowPower: model.preferences.lowPowerAnimations)
+        pointerTimer = PetTimerScheduler.schedule(
+            interval: 1.0 / frequency,
+            repeats: true
+        ) { [weak self] in
+            guard let self, let window = self.window, !self.isDragging else { return }
+            let previousActivity = self.model.lastPointerActivity
+            self.model.noteMouseActivity(at: NSEvent.mouseLocation)
+            if self.model.lastPointerActivity != previousActivity {
+                self.cancelIdleAnimation(resetCycle: true)
+            }
+            guard self.petView.petState == .idle
+                || self.petView.petState == .miniIdle
+                || self.petView.petState == .miniPeek else { return }
+            self.petView.setPointerLocation(NSEvent.mouseLocation)
+            if window.isVisible == false { window.orderFrontRegardless() }
+        }
+    }
+
     /// Re-schedules the loop whenever the resting boundary is crossed. State
     /// changes and pointer moves mark the engine unsettled, so the very next
     /// tick brings the full frequency back; at idle cadence that reaction
@@ -216,6 +223,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func stop() {
+        isStarted = false
         animationTimer?.invalidate()
         pointerTimer?.invalidate()
         sleepTimer?.invalidate()

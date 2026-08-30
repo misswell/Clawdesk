@@ -4,6 +4,10 @@ import Foundation
 /// tracking do not pause eye-follow or animation callbacks.
 @MainActor
 enum PetTimerScheduler {
+    static func pointerFrequency(lowPower: Bool) -> Double {
+        lowPower ? 12 : 30
+    }
+
     static func schedule(
         interval: TimeInterval,
         repeats: Bool,

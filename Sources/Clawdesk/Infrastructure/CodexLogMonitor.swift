@@ -16,6 +16,13 @@ public final class CodexLogMonitor {
     private var offsets: [URL: UInt64] = [:]
     private var partialLines: [URL: Data] = [:]
     private var task: Task<Void, Never>?
+    private static let maxTrackedFiles = 128
+    private static let maxReadBytesPerScan = 256 * 1024
+    private static let maxInitialBackfillBytes: UInt64 = 1024 * 1024
+    private static let maxPartialLineBytes = 512 * 1024
+
+    var trackedFileCount: Int { offsets.count }
+    var bufferedPartialByteCount: Int { partialLines.values.reduce(0) { $0 + $1.count } }
 
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -48,18 +55,30 @@ public final class CodexLogMonitor {
         ) else { return }
 
         let cutoff = Date.now.addingTimeInterval(-24 * 60 * 60)
-        for file in files where file.pathExtension == "jsonl" && file.lastPathComponent.hasPrefix("rollout-") {
-            guard let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
-                  values.contentModificationDate ?? .distantPast >= cutoff else { continue }
-            readNewLines(from: file, size: UInt64(values.fileSize ?? 0))
+        let candidates = files.compactMap { file -> (URL, Date, UInt64)? in
+            guard file.pathExtension == "jsonl", file.lastPathComponent.hasPrefix("rollout-"),
+                  let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                  let modified = values.contentModificationDate, modified >= cutoff else { return nil }
+            return (file, modified, UInt64(values.fileSize ?? 0))
         }
-        offsets = offsets.filter { fileManager.fileExists(atPath: $0.key.path) }
-        partialLines = partialLines.filter { fileManager.fileExists(atPath: $0.key.path) }
+        .sorted { $0.1 > $1.1 }
+        .prefix(Self.maxTrackedFiles)
+        let activeFiles = Set(candidates.map { $0.0 })
+        for (file, _, size) in candidates {
+            readNewLines(from: file, size: size)
+        }
+        offsets = offsets.filter { activeFiles.contains($0.key) }
+        partialLines = partialLines.filter { activeFiles.contains($0.key) }
     }
 
     private func readNewLines(from file: URL, size: UInt64) {
-        let previous = offsets[file] ?? 0
-        let start = previous > size ? 0 : previous
+        let previous = offsets[file]
+        let start: UInt64
+        if let previous {
+            start = previous > size ? 0 : previous
+        } else {
+            start = size > Self.maxInitialBackfillBytes ? size - Self.maxInitialBackfillBytes : 0
+        }
         if start == 0 {
             partialLines.removeValue(forKey: file)
         }
@@ -67,7 +86,7 @@ public final class CodexLogMonitor {
         defer { try? handle.close() }
         do {
             try handle.seek(toOffset: start)
-            let data = try handle.readToEnd() ?? Data()
+            let data = try handle.read(upToCount: Self.maxReadBytesPerScan) ?? Data()
             offsets[file] = start + UInt64(data.count)
             var buffer = partialLines[file] ?? Data()
             buffer.append(data)
@@ -76,7 +95,7 @@ public final class CodexLogMonitor {
             let chunks = buffer.split(separator: 0x0A, omittingEmptySubsequences: false)
             let hasCompleteFinalChunk = buffer.last == 0x0A
             let completeChunks = hasCompleteFinalChunk ? chunks : chunks.dropLast()
-            for chunk in completeChunks where !chunk.isEmpty {
+            for chunk in completeChunks where !chunk.isEmpty && chunk.count <= Self.maxPartialLineBytes {
                 guard let object = try? JSONSerialization.jsonObject(with: Data(chunk)) as? [String: Any],
                       let event = makeEvent(from: object, file: file) else { continue }
                 onEvent?(event)
@@ -84,8 +103,10 @@ public final class CodexLogMonitor {
 
             if hasCompleteFinalChunk {
                 partialLines.removeValue(forKey: file)
-            } else if let last = chunks.last, !last.isEmpty {
+            } else if let last = chunks.last, !last.isEmpty, last.count <= Self.maxPartialLineBytes {
                 partialLines[file] = Data(last)
+            } else {
+                partialLines.removeValue(forKey: file)
             }
         } catch {
             // Rollout files are append-only and may be mid-write. The next
