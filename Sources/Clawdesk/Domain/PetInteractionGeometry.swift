@@ -20,14 +20,47 @@ public struct PetDragAnchor: Equatable, Sendable {
     }
 }
 
+/// Pointer-to-gaze normalization, ported from bloub's `ui/gaze.ts` +
+/// `BloubBot.aim()`: the pointer offset from the pet's centre is divided by
+/// HALF THE SCREEN extents and clamped, so the gaze saturates exactly when
+/// the cursor reaches the screen edge — the same sweep as the original,
+/// where the bot's head covers its whole designed range as the mouse
+/// travels the page.
+///
+/// `AppKit` screen coordinates grow upward; the returned offset uses the
+/// screen convention instead (y positive = cursor BELOW the pet), matching
+/// the `Aim` struct the upstream rule consumes.
 public enum PetPointerMapper {
-    public static func offset(for localPoint: CGPoint, in bounds: CGRect) -> CGPoint {
-        guard bounds.width > 0, bounds.height > 0 else { return .zero }
-        let dx = (localPoint.x - bounds.midX) / max(1, bounds.width * 0.20)
-        let dy = (localPoint.y - bounds.midY) / max(1, bounds.height * 0.25)
+    /// Normalized gaze offset: x right-positive, y down-positive, -1...1.
+    public static func gazeOffset(
+        petCenter: CGPoint,
+        cursor: CGPoint,
+        screenSize: CGSize
+    ) -> CGPoint {
+        let halfWidth = max(1, screenSize.width / 2)
+        let halfHeight = max(1, screenSize.height / 2)
+        // AppKit y grows upward; flip so y-down is positive, like upstream.
+        let nx = (cursor.x - petCenter.x) / halfWidth
+        let ny = (petCenter.y - cursor.y) / halfHeight
         return CGPoint(
-            x: max(-5, min(5, dx * 5)),
-            y: max(-4, min(4, dy * 4))
+            x: min(1, max(-1, nx)),
+            y: min(1, max(-1, ny))
         )
+    }
+
+    /// How much the pet should look STRAIGHT AT THE VIEWER because the cursor
+    /// is on its body: 1 at the centre of `petRect`, 0 at its edge (and
+    /// beyond), falling smoothly in between so the gaze never pops between
+    /// "forward" and "tracking".
+    ///
+    /// The original does the same by construction — a cursor resting on the
+    /// bot produces a near-zero offset, and its gaze comes to the front.
+    /// `petRect` should be the ball, not the whole window.
+    public static func forwardFactor(petRect: CGRect, cursor: CGPoint) -> CGFloat {
+        guard petRect.width > 0, petRect.height > 0 else { return 0 }
+        let dx = abs(cursor.x - petRect.midX) / (petRect.width / 2)
+        let dy = abs(cursor.y - petRect.midY) / (petRect.height / 2)
+        let edgeDistance = max(dx, dy)
+        return min(1, max(0, 1 - edgeDistance))
     }
 }

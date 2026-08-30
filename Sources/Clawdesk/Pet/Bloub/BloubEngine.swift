@@ -16,13 +16,25 @@ public struct BloubLook: Equatable, Sendable {
     public var mix: CGFloat
     public var spin: CGFloat
     public var wander: CGFloat
+    /// Absolute head roll while tracking. `nil` keeps the pose's own roll —
+    /// the web original's signature tilt. The desktop pointer driver passes 0
+    /// so the eyes sit upright and slide around the ball without leaning.
+    public var roll: CGFloat?
 
-    public init(yaw: CGFloat, pitch: CGFloat, mix: CGFloat, spin: CGFloat, wander: CGFloat) {
+    public init(
+        yaw: CGFloat,
+        pitch: CGFloat,
+        mix: CGFloat,
+        spin: CGFloat,
+        wander: CGFloat,
+        roll: CGFloat? = nil
+    ) {
         self.yaw = yaw
         self.pitch = pitch
         self.mix = mix
         self.spin = spin
         self.wander = wander
+        self.roll = roll
     }
 
     /// No external pilot: the state's own gaze rules.
@@ -153,6 +165,28 @@ public final class BloubEngine {
     }
 
     public var state: BloubState { current }
+
+    /// Scheduling hint for the render driver (architecture rule: idle never
+    /// means a permanent 60 FPS clock).
+    ///
+    /// Settled means every DISCRETE animation has finished — state fade,
+    /// state-change blink, gaze catch-up, shape and expression morphs, and
+    /// the state's own measured animation (`settlesAt`) — so the frame only
+    /// changes through the slow rest life (drift periods of 3.7–13.7 s, breath
+    /// 3.4 s, blinks every 1.9–4.6 s). A driver may then drop to a low idle
+    /// frequency without the pet visibly changing: the reference video itself
+    /// is 10 fps at rest, and its blinks last one or two frames.
+    public func isSettled(at now: TimeInterval) -> Bool {
+        guard let definition = BloubStates.catalog[current] else { return true }
+        let local = now - tCurrent
+        if local < definition.morph { return false }
+        if now - blinkAt < 0.25 { return false }
+        if now - lookAt < lookMorph { return false }
+        if now - shapeAt < Self.shapeMorphDuration { return false }
+        if now - expressionAt < Self.shapeMorphDuration { return false }
+        guard let settlesAt = definition.settlesAt else { return false }
+        return local >= settlesAt
+    }
 
     /// Body shape chosen in the customizer. It only replaces the body on rest
     /// states (`baseBody`); elsewhere the silhouette IS the animation and must
@@ -311,7 +345,8 @@ public final class BloubEngine {
     /// once would propagate to every frame and the bot would never settle.
     public func setLook(_ newLook: BloubLook?, at now: TimeInterval, morph: TimeInterval? = nil) {
         if let newLook {
-            let sum = newLook.yaw + newLook.pitch + newLook.mix + newLook.spin + newLook.wander
+            let sum = newLook.yaw + newLook.pitch + newLook.mix + newLook.spin
+                + newLook.wander + (newLook.roll ?? 0)
             guard sum.isFinite else { return }
         }
         lookPrevious = lookValue(at: now)
@@ -333,7 +368,10 @@ public final class BloubEngine {
             pitch: BloubEase.lerp(a.pitch, b.pitch, t),
             mix: BloubEase.lerp(a.mix, b.mix, t),
             spin: BloubEase.lerp(a.spin, b.spin, t),
-            wander: BloubEase.lerp(a.wander, b.wander, t)
+            wander: BloubEase.lerp(a.wander, b.wander, t),
+            // A nil roll means "use the pose's own"; when blending towards a
+            // look that carries one, approach it from upright (0).
+            roll: a.roll == nil && b.roll == nil ? nil : BloubEase.lerp(a.roll ?? 0, b.roll ?? 0, t)
         )
     }
 
@@ -473,9 +511,14 @@ public final class BloubEngine {
                 + CGFloat(life.dYaw) - activeLook.spin,
             pitch: BloubEase.lerp(pose.gaze.pitch, activeLook.pitch, activeLook.mix)
                 + CGFloat(life.dPitch),
-            // Roll follows nothing: the bot's head is tilted -13° on the video,
-            // and rolling it with the cursor breaks that signature.
-            roll: pose.gaze.roll + CGFloat(life.dRoll)
+            // Roll follows nothing on the web original (the -13° head tilt is
+            // its signature), unless the driver commands an absolute roll —
+            // the desktop pointer driver passes 0 so tracking sits upright.
+            roll: BloubEase.lerp(
+                pose.gaze.roll,
+                activeLook.roll ?? pose.gaze.roll,
+                activeLook.mix
+            ) + CGFloat(life.dRoll)
         )
 
         // Blink triggered by the state change, in addition to the calendar.

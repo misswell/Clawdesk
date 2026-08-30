@@ -9,30 +9,34 @@ import Foundation
 /// second animation clock or a random-number generator.
 public enum BloubMotion {
     public static let restGaze = BloubGaze(yaw: 28.49, pitch: 28.62, roll: -13)
-    public static let yawMax = 16.0
-    public static let pitchMax = 13.0
-    public static let pointerPitch = 10.0
-    public static let turn = 26.0
 
-    /// Maps a normalized pointer position to the absolute head direction used
-    /// by bloub. `ny` follows screen coordinates: positive means down.
+    /// Amplitudes of the desktop tracking cone, in degrees. Wider than the
+    /// web original's ±16/±13 (which was tuned against a page layout): on the
+    /// desktop the eyes visibly slide around the ball towards the cursor,
+    /// approaching the limb in all four directions — the effect asked for.
+    public static let gazeYawMax = 45.0
+    public static let gazePitchMax = 38.0
+    /// Head pitch with the cursor centred: slightly above the equator, the
+    /// original's "attentive" stance.
+    public static let gazePitch = 8.0
+    /// Response exponent < 1: small cursor moves still move the eyes clearly,
+    /// while the full sweep saturates at the screen edge.
+    public static let gazeResponse = 0.65
+
+    /// Maps a normalized pointer position (-1...1 per half screen, y down
+    /// positive) to the absolute tracking gaze: upright (roll 0) and centred
+    /// on forward, so the eyes genuinely run to whichever side the cursor is
+    /// on — the four-direction follow.
     public static func targetGaze(normalizedX: Double, normalizedY: Double) -> BloubGaze {
-        let x = clamp(normalizedX)
-        let y = clamp(normalizedY)
+        func curve(_ value: Double) -> Double {
+            let v = clamp(value)
+            let shaped = pow(abs(v), gazeResponse)
+            return v < 0 ? -shaped : shaped
+        }
         return BloubGaze(
-            yaw: -turn + x * yawMax,
-            pitch: pointerPitch - y * pitchMax,
-            roll: restGaze.roll
-        )
-    }
-
-    /// Maps Clawdesk's view-space pointer offset to the source model. AppKit's
-    /// view coordinates grow upward, while the browser source uses screen
-    /// coordinates that grow downward.
-    public static func targetGaze(forPointerOffset offset: CGPoint) -> BloubGaze {
-        targetGaze(
-            normalizedX: Double(offset.x / 5),
-            normalizedY: Double(-offset.y / 4)
+            yaw: curve(normalizedX) * gazeYawMax,
+            pitch: gazePitch - curve(normalizedY) * gazePitchMax,
+            roll: 0
         )
     }
 
@@ -146,52 +150,6 @@ public struct BloubLiveliness: Equatable, Sendable {
         self.driftX = driftX
         self.driftY = driftY
         self.breath = breath
-    }
-}
-
-/// An allocation-free, ease-out morph for continuously changing targets.
-///
-/// Superseded in the renderer by `BloubEngine.setLook`, which performs the
-/// same catch-up-from-current-value semantics inside the engine; kept for
-/// non-engine callers that need the same behaviour standalone.
-public struct BloubGazeMorph: Equatable, Sendable {
-    public private(set) var target: CGPoint
-
-    private let duration: TimeInterval
-    private var from: CGPoint
-    private var elapsed: TimeInterval
-
-    public init(duration: TimeInterval = 0.24, initial: CGPoint = .zero) {
-        self.duration = max(0.001, duration)
-        self.from = initial
-        self.target = initial
-        self.elapsed = max(0.001, duration)
-    }
-
-    public var value: CGPoint {
-        let t = BloubMotion.easeOutQuint(elapsed / duration)
-        return CGPoint(
-            x: from.x + (target.x - from.x) * t,
-            y: from.y + (target.y - from.y) * t
-        )
-    }
-
-    public mutating func setTarget(_ newTarget: CGPoint) {
-        let current = value
-        from = current
-        target = newTarget
-        elapsed = 0
-    }
-
-    public mutating func advance(by delta: TimeInterval) {
-        guard delta.isFinite, delta > 0 else { return }
-        elapsed = min(duration, elapsed + delta)
-    }
-
-    public mutating func reset(to point: CGPoint = .zero) {
-        from = point
-        target = point
-        elapsed = duration
     }
 }
 

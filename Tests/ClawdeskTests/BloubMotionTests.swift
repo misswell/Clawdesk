@@ -4,13 +4,27 @@ import XCTest
 
 final class BloubMotionTests: XCTestCase {
     func testPointerTargetUsesAbsoluteBloubAngles() {
+        // The desktop cone centers on forward, eyes upright, and sweeps wide
+        // enough that the capsules slide to the limb in all four directions.
+        // A power curve (< 1) keeps small cursor moves responsive.
         let center = BloubMotion.targetGaze(normalizedX: 0, normalizedY: 0)
-        XCTAssertEqual(center.yaw, -26, accuracy: 0.0001)
-        XCTAssertEqual(center.pitch, 10, accuracy: 0.0001)
+        XCTAssertEqual(center.yaw, 0, accuracy: 0.0001)
+        XCTAssertEqual(center.pitch, 8, accuracy: 0.0001)
+        XCTAssertEqual(center.roll, 0, accuracy: 0.0001)
 
+        // Full deflection reaches the amplitudes exactly (curve(±1) = ±1).
         let topRight = BloubMotion.targetGaze(normalizedX: 1, normalizedY: -1)
-        XCTAssertEqual(topRight.yaw, -10, accuracy: 0.0001)
-        XCTAssertEqual(topRight.pitch, 23, accuracy: 0.0001)
+        XCTAssertEqual(topRight.yaw, 45, accuracy: 0.0001)
+        XCTAssertEqual(topRight.pitch, 46, accuracy: 0.0001)
+
+        let bottomLeft = BloubMotion.targetGaze(normalizedX: -1, normalizedY: 1)
+        XCTAssertEqual(bottomLeft.yaw, -45, accuracy: 0.0001)
+        XCTAssertEqual(bottomLeft.pitch, -30, accuracy: 0.0001)
+
+        // Small offsets are amplified, not ignored: a 10 % move yields a
+        // clearly visible quarter of the full sweep.
+        let small = BloubMotion.targetGaze(normalizedX: 0.1, normalizedY: 0)
+        XCTAssertEqual(small.yaw, 45 * pow(0.1, 0.65), accuracy: 0.01)
     }
 
     func testLivelinessIsDeterministicAndCanBeDisabledForPointerTracking() {
@@ -35,20 +49,4 @@ final class BloubMotionTests: XCTestCase {
         XCTAssertEqual(BloubMotion.blinkLid(at: start), 1, accuracy: 0.0001)
         XCTAssertEqual(BloubMotion.blinkLid(at: start + 0.18 * 0.45), 0, accuracy: 0.0001)
         XCTAssertEqual(BloubMotion.blinkLid(at: start + 0.18), 1, accuracy: 0.0001)
-    }
-
-    func testGazeMorphStartsFromCurrentRenderedValueWhenTargetChanges() {
-        var morph = BloubGazeMorph(duration: 0.24)
-        morph.setTarget(CGPoint(x: 5, y: -4))
-        morph.advance(by: 0.12)
-        let current = morph.value
-
-        morph.setTarget(CGPoint(x: -5, y: 4))
-        XCTAssertEqual(morph.value.x, current.x, accuracy: 0.0001)
-        XCTAssertEqual(morph.value.y, current.y, accuracy: 0.0001)
-
-        morph.advance(by: 0.24)
-        XCTAssertEqual(morph.value.x, -5, accuracy: 0.0001)
-        XCTAssertEqual(morph.value.y, 4, accuracy: 0.0001)
-    }
-}
+    }}

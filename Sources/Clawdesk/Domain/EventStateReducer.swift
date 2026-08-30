@@ -142,9 +142,24 @@ public final class SessionStore {
     /// SessionEnd, but process crashes and force-quits do not. A long timeout
     /// keeps this cleanup conservative and lets the next event revive a live
     /// session without any process polling overhead.
-    public func pruneStale(now: Date = .now, olderThan interval: TimeInterval = 15 * 60) -> StateTransition? {
+    /// Prunes sessions idle for `interval`, plus — when a liveness checker is
+    /// supplied — sessions pinned to a terminal process that no longer exists:
+    /// a closed terminal means the session is an orphan, and waiting out the
+    /// stale window would keep a dead session's state on the pet.
+    public func pruneStale(
+        now: Date = .now,
+        olderThan interval: TimeInterval = 15 * 60,
+        isProcessAlive: ((Int32) -> Bool)? = nil
+    ) -> StateTransition? {
         let staleIDs = sessionsByID.values
-            .filter { now.timeIntervalSince($0.lastActivity) >= interval }
+            .filter { session in
+                if now.timeIntervalSince(session.lastActivity) >= interval { return true }
+                if let pid = session.terminalPID, let alive = isProcessAlive,
+                   pid > 0, !alive(Int32(clamping: pid)) {
+                    return true
+                }
+                return false
+            }
             .map(\.id)
         guard !staleIDs.isEmpty else { return nil }
         for id in staleIDs { sessionsByID.removeValue(forKey: id) }

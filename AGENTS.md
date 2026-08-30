@@ -45,7 +45,9 @@ When the pet upstream changes, compare against `Upstream/MAPPING.md`, update
 - `Pet/Bloub/BloubEngine.swift` is a clock-less engine: `sample(at:)` is a pure
   function of time, and all inputs enter through timestamped setters.
 - `UI/PetCanvasView.swift` is a low-memory CoreGraphics renderer; it does not
-  decode a continuously running web animation timeline.
+  decode a continuously running web animation timeline. Its driver throttles
+  to a low idle cadence whenever the engine reports settled — idle never
+  means a permanent 60 FPS clock.
 - `ClawdeskModel` is the main-actor coordinator used by AppKit and SwiftUI.
 
 Keep the public interfaces small and keep agent-specific configuration inside

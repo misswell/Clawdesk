@@ -48,7 +48,11 @@ public final class PetCanvasView: NSView {
         didSet {
             guard oldValue != petState else { return }
             syncBloubState()
-            if petState != .idle, petState != .miniIdle {
+            // Pointer-interaction states (hover peek, drag) are cursor
+            // affordances: the cursor is ON the pet by definition, so the
+            // tracking context survives them. Expressive states hand the
+            // eyes back to their own pose.
+            if petState != .idle, petState != .miniIdle, !petState.isPointerInteraction {
                 pointerKnown = false
                 updateBloubLook()
             }
@@ -139,6 +143,12 @@ public final class PetCanvasView: NSView {
     private var animationClock = PetAnimationClock()
     private var assetClock: TimeInterval { animationClock.time }
     private var pointerKnown = false
+    /// True while the last draw served a multi-frame theme asset: those run
+    /// on their own frame timeline and need the full animation frequency.
+    private var assetAnimationActive = false
+    /// 1 when the cursor rests on the pet's body, 0 when it is elsewhere;
+    /// pulls the tracking gaze straight to the viewer across the ball.
+    private var pointerForward: CGFloat = 0
     private static let maxAssetDimension = 512
     private static let maxAnimationBytes = 64 * 1024 * 1024
     private static let maxAssetCacheBytes = 96 * 1024 * 1024
@@ -189,17 +199,27 @@ public final class PetCanvasView: NSView {
     /// simply stop feeding targets and recover theirs.
     private func updateBloubLook() {
         let tracking = theme.supportsEyeTracking
-            && (petState == .idle || petState == .miniIdle)
+            && (petState == .idle || petState == .miniIdle || petState == .miniPeek)
             && pointerKnown
         if tracking {
-            let gaze = BloubMotion.targetGaze(forPointerOffset: pointerOffset)
+            // pointerOffset is the upstream `Aim`: normalized x (right
+            // positive) and y (down positive) in -1...1. `targetGaze` turns
+            // it into the same absolute head angles as the original. With the
+            // cursor on the body, the gaze glides straight to the viewer
+            // (yaw and pitch to zero) instead of holding the cone's stance.
+            let gaze = BloubMotion.targetGaze(
+                normalizedX: Double(pointerOffset.x),
+                normalizedY: Double(pointerOffset.y)
+            )
+            let forward = CGFloat(pointerForward)
             bloubEngine.setLook(
                 BloubLook(
-                    yaw: CGFloat(gaze.yaw),
-                    pitch: CGFloat(gaze.pitch),
+                    yaw: CGFloat(gaze.yaw) * (1 - forward),
+                    pitch: CGFloat(gaze.pitch) * (1 - forward),
                     mix: 1,
                     spin: 0,
-                    wander: 0
+                    wander: 0,
+                    roll: 0
                 ),
                 at: assetClock
             )
@@ -254,6 +274,15 @@ public final class PetCanvasView: NSView {
         needsDisplay = true
     }
 
+    /// True when the next frame only differs through the slow rest life
+    /// (drift, breath, blink calendar) and no theme asset animation is
+    /// playing: the render driver may drop to its idle frequency. The
+    /// reference video itself rests at ~10 fps with one-to-two-frame blinks,
+    /// so a low idle clock stays faithful to bloub's motion language.
+    public var isResting: Bool {
+        bloubEngine.isSettled(at: assetClock) && !assetAnimationActive
+    }
+
     /// Flush a state transition before a transparent panel is moved or
     /// another interaction event arrives. This keeps stale pixels out of the
     /// window backing surface instead of waiting for AppKit's next run-loop
@@ -265,14 +294,41 @@ public final class PetCanvasView: NSView {
     }
 
     public func setPointerLocation(_ point: NSPoint) {
-        guard theme.supportsEyeTracking, (petState == .idle || petState == .miniIdle) else {
+        guard theme.supportsEyeTracking,
+              (petState == .idle || petState == .miniIdle || petState == .miniPeek) else {
             if pointerOffset != .zero { pointerOffset = .zero }
             return
         }
-        let windowPoint = window?.convertFromScreen(NSRect(origin: point, size: .zero)).origin ?? point
-        let local = convert(windowPoint, from: nil)
+        guard let window else { return }
+        // The rule normalizes against half the screen, not the pet window:
+        // the gaze must saturate when the cursor reaches the screen edge,
+        // wherever the pet sits (upstream divides by half the browser
+        // window). `point` and `convertToScreen` are both AppKit screen
+        // coordinates (y grows upward).
+        let petRect = window.convertToScreen(bounds)
+        let screenFrame = window.screen?.frame
+            ?? NSScreen.screens.first(where: { $0.frame.contains(point) })?.frame
+            ?? NSScreen.main?.frame
+            ?? NSRect(x: 0, y: 0, width: 1, height: 1)
         pointerKnown = true
-        pointerOffset = PetPointerMapper.offset(for: local, in: bounds)
+        let newOffset = PetPointerMapper.gazeOffset(
+            petCenter: CGPoint(x: petRect.midX, y: petRect.midY),
+            cursor: point,
+            screenSize: screenFrame.size
+        )
+        // The forward zone is the ball itself, not the whole window: cursor
+        // on the body makes the eyes rush to the front (look at the viewer).
+        let ballRect = petRect.insetBy(
+            dx: petRect.width * 0.18,
+            dy: petRect.height * 0.18
+        )
+        let newForward = PetPointerMapper.forwardFactor(petRect: ballRect, cursor: point)
+        // A resting cursor must not churn the engine: re-posing the look
+        // target every poll would keep the gaze catch-up alive forever and
+        // the pet would never settle into its idle cadence.
+        guard newOffset != pointerOffset || newForward != pointerForward else { return }
+        pointerOffset = newOffset
+        pointerForward = newForward
     }
 
     public override func draw(_ dirtyRect: NSRect) {
@@ -300,6 +356,7 @@ public final class PetCanvasView: NSView {
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
 
+        assetAnimationActive = false
         if !petState.isPointerInteraction, drawCustomAsset(in: context) {
             context.restoreGState()
             return
@@ -318,6 +375,9 @@ public final class PetCanvasView: NSView {
         ),
               let animation = loadAsset(at: url),
               !animation.frames.isEmpty else { return false }
+        // Multi-frame assets run on their own timeline and need the full
+        // animation frequency; a single static frame does not.
+        assetAnimationActive = animation.frames.count > 1
         let frame = currentFrame(in: animation)
         let width = CGFloat(frame.width)
         let height = CGFloat(frame.height)
@@ -502,10 +562,11 @@ public final class PetCanvasView: NSView {
         context.saveGState()
         context.translateBy(x: bounds.midX, y: bounds.midY)
         context.scaleBy(x: viewScale, y: viewScale)
-        // The canvas flip leaves a y-up space; the engine speaks y-down, so
-        // flip once more around the ball centre. Engine geometry can then be
-        // drawn verbatim — no per-component sign tracking.
-        context.scaleBy(x: 1, y: -1)
+        // After the canvas flip the context is y-down from the top edge — the
+        // same handedness the engine speaks — so engine geometry is drawn
+        // verbatim with no per-component sign tracking. (Verified against the
+        // live display path: the production context CTM is the identity, so
+        // the early flip is the only handedness change on this stack.)
 
         // Orbit depth: back half of every arc first, so the body occludes it.
         for arc in frame.arcs {
