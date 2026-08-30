@@ -108,6 +108,22 @@ public enum PermissionMode: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public enum PermissionBubbleCorner: String, CaseIterable, Codable, Sendable {
+    case topLeft = "top-left"
+    case topRight = "top-right"
+    case bottomLeft = "bottom-left"
+    case bottomRight = "bottom-right"
+
+    public var displayName: String {
+        switch self {
+        case .topLeft: return "Top left"
+        case .topRight: return "Top right"
+        case .bottomLeft: return "Bottom left"
+        case .bottomRight: return "Bottom right"
+        }
+    }
+}
+
 public struct QuestionOption: Equatable, Sendable, Identifiable {
     public let id: String
     public let label: String
@@ -186,6 +202,10 @@ public struct AgentEvent: Equatable, Sendable {
     public var folder: String?
     public var terminalPID: Int?
     public var subagentCount: Int
+    public var backgroundTasksCount: Int?
+    public var backgroundSubagentCount: Int?
+    public var sessionCronsCount: Int?
+    public var stopHookActive: Bool
     public var permission: PermissionRequest?
     public var question: QuestionPrompt?
     public var quota: QuotaReport?
@@ -210,6 +230,10 @@ public struct AgentEvent: Equatable, Sendable {
         folder: String? = nil,
         terminalPID: Int? = nil,
         subagentCount: Int = 0,
+        backgroundTasksCount: Int? = nil,
+        backgroundSubagentCount: Int? = nil,
+        sessionCronsCount: Int? = nil,
+        stopHookActive: Bool = false,
         permission: PermissionRequest? = nil,
         question: QuestionPrompt? = nil,
         quota: QuotaReport? = nil,
@@ -233,6 +257,10 @@ public struct AgentEvent: Equatable, Sendable {
         self.folder = folder
         self.terminalPID = terminalPID
         self.subagentCount = max(0, subagentCount)
+        self.backgroundTasksCount = backgroundTasksCount.map { max(0, $0) }
+        self.backgroundSubagentCount = backgroundSubagentCount.map { max(0, $0) }
+        self.sessionCronsCount = sessionCronsCount.map { max(0, $0) }
+        self.stopHookActive = stopHookActive
         self.permission = permission
         self.question = question
         self.quota = quota

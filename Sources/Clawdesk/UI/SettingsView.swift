@@ -251,6 +251,20 @@ private struct AgentSettingsView: View {
                             Text(agent.detail).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        if agent.permissionApproval {
+                            Toggle(model.preferences.text("Show pop-up bubbles"), isOn: Binding(
+                                get: { !model.preferences.permissionBubbleDisabledAgentIDs.contains(agent.id) },
+                                set: { enabled in
+                                    if enabled {
+                                        model.preferences.permissionBubbleDisabledAgentIDs.remove(agent.id)
+                                    } else {
+                                        model.preferences.permissionBubbleDisabledAgentIDs.insert(agent.id)
+                                    }
+                                }
+                            ))
+                            .labelsHidden()
+                            .help(model.preferences.text("Show pop-up bubbles"))
+                        }
                         if HookInstaller.supportedAgentIDs.contains(agent.id) {
                             HStack(spacing: 6) {
                                 Button(model.agentInstallStatus[agent.id] == nil ? model.preferences.text("Install") : model.preferences.text("Re-sync")) {
@@ -308,6 +322,14 @@ private struct PermissionSettingsView: View {
                     }
                 }
                 Toggle(model.preferences.text("Show pop-up bubbles"), isOn: $model.preferences.showPermissionBubbles)
+                Toggle(model.preferences.text("Follow the pet"), isOn: $model.preferences.permissionBubbleFollowsPet)
+                    .disabled(!model.preferences.showPermissionBubbles)
+                Picker(model.preferences.text("Fixed corner"), selection: $model.preferences.permissionBubbleCorner) {
+                    ForEach(PermissionBubbleCorner.allCases, id: \.self) { corner in
+                        Text(model.preferences.text(corner.displayName)).tag(corner)
+                    }
+                }
+                .disabled(!model.preferences.showPermissionBubbles || model.preferences.permissionBubbleFollowsPet)
             } header: {
                 Text(model.preferences.text("Local approval"))
             } footer: {

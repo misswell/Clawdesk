@@ -39,6 +39,9 @@ public final class AppPreferences: ObservableObject {
     @Published public var permissionMode: PermissionMode { didSet { persist() } }
     @Published public var permissionAutomation: PermissionAutomation { didSet { persist() } }
     @Published public var showPermissionBubbles: Bool { didSet { persist() } }
+    @Published public var permissionBubbleFollowsPet: Bool { didSet { persist() } }
+    @Published public var permissionBubbleCorner: PermissionBubbleCorner { didSet { persist() } }
+    @Published public var permissionBubbleDisabledAgentIDs: Set<String> { didSet { persist() } }
     @Published public var serverPort: UInt16 { didSet { persist() } }
     @Published public var mobileEnabled: Bool { didSet { persist() } }
     @Published public var mobilePort: UInt16 { didSet { persist() } }
@@ -87,6 +90,11 @@ public final class AppPreferences: ObservableObject {
         permissionMode = PermissionMode(rawValue: defaults.string(forKey: "permissionMode") ?? "ask-every-time") ?? .askEveryTime
         permissionAutomation = PermissionAutomation(rawValue: defaults.string(forKey: "permissionAutomation") ?? "") ?? .off
         showPermissionBubbles = defaults.object(forKey: "showPermissionBubbles") as? Bool ?? true
+        permissionBubbleFollowsPet = defaults.bool(forKey: "permissionBubbleFollowsPet")
+        permissionBubbleCorner = PermissionBubbleCorner(
+            rawValue: defaults.string(forKey: "permissionBubbleCorner") ?? "bottom-right"
+        ) ?? .bottomRight
+        permissionBubbleDisabledAgentIDs = Set(defaults.stringArray(forKey: "permissionBubbleDisabledAgentIDs") ?? [])
         serverPort = UInt16(defaults.integer(forKey: "serverPort")) == 0 ? 37777 : UInt16(defaults.integer(forKey: "serverPort"))
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
@@ -216,6 +224,9 @@ public final class AppPreferences: ObservableObject {
         defaults.set(permissionMode.rawValue, forKey: "permissionMode")
         defaults.set(permissionAutomation.rawValue, forKey: "permissionAutomation")
         defaults.set(showPermissionBubbles, forKey: "showPermissionBubbles")
+        defaults.set(permissionBubbleFollowsPet, forKey: "permissionBubbleFollowsPet")
+        defaults.set(permissionBubbleCorner.rawValue, forKey: "permissionBubbleCorner")
+        defaults.set(Array(permissionBubbleDisabledAgentIDs).sorted(), forKey: "permissionBubbleDisabledAgentIDs")
         defaults.set(Int(serverPort), forKey: "serverPort")
         defaults.set(mobileEnabled, forKey: "mobileEnabled")
         defaults.set(Int(mobilePort), forKey: "mobilePort")

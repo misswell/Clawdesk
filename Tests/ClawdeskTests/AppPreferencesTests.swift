@@ -81,6 +81,23 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(reloaded.permissionAutomation, .autoTools)
     }
 
+    func testPermissionBubblePlacementDefaultsAndPersists() {
+        let suite = "clawdesk-bubble-placement-\(UUID().uuidString)"
+        let prefs = makePreferences(suite: suite)
+        XCTAssertFalse(prefs.permissionBubbleFollowsPet)
+        XCTAssertEqual(prefs.permissionBubbleCorner, .bottomRight)
+
+        prefs.permissionBubbleFollowsPet = true
+        prefs.permissionBubbleCorner = .topLeft
+        prefs.permissionBubbleDisabledAgentIDs = ["codex", "claude-code"]
+
+        let defaults = UserDefaults(suiteName: suite)!
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertTrue(reloaded.permissionBubbleFollowsPet)
+        XCTAssertEqual(reloaded.permissionBubbleCorner, .topLeft)
+        XCTAssertEqual(reloaded.permissionBubbleDisabledAgentIDs, ["claude-code", "codex"])
+    }
+
     func testEnabledAgentIDsPersistAsSortedUserDefaultsValues() {
         let suite = "clawdesk-enabled-agents-\(UUID().uuidString)"
         let prefs = makePreferences(suite: suite)

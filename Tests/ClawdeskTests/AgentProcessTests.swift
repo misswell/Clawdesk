@@ -91,6 +91,32 @@ final class AgentProcessTests: XCTestCase {
         XCTAssertNil(store2.pruneStale())
     }
 
+    func testCodexActiveSilenceUsesIndependentTimeoutAndSettlesBeforeIdleCleanup() {
+        let store = SessionStore()
+        let started = Date(timeIntervalSince1970: 1_000)
+        _ = store.apply(AgentEvent(
+            sessionID: "codex-live",
+            agentID: "codex",
+            eventName: "UserPromptSubmit",
+            timestamp: started
+        ))
+
+        XCTAssertNil(store.pruneStale(
+            now: started.addingTimeInterval(16 * 60),
+            olderThan: 15 * 60,
+            codexActiveTimeout: 20 * 60
+        ))
+        XCTAssertEqual(store.sessions.first?.state, .thinking)
+
+        let settled = store.pruneStale(
+            now: started.addingTimeInterval(20 * 60),
+            olderThan: 15 * 60,
+            codexActiveTimeout: 20 * 60
+        )
+        XCTAssertEqual(settled?.sessions.first?.state, .idle)
+        XCTAssertEqual(settled?.sessions.first?.lastActivity, started.addingTimeInterval(20 * 60))
+    }
+
     // MARK: - startup recovery state machine
 
     @MainActor

@@ -275,7 +275,9 @@ public final class ClawdeskModel: ObservableObject {
                     self?.resolvePermission(id: request.id, decision: decision)
                 }
             }
-            if preferences.showPermissionBubbles {
+            let localBubbleEnabled = preferences.showPermissionBubbles
+                && !preferences.permissionBubbleDisabledAgentIDs.contains(request.agentID)
+            if localBubbleEnabled {
                 if !pendingPermissions.contains(where: { $0.id == request.id }) {
                     pendingPermissions.append(request)
                 }

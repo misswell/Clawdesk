@@ -76,7 +76,18 @@ public final class SessionStore {
         let liveCountAfter = liveCountBefore + (existing == nil ? 1 : 0)
         var mappingEvent = event
         let stoppingSubagent = isSubagentStop(event.eventName)
-        mappingEvent.subagentCount = stoppingSubagent ? event.subagentCount : max(event.subagentCount, existing?.subagentCount ?? 0)
+        let authoritativeBackgroundSubagents = event.backgroundSubagentCount
+        let effectiveSubagentCount = authoritativeBackgroundSubagents
+            ?? (stoppingSubagent ? event.subagentCount : max(event.subagentCount, existing?.subagentCount ?? 0))
+        mappingEvent.subagentCount = effectiveSubagentCount
+        let holdingClaudeStop = isClaudeMainStop(event)
+            && ((event.backgroundTasksCount ?? 0) > 0
+                || (event.backgroundSubagentCount ?? 0) > 0
+                || (event.sessionCronsCount ?? 0) > 0
+                || event.stopHookActive)
+        if holdingClaudeStop {
+            mappingEvent.stateHint = effectiveSubagentCount > 0 ? .juggling : .typing
+        }
         let mapped = EventStateMapper.preservesVisibleState(for: mappingEvent)
             ? (existing?.state ?? .idle)
             : EventStateMapper.state(for: mappingEvent, liveSessionCount: max(1, liveCountAfter))
@@ -95,14 +106,17 @@ public final class SessionStore {
         recent.append(event.eventName)
         if recent.count > 12 { recent.removeFirst(recent.count - 12) }
 
-        let title = event.title ?? existing?.title ?? defaultTitle(for: event.agentID)
+        let normalizedAgent = event.agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let title = normalizedAgent == "traecode"
+            ? (existing?.title ?? event.title ?? defaultTitle(for: event.agentID))
+            : (event.title ?? existing?.title ?? defaultTitle(for: event.agentID))
         let snapshot = SessionSnapshot(
             id: event.sessionID,
             agentID: event.agentID,
             title: title,
             folder: event.folder ?? existing?.folder,
             state: mapped,
-            subagentCount: stoppingSubagent ? event.subagentCount : max(event.subagentCount, existing?.subagentCount ?? 0),
+            subagentCount: effectiveSubagentCount,
             lastEvent: event.eventName,
             lastActivity: event.timestamp,
             terminalPID: event.terminalPID ?? existing?.terminalPID,
@@ -149,19 +163,32 @@ public final class SessionStore {
     public func pruneStale(
         now: Date = .now,
         olderThan interval: TimeInterval = 15 * 60,
+        codexActiveTimeout: TimeInterval = 20 * 60,
         isProcessAlive: ((Int32) -> Bool)? = nil
     ) -> StateTransition? {
-        let staleIDs = sessionsByID.values
-            .filter { session in
-                if now.timeIntervalSince(session.lastActivity) >= interval { return true }
-                if let pid = session.terminalPID, let alive = isProcessAlive,
-                   pid > 0, !alive(Int32(clamping: pid)) {
-                    return true
-                }
-                return false
+        var staleIDs: [String] = []
+        var changed = false
+        for (id, var session) in sessionsByID {
+            if let pid = session.terminalPID, let alive = isProcessAlive,
+               pid > 0, !alive(Int32(clamping: pid)) {
+                staleIDs.append(id)
+                continue
             }
-            .map(\.id)
-        guard !staleIDs.isEmpty else { return nil }
+            let age = now.timeIntervalSince(session.lastActivity)
+            let agent = session.agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let codexActive = (agent == "codex" || agent == "codex-cli")
+                && [.thinking, .typing, .building, .juggling, .sweeping, .carrying, .notification].contains(session.state)
+            if codexActive {
+                guard codexActiveTimeout > 0, age >= codexActiveTimeout else { continue }
+                session.state = .idle
+                session.lastActivity = now
+                sessionsByID[id] = session
+                changed = true
+                continue
+            }
+            if age >= interval { staleIDs.append(id) }
+        }
+        guard changed || !staleIDs.isEmpty else { return nil }
         for id in staleIDs { sessionsByID.removeValue(forKey: id) }
         return StateTransition(state: aggregateState(), sessions: sessions)
     }
@@ -208,6 +235,12 @@ public final class SessionStore {
     private func isSubagentStop(_ name: String) -> Bool {
         let normalized = name.lowercased().replacingOccurrences(of: "_", with: "").replacingOccurrences(of: "-", with: "")
         return normalized == "subagentstop" || normalized == "subagentstopped"
+    }
+
+    private func isClaudeMainStop(_ event: AgentEvent) -> Bool {
+        let agent = event.agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let name = event.eventName.lowercased().replacingOccurrences(of: "_", with: "").replacingOccurrences(of: "-", with: "")
+        return (agent == "claude" || agent == "claude-code") && name == "stop"
     }
 
     private func defaultTitle(for agentID: String) -> String {
