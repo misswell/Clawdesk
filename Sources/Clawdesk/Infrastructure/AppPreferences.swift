@@ -55,6 +55,9 @@ public final class AppPreferences: ObservableObject {
     /// from versions before this preference remain repairable.
     @Published public var enabledAgentIDs: Set<String> { didSet { persist() } }
     @Published public var windowOrigin: CGPoint? { didSet { persist() } }
+    /// The normal-mode position, parked while mini mode docks the pet so a
+    /// mini round-trip does not lose where the user left it.
+    @Published public var preMiniWindowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
     /// Bloub customizer choices (body shape, colour, resting expression).
     @Published public var bloubAppearance: BloubAppearance { didSet { persist() } }
@@ -107,6 +110,11 @@ public final class AppPreferences: ObservableObject {
             windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
         } else {
             windowOrigin = nil
+        }
+        if defaults.object(forKey: "preMiniX") != nil, defaults.object(forKey: "preMiniY") != nil {
+            preMiniWindowOrigin = CGPoint(x: defaults.double(forKey: "preMiniX"), y: defaults.double(forKey: "preMiniY"))
+        } else {
+            preMiniWindowOrigin = nil
         }
         customThemes = Self.loadCustomThemes(from: customThemesDirectory)
         isLoading = false
@@ -230,6 +238,13 @@ public final class AppPreferences: ObservableObject {
         } else {
             defaults.removeObject(forKey: "windowX")
             defaults.removeObject(forKey: "windowY")
+        }
+        if let preMiniWindowOrigin {
+            defaults.set(preMiniWindowOrigin.x, forKey: "preMiniX")
+            defaults.set(preMiniWindowOrigin.y, forKey: "preMiniY")
+        } else {
+            defaults.removeObject(forKey: "preMiniX")
+            defaults.removeObject(forKey: "preMiniY")
         }
     }
 

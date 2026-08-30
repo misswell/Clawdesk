@@ -72,6 +72,12 @@ public struct BloubStateDefinition: Sendable {
     /// True when the state wears the resting face (replaceable by a
     /// customizer expression). Only `idle` and `swirl`.
     public let baseFace: Bool
+    /// Local time after which the state's own animation is visually done and
+    /// only the rest life (drift, breath, blink calendar) remains. The render
+    /// driver uses this to drop to a low idle frequency (architecture rule:
+    /// idle never means a permanent 60 FPS clock). `nil` = the state loops
+    /// forever and never settles.
+    public let settlesAt: TimeInterval?
     public let pose: @Sendable (CGFloat) -> BloubPose
 
     public init(
@@ -82,6 +88,7 @@ public struct BloubStateDefinition: Sendable {
         blinkIn: Bool,
         baseBody: Bool,
         baseFace: Bool,
+        settlesAt: TimeInterval? = nil,
         pose: @escaping @Sendable (CGFloat) -> BloubPose
     ) {
         self.id = id
@@ -91,6 +98,7 @@ public struct BloubStateDefinition: Sendable {
         self.blinkIn = blinkIn
         self.baseBody = baseBody
         self.baseFace = baseFace
+        self.settlesAt = settlesAt
         self.pose = pose
     }
 }
@@ -202,7 +210,8 @@ public enum BloubStates {
             morph: 0.45,
             blinkIn: false,
             baseBody: true,
-            baseFace: true
+            baseFace: true,
+            settlesAt: 0,  // static pose
         ) { _ in BloubPose() },
 
         .thinking: BloubStateDefinition(
@@ -211,7 +220,8 @@ public enum BloubStates {
             morph: 0.4,
             blinkIn: true,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: nil,  // pulse loops forever
         ) { t in
             let mid = dotPulse(t, 1)
             // The side dots emerge from the ball's flanks: on the video they
@@ -242,7 +252,8 @@ public enum BloubStates {
             morph: 0.3,
             blinkIn: true,
             baseBody: true,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0,  // static pose
         ) { _ in
             var pose = BloubPose()
             pose.gaze = BloubGaze(yaw: -5.37, pitch: 4.55, roll: 6.7)
@@ -262,7 +273,8 @@ public enum BloubStates {
             morph: 0.55,
             blinkIn: true,
             baseBody: true,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0,  // static pose
         ) { _ in
             var pose = BloubPose()
             pose.gaze = BloubGaze(yaw: 6.92, pitch: -21.96, roll: 11.6)
@@ -278,7 +290,8 @@ public enum BloubStates {
             morph: 0.45,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 2.1,  // the ! is back in place; the 0.005R buzz is sub-pixel
         ) { t in
             // Measured run: -0.087 -> +0.732 in 1.5 s, ease-in-out,
             // micro-overshoot; the "!" is back in place at 1.6 + 0.4.
@@ -316,7 +329,8 @@ public enum BloubStates {
             morph: 0.5,
             blinkIn: true,
             baseBody: true,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0.5,  // badge pop settled
         ) { t in
             // Blue badge pop: peaks at +14 % around 0.3 s then stabilises.
             let p = BloubEase.clamp01(t / 0.45)
@@ -343,7 +357,8 @@ public enum BloubStates {
             morph: 0.45,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0,  // static pose
         ) { _ in
             var pose = BloubPose()
             pose.body = BloubBody(
@@ -361,7 +376,8 @@ public enum BloubStates {
             morph: 0.5,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: nil,  // bounce loops forever
         ) { t in
             var pose = BloubPose()
             // Measured vertical bounce: ±0.19 around +0.11, period 0.6 s.
@@ -379,7 +395,8 @@ public enum BloubStates {
             morph: 0.4,
             blinkIn: true,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0,  // static pose
         ) { _ in
             var pose = BloubPose()
             pose.body = BloubBody(profile: BloubProfileFixture.egg)
@@ -396,7 +413,8 @@ public enum BloubStates {
             morph: 0.4,
             blinkIn: true,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 0,  // static pose
         ) { _ in
             var pose = BloubPose()
             pose.body = BloubBody(profile: BloubProfileFixture.hexagon)
@@ -412,7 +430,8 @@ public enum BloubStates {
             morph: 0.5,
             blinkIn: true,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 2.3,  // bouquet faded
         ) { t in
             // The triangle stays nearly still while the bouquet crosses it.
             let fade = BloubEase.clamp01(t / 0.35) * BloubEase.clamp01((2.2 - t) / 0.5)
@@ -445,7 +464,8 @@ public enum BloubStates {
             morph: 0.6,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 4.6,  // rings gone
         ) { t in
             // Measured rotation: ramp over 0.35 s then 1.25 turns/s
             // (counter-clockwise).
@@ -495,7 +515,8 @@ public enum BloubStates {
             morph: 0.3,
             blinkIn: true,
             baseBody: true,
-            baseFace: true
+            baseFace: true,
+            settlesAt: 1.3,  // rings gone
         ) { t in
             var pose = BloubPose()
             // Three rings out of orbit's six: half the bouquet is enough to
@@ -521,7 +542,8 @@ public enum BloubStates {
             morph: 0.4,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 2.5,  // core regrown
         ) { t in
             // Measured collapse: 1.0 -> 0.166 in 0.7 s, ease-out, no bounce.
             let collapse = 1 - 0.834 * BloubEase.easeOutQuint(BloubEase.clamp01(t / 0.7))
@@ -541,7 +563,8 @@ public enum BloubStates {
             morph: 0.45,
             blinkIn: false,
             baseBody: false,
-            baseFace: false
+            baseFace: false,
+            settlesAt: 2.6,  // dot regrown
         ) { t in
             let collapse = 1 - (1 - BloubDecor.cometDot) * BloubEase.easeOutQuint(BloubEase.clamp01(t / 0.55))
             let regrow = BloubEase.easeOutQuint(BloubEase.clamp01((t - 1.85) / 0.6))

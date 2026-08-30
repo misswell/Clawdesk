@@ -122,7 +122,8 @@ final class BloubGazeTests: XCTestCase {
 
     func testPointerTargetMovesTheHead() {
         let engine = BloubEngine(radius: 100, initial: .idle)
-        let gaze = BloubMotion.targetGaze(forPointerOffset: CGPoint(x: 5, y: 0))
+        // Cursor fully to the right (nx = 1): yaw +16 — the head turns right.
+        let gaze = BloubMotion.targetGaze(normalizedX: 1, normalizedY: 0)
         engine.setLook(
             BloubLook(yaw: CGFloat(gaze.yaw), pitch: CGFloat(gaze.pitch), mix: 1, spin: 0, wander: 0),
             at: 0

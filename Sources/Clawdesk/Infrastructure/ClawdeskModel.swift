@@ -36,6 +36,52 @@ public final class ClawdeskModel: ObservableObject {
     private var kimiGateOrder: [String: [String]] = [:]
     var lastPointerActivity = Date.now
     var dozingSince: Date?
+
+    // MARK: Startup recovery (upstream parity: a restart while a supported
+    // CLI is running must not collapse into sleep before any hook fires)
+
+    /// Injectable for tests; the production value shells out to `ps`.
+    var agentRunningProbe: @Sendable () -> Bool = { AgentProcessProbe.isAnySupportedAgentRunning() }
+    private(set) var startupRecoveryActive = false
+    private var startupRecoveryDeadline: Date?
+    private var lastStartupProbeAt: Date?
+    /// Upstream caps the recovery window at five minutes: a wedged probe can
+    /// keep the pet awake no longer than that.
+    private let startupRecoveryWindow: TimeInterval = 300
+    private let startupProbeInterval: TimeInterval = 10
+
+    func beginStartupRecovery() {
+        startupRecoveryActive = true
+        startupRecoveryDeadline = .now.addingTimeInterval(startupRecoveryWindow)
+        lastStartupProbeAt = nil
+    }
+
+    func endStartupRecovery() {
+        startupRecoveryActive = false
+        startupRecoveryDeadline = nil
+        lastStartupProbeAt = nil
+    }
+
+    /// Re-probes while no session has claimed the pet yet: agents still
+    /// running keeps recovery on; an empty probe ends it early. Real session
+    /// events cancel it in `apply`.
+    func tickStartupRecovery(now: Date = .now) {
+        guard startupRecoveryActive else { return }
+        if !sessions.isEmpty || now >= (startupRecoveryDeadline ?? now) {
+            endStartupRecovery()
+            return
+        }
+        if let last = lastStartupProbeAt, now.timeIntervalSince(last) < startupProbeInterval {
+            return
+        }
+        lastStartupProbeAt = now
+        let probe = agentRunningProbe
+        Task { @MainActor [weak self] in
+            let found = await Task.detached(priority: .utility) { probe() }.value
+            guard let self, self.startupRecoveryActive, self.sessions.isEmpty else { return }
+            if found { self.lastPointerActivity = .now } else { self.endStartupRecovery() }
+        }
+    }
     private var sleepPhaseStartedAt: Date?
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
@@ -105,6 +151,7 @@ public final class ClawdeskModel: ObservableObject {
 
     public func start() {
         eventServer.start()
+        beginStartupRecovery()
         if preferences.mobileEnabled { mobileBridge.start() }
         codexLogMonitor.onEvent = { [weak self] event in self?.accept(event) }
         codexLogMonitor.start()
@@ -327,6 +374,14 @@ public final class ClawdeskModel: ObservableObject {
 
     public func tickForSleep(now: Date = .now) -> Bool {
         guard !preferences.doNotDisturb else { return false }
+        if startupRecoveryActive {
+            // A supported CLI is running but no hook has fired yet — hold the
+            // sleep clock so the pet stays awake (upstream startup recovery).
+            if let deadline = startupRecoveryDeadline, now >= deadline {
+                endStartupRecovery()
+            }
+            return false
+        }
         let transition = SleepSequencePlanner.next(
             state: petState,
             now: now,
@@ -360,8 +415,15 @@ public final class ClawdeskModel: ObservableObject {
         return true
     }
 
+    /// `kill(pid, 0)` semantics: exists (or is owned by another user), or not.
+    nonisolated static func isProcessAlive(_ pid: Int32) -> Bool {
+        guard pid > 0 else { return false }
+        return kill(pid, 0) == 0 || errno == EPERM
+    }
+
     public func tickForMaintenance() {
-        if let transition = sessionStore.pruneStale() {
+        tickStartupRecovery()
+        if let transition = sessionStore.pruneStale(isProcessAlive: Self.isProcessAlive) {
             sessions = transition.sessions
             publishSnapshot(state: transition.state, sessions: transition.sessions)
             if !preferences.doNotDisturb, !petState.isSleepSequence { petState = transition.state }
@@ -376,7 +438,10 @@ public final class ClawdeskModel: ObservableObject {
             .replacingOccurrences(of: "_", with: "")
             .replacingOccurrences(of: "-", with: "")
         let metadataOnly = event.metadataOnly || normalizedEvent == "quotaupdate"
-        if !metadataOnly { resetSleepSequence() }
+        if !metadataOnly {
+            resetSleepSequence()
+            if startupRecoveryActive { endStartupRecovery() }
+        }
         if let quota = event.quota {
             quotaReports = quotaStore.apply(quota)
         }

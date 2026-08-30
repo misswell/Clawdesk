@@ -70,6 +70,54 @@ final class PetInteractionTests: XCTestCase {
     }
 
     @MainActor
+    func testHoverPeekKeepsPointerTracking() throws {
+        // Regression: hovering the pet flips it to mini-peek, and the peek
+        // used to kill pointer tracking — the eyes snapped to the resting
+        // pose until clicked. The peek is a pointer-over state: tracking and
+        // the forward gaze must survive it.
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 240),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        panel.contentView = view
+        view.petState = .miniIdle
+        view.theme = ThemeCatalog.theme(id: "pinch")
+
+        view.setPointerLocation(NSPoint(x: 800, y: 800))
+        let trackedOffset = view.pointerOffset
+        XCTAssertNotEqual(trackedOffset, .zero)
+
+        view.petState = .miniPeek
+        view.setPointerLocation(NSPoint(x: 900, y: 700))
+        XCTAssertNotEqual(view.pointerOffset, trackedOffset, "peek must keep updating the gaze")
+    }
+
+    func testForwardFactorPeaksAtBallCentreAndFallsToZeroAtTheEdge() {
+        let ball = CGRect(x: 0, y: 0, width: 100, height: 100)
+        XCTAssertEqual(
+            PetPointerMapper.forwardFactor(petRect: ball, cursor: CGPoint(x: 50, y: 50)),
+            1, accuracy: 0.001
+        )
+        // Halfway to the edge: half of the pull to the front.
+        XCTAssertEqual(
+            PetPointerMapper.forwardFactor(petRect: ball, cursor: CGPoint(x: 75, y: 50)),
+            0.5, accuracy: 0.001
+        )
+        XCTAssertEqual(
+            PetPointerMapper.forwardFactor(petRect: ball, cursor: CGPoint(x: 50, y: 100)),
+            0, accuracy: 0.001
+        )
+        // Beyond the edge clamps at zero — pure tracking out there.
+        XCTAssertEqual(
+            PetPointerMapper.forwardFactor(petRect: ball, cursor: CGPoint(x: 250, y: -150)),
+            0, accuracy: 0.001
+        )
+    }
+
+    @MainActor
     func testScreenPointerLocationMovesIdleEyesThroughWindowCoordinates() {
         let viewFrame = NSRect(x: 0, y: 0, width: 240, height: 240)
         let view = PetCanvasView(frame: viewFrame)
@@ -84,10 +132,13 @@ final class PetInteractionTests: XCTestCase {
         view.petState = .idle
         view.theme = ThemeCatalog.theme(id: "pinch")
 
-        view.setPointerLocation(NSPoint(x: 720, y: 520))
+        // Screen point below-right of the window centre (AppKit y grows up).
+        view.setPointerLocation(NSPoint(x: 720, y: 320))
 
         XCTAssertGreaterThan(view.pointerOffset.x, 0)
         XCTAssertGreaterThan(view.pointerOffset.y, 0)
+        XCTAssertLessThanOrEqual(view.pointerOffset.x, 1)
+        XCTAssertLessThanOrEqual(view.pointerOffset.y, 1)
     }
 
     func testDragAnchorUsesStableScreenDelta() {
@@ -100,18 +151,44 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertEqual(anchor.windowOrigin(for: CGPoint(x: 180, y: 300)), CGPoint(x: 160, y: 260))
     }
 
-    func testPointerOffsetFollowsCursorAndClampsAtPetEdges() {
-        let bounds = CGRect(x: 0, y: 0, width: 240, height: 240)
+    func testGazeOffsetNormalizesAgainstHalfTheScreen() {
+        // Upstream rule: the offset divides by half the screen extents and
+        // clamps, saturating exactly at the screen edge. Screen coords grow
+        // upward; the returned offset is screen-convention (y down positive).
+        let center = CGPoint(x: 756, y: 495)
+        let size = CGSize(width: 1512, height: 982)
 
-        XCTAssertEqual(PetPointerMapper.offset(for: CGPoint(x: 120, y: 120), in: bounds), .zero)
+        XCTAssertEqual(
+            PetPointerMapper.gazeOffset(petCenter: center, cursor: center, screenSize: size),
+            .zero
+        )
 
-        let rightAndAbove = PetPointerMapper.offset(for: CGPoint(x: 240, y: 240), in: bounds)
-        XCTAssertEqual(rightAndAbove.x, 5, accuracy: 0.001)
-        XCTAssertEqual(rightAndAbove.y, 4, accuracy: 0.001)
+        // Cursor below-right of the pet: positive on both axes.
+        let belowRight = PetPointerMapper.gazeOffset(
+            petCenter: center,
+            cursor: CGPoint(x: center.x + size.width / 2, y: center.y - size.height / 2),
+            screenSize: size
+        )
+        XCTAssertEqual(belowRight.x, 1, accuracy: 0.001)
+        XCTAssertEqual(belowRight.y, 1, accuracy: 0.001)
 
-        let leftAndBelow = PetPointerMapper.offset(for: CGPoint(x: 0, y: 0), in: bounds)
-        XCTAssertEqual(leftAndBelow.x, -5, accuracy: 0.001)
-        XCTAssertEqual(leftAndBelow.y, -4, accuracy: 0.001)
+        // Cursor above-left: negative on both axes.
+        let aboveLeft = PetPointerMapper.gazeOffset(
+            petCenter: center,
+            cursor: CGPoint(x: center.x - size.width / 2, y: center.y + size.height / 2),
+            screenSize: size
+        )
+        XCTAssertEqual(aboveLeft.x, -1, accuracy: 0.001)
+        XCTAssertEqual(aboveLeft.y, -1, accuracy: 0.001)
+
+        // Far beyond the screen clamps instead of extrapolating.
+        let clamped = PetPointerMapper.gazeOffset(
+            petCenter: center,
+            cursor: CGPoint(x: center.x + size.width * 10, y: center.y),
+            screenSize: size
+        )
+        XCTAssertEqual(clamped.x, 1, accuracy: 0.001)
+        XCTAssertEqual(clamped.y, 0, accuracy: 0.001)
     }
 
     func testBuiltInThemesExposeDistinctBloubBodyColors() {

@@ -9,6 +9,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private let quotaRing: QuotaRingWindowController
     private let sessionHUD: SessionHUDWindowController
     private var animationTimer: Timer?
+    /// True while the animation loop runs at its full frequency; false while
+    /// the pet is resting and the loop is throttled down.
+    private var animationTimerHigh = true
     private var pointerTimer: Timer?
     private var sleepTimer: Timer?
     private var roamTimer: Timer?
@@ -18,6 +21,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var isDragging = false
     private var dragAnchor: PetDragAnchor?
     private var isRoaming = false
+    private var arrivalTracker = SessionArrivalTracker()
     private var hoverRestoreTask: Task<Void, Never>?
     private var nextRoamDate = Date.distantPast
     private let roamFence = RoamFenceCoordinator()
@@ -80,6 +84,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         model.$sessions.sink { [weak self] sessions in
             self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
             self?.refreshSessionHUD()
+            self?.celebrateArrivals(in: sessions)
         }.store(in: &cancellables)
         model.preferences.$selectedThemeID.sink { [weak self] _ in
             self?.cancelIdleAnimation(resetCycle: true)
@@ -138,14 +143,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     public func start() {
         restorePosition()
         window?.orderFrontRegardless()
-        let animationFrequency = model.preferences.lowPowerAnimations ? 30.0 : 60.0
-        animationTimer = PetTimerScheduler.schedule(
-            interval: 1.0 / animationFrequency,
-            repeats: true
-        ) { [weak self] in
-            guard let self, !self.isDragging else { return }
-            self.petView.advanceFrame()
-        }
+        restartAnimationTimer()
+        model.preferences.$lowPowerAnimations.sink { [weak self] _ in
+            self?.restartAnimationTimer()
+        }.store(in: &cancellables)
         pointerTimer = PetTimerScheduler.schedule(
             interval: 1.0 / 60.0,
             repeats: true
@@ -157,7 +158,11 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             if self.model.lastPointerActivity != previousActivity {
                 self.cancelIdleAnimation(resetCycle: true)
             }
-            guard self.petView.petState == .idle || self.petView.petState == .miniIdle else { return }
+            // Hover peek is itself a pointer-over state: keep feeding the
+            // gaze so the eyes come to the front while hovered.
+            guard self.petView.petState == .idle
+                || self.petView.petState == .miniIdle
+                || self.petView.petState == .miniPeek else { return }
             self.petView.setPointerLocation(NSEvent.mouseLocation)
             if window.isVisible == false { window.orderFrontRegardless() }
         }
@@ -174,6 +179,40 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         ) { [weak self] in
             self?.checkRoam()
         }
+    }
+
+    /// Animation frequencies: full speed while anything discrete is animating
+    /// (state fades, tracking, decorations, theme asset timelines) and a low
+    /// idle cadence once the pet has settled — the frame then only changes
+    /// through bloub's slow rest life, and the reference video itself rests
+    /// at ~10 fps. Idle therefore never means a permanent 60 FPS clock.
+    private var animationFrequencies: (high: Double, idle: Double) {
+        model.preferences.lowPowerAnimations ? (30, 8) : (60, 12)
+    }
+
+    private func restartAnimationTimer() {
+        animationTimer?.invalidate()
+        let frequencies = animationFrequencies
+        let interval = 1.0 / (animationTimerHigh ? frequencies.high : frequencies.idle)
+        animationTimer = PetTimerScheduler.schedule(
+            interval: interval,
+            repeats: true
+        ) { [weak self] in
+            guard let self, !self.isDragging else { return }
+            self.petView.advanceFrame()
+            self.adaptAnimationFrequency()
+        }
+    }
+
+    /// Re-schedules the loop whenever the resting boundary is crossed. State
+    /// changes and pointer moves mark the engine unsettled, so the very next
+    /// tick brings the full frequency back; at idle cadence that reaction
+    /// costs at most one low-frequency tick.
+    private func adaptAnimationFrequency() {
+        let wantsHigh = !petView.isResting
+        guard wantsHigh != animationTimerHigh else { return }
+        animationTimerHigh = wantsHigh
+        restartAnimationTimer()
     }
 
     public func stop() {
@@ -194,15 +233,24 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func setMiniMode(_ enabled: Bool, animate: Bool) {
-        guard window != nil else { return }
+        guard let window else { return }
         cancelIdleAnimation(resetCycle: true)
         petView.miniMode = enabled
         if enabled {
+            // Park the normal-mode position: entering mini mode re-docks the
+            // pet, and leaving must bring it back where the user had it.
+            model.preferences.preMiniWindowOrigin = window.frame.origin
             sessionHUD.hide()
             moveToMiniEdge(animated: animate)
             if model.petState == .idle { setPetVisualState(.miniIdle) }
         } else {
-            moveBackFromMini()
+            if let parked = model.preferences.preMiniWindowOrigin {
+                window.setFrameOrigin(parked)
+                model.preferences.windowOrigin = parked
+                model.preferences.preMiniWindowOrigin = nil
+            } else {
+                moveBackFromMini()
+            }
             setPetVisualState(model.petState)
         }
     }
@@ -260,6 +308,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         isDragging = false
         dragAnchor = nil
         if shouldEnterMiniMode {
+            model.preferences.preMiniWindowOrigin = window?.frame.origin
+                ?? model.preferences.windowOrigin
             model.preferences.isMiniMode = true
         } else {
             model.preferences.windowOrigin = window?.frame.origin
@@ -271,6 +321,15 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var shouldEnterMiniMode: Bool {
         guard let window, let screen = screenForWindow(window) else { return false }
         return window.frame.maxX >= screen.visibleFrame.maxX - 8
+    }
+
+    /// Clawdesk Behavior: a genuinely new session earns a one-shot wink (the
+    /// double-tap reaction maps to bloub's wink). The launch batch never
+    /// celebrates — see `SessionArrivalTracker`.
+    private func celebrateArrivals(in sessions: [SessionSnapshot]) {
+        let arrivals = arrivalTracker.arrivals(in: sessions)
+        guard !arrivals.isEmpty else { return }
+        showReaction(.reactDouble, duration: 0.9)
     }
 
     private func showReaction(_ state: PetState, duration: Double) {
@@ -374,13 +433,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func restorePosition() {
         guard let window else { return }
+        // Position memory (upstream parity, including mini mode): the last
+        // spot the pet appeared at wins — in mini mode that is wherever it
+        // was docked or dragged when the session ended.
+        if let saved = model.preferences.windowOrigin {
+            window.setFrameOrigin(saved)
+            return
+        }
         if model.preferences.isMiniMode {
             moveToMiniEdge(animated: false)
             return
         }
-        if let saved = model.preferences.windowOrigin {
-            window.setFrameOrigin(saved)
-        } else if let screen = NSScreen.main {
+        if let screen = NSScreen.main {
             let frame = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30))
         }

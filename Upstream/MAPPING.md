@@ -46,8 +46,11 @@ TypeScript engine at the synced commit (`BloubFixtureTests`): orbit @
 spherical eye projections at the rest and wide gazes. The appearance layer is
 pinned the same way (`BloubAppearanceTests`): analytic shape radii, the 16
 expression tables, and sampled eye-fit solver outputs for every shape.
-Structural behaviour (purity, continuity, easing, decorations) is covered by
-the state/shape/morph/eye/gaze/timing suites in the same target.
+Structural behaviour (purity, continuity, easing, decorations, the idle
+scheduling contract) is covered by the state/shape/morph/eye/gaze/timing/
+settle suites in the same target, and `BloubSnapshotTests` complements the
+numeric fixtures with pinned off-screen frames (regenerate goldens with
+`CLAWDESK_UPDATE_BLOUB_SNAPSHOTS=1 swift test`).
 
 Never judge bloub compatibility by screenshots alone; the fixture numbers are
-the contract.
+the contract, the snapshots catch what numbers cannot see.

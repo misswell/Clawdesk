@@ -92,4 +92,21 @@ final class AppPreferencesTests: XCTestCase {
         let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
         XCTAssertEqual(reloaded.enabledAgentIDs, ["claude-code", "codex"])
     }
+
+    func testWindowOriginsPersistIncludingParkedPreMiniSpot() {
+        let suite = "clawdesk-position-memory-\(UUID().uuidString)"
+        let prefs = makePreferences(suite: suite)
+        prefs.windowOrigin = CGPoint(x: 640, y: 220)
+        prefs.preMiniWindowOrigin = CGPoint(x: 1280, y: 480)
+
+        let defaults = UserDefaults(suiteName: suite)!
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertEqual(reloaded.windowOrigin, CGPoint(x: 640, y: 220))
+        XCTAssertEqual(reloaded.preMiniWindowOrigin, CGPoint(x: 1280, y: 480))
+
+        // Clearing the parked spot persists too (mini round-trip finished).
+        reloaded.preMiniWindowOrigin = nil
+        let cleared = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
+        XCTAssertNil(cleared.preMiniWindowOrigin)
+    }
 }
