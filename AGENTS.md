@@ -16,7 +16,7 @@ Both upstreams are tracked independently in `Upstream/` (manifests, mapping,
 compatibility notes, sync changelog).
 
 - Agent upstream: `https://github.com/rullerzhou-afk/clawd-on-desk`
-- Agent baseline inspected: `a7283581f1d46421beba91ef10ffaa994bc0a52f`
+- Agent baseline inspected: `c8c153cce4fe1f0452e00212e0cd1d2725547f61`
 - State semantics: upstream `docs/guides/state-mapping.md`
 - Pet upstream: `https://github.com/jeremy-prt/bloub` (see
   `Upstream/bloub.json` for the synced commit)

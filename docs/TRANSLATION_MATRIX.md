@@ -1,7 +1,7 @@
 # Upstream → Clawdesk translation matrix
 
 Working audit of the upstream `clawd-on-desk` implementation (`src/**`, `hooks/**`,
-baseline `a7283581…`) translated module-by-module into native Swift Clawdesk.
+baseline `c8c153cc…`, upstream v0.16.0) translated module-by-module into native Swift Clawdesk.
 Status legend:
 
 - **Done** — semantics implemented in Clawdesk (native seam listed).
@@ -18,11 +18,11 @@ Status legend:
 | `state.js`, `state-priority.js`, `state-session-events.js`, `state-session-snapshot.js`, `state-stale-cleanup.js`, `state-session-dedupe.js` | Done | `EventStateReducer` / `SessionStore` |
 | `state-visual-resolver.js`, `state-agent-icons.js`, `state-hitbox-resolver.js` | Partial | visual mapping done; agent icons/hitboxes pending |
 | `state-account-quota.js` | Partial | `QuotaStore`; account-level persistence pending |
-| `subagent-lifecycle.js`, `server-windows-process-metadata.js` | Partial | subagent count mapping; Windows process metadata excluded |
+| `subagent-lifecycle.js`, `server-windows-process-metadata.js` | Done / Excluded | identity/count tiers and Claude typed background-subagent completion holds are native; Windows process metadata is outside the macOS target |
 | `transcript-path.js`, `codex-monitor-callback.js`, `codex-official-activity.js`, `codex-assistant-output.js`, `codex-session-index.js`, `codex-user-input.js`, `codex-subagent-fields.js`, `codex-turn-id.js`, `codex-turn-fence.js`, `codex-originator.js` | Partial | `CodexLogMonitor` + adapters |
-| `session-alias.js`, `session-key.js`, `session-open-folder.js`, `session-recovery-loader.js`, `session-focus*.js`, `session-ipc.js`, `session-hud*.js` | Partial | Dashboard/Sessions menu focus + native click-reveal Session HUD; pinning, hot-zone grace, and richer session metadata pending |
+| `session-alias.js`, `session-key.js`, `session-open-folder.js`, `session-recovery-loader.js`, `session-focus*.js`, `session-ipc.js`, `session-hud*.js` | Done | Dashboard/Sessions focus + native click-reveal Session HUD with pinning, hot-zone grace, context usage and bounded overflow |
 | `session-automation-*.js`, `permission-automation-policy.js`, `permission-automation-confirmation*.js` | Partial | `PermissionPolicy` (fail-closed); per-session grants pending |
-| `bubble-format.js`, `bubble-policy.js`, `bubble-renderer.js`, `permission.js`, `preload-bubble.js` | Partial | `PermissionBubbleController` + suggestions |
+| `bubble-format.js`, `bubble-policy.js`, `bubble-renderer.js`, `permission.js`, `preload-bubble.js` | Done | `PermissionBubbleController` with suggestions, simultaneous scroll queue, expanded details, placement and per-agent enablement |
 | `agent-gate.js`, `agent-installation-detector.js`, `agent-runtime-main.js`, `agent-display-name.js` | Partial | `AgentRegistry` / `HookInstaller` |
 
 ## Agent integrations (`hooks/`, `src/…-install.js`, `src/…-hook.js`)
@@ -31,7 +31,7 @@ Status legend:
 | --- | --- | --- |
 | claude (hook/install/statusline/rate-limits/stop-disposition), `claude-hook-health.js`, `claude-hook-operations.js`, `claude-settings-watcher.js` | Done | `HookInstaller` + `ClaudeHookHealthMonitor` |
 | codex (hook/install/rate-limits/debug/remote-monitor) | Done | `HookInstaller` + `CodexLogMonitor` |
-| copilot, gemini, antigravity, cursor, codebuddy, workbuddy, qwen, codewhale, kiro, kimi, reasonix, qoder/qoderwork/qwenwork | Done | `AdditionalHookAdapters` |
+| copilot, gemini, antigravity, cursor, codebuddy, workbuddy, qwen, codewhale, kiro, kimi, reasonix, qoder/qoderwork/qwenwork, TraeCode | Done | `AdditionalHookAdapters` |
 | zcode lifecycle + manual `PermissionRequest` approval | Done | `AdditionalHookAdapters` + `AgentEventAdapters` strict ZCode response |
 | opencode/mimocode, openclaw, hermes, pi, dsh | Done | `PluginHookAdapters` |
 | `context-usage.js`, `antigravity-*` | Partial | statusline quota for Claude; Antigravity context pending |

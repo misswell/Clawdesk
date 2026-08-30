@@ -32,6 +32,58 @@ private struct TestQuotaAdapter: AgentQuotaAdapter {
 
 @MainActor
 final class LocalEventServerTests: XCTestCase {
+    func testTraeCodeNamespacesSessionAndUsesFirstSafePromptLineAsTitle() async throws {
+        let server = LocalEventServer(preferredPort: 37_869)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=UserPromptSubmit&agent=traecode&session_id=shared-id",
+            body: #"{"prompt":"\nImplement the searchable settings panel\nsecond line"}"#
+        )
+
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(recorder.value()?.sessionID, "traecode:shared-id")
+        XCTAssertEqual(recorder.value()?.title, "Implement the searchable settings panel")
+        XCTAssertEqual(recorder.value()?.agentID, "traecode")
+    }
+
+    func testClaudeBackgroundTaskSnapshotPreservesTypedSubagentZeroVersusPresence() async throws {
+        let server = LocalEventServer(preferredPort: 37_868)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        _ = try curl(
+            port: server.port,
+            path: "/state?event=Stop&agent=claude-code&session_id=background",
+            body: #"{"background_tasks":[{"type":"subagent","id":"private"},{"type":"shell","command":"private"}],"session_crons":[]}"#
+        )
+
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(recorder.value()?.backgroundTasksCount, 2)
+        XCTAssertEqual(recorder.value()?.backgroundSubagentCount, 1)
+        XCTAssertEqual(recorder.value()?.sessionCronsCount, 0)
+        XCTAssertFalse(recorder.value()?.payload.values.contains("private") == true)
+    }
+
     func testRemoteIngressIsProfileBoundAndRejectsOtherRoutes() async throws {
         let server = LocalEventServer(preferredPort: 37_870)
         let nonce = String(repeating: "a", count: 32)

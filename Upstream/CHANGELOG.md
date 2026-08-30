@@ -1,5 +1,21 @@
 # Upstream sync changelog
 
+## 2026-08-30 — clawd-on-desk v0.16.0 parity audit
+
+- Advanced the tracked agent baseline from `a7283581` to `c8c153cc` (51
+  upstream commits, v0.16.0).
+- Added the TraeCode (Trae CN) state-only integration with the documented six
+  events, nested hook schema, bounded fail-open transport, `{}` stdout,
+  namespaced sessions, and first-safe-prompt title semantics.
+- Upgraded the native permission surface with a scrollable simultaneous-request
+  queue, expandable action/command/input details, fixed/follow-pet placement,
+  and per-agent bubble switches.
+- Added Claude background-subagent/task/cron Stop gating and an independent
+  active Codex silence timeout so long-running work is not celebrated or
+  removed prematurely.
+- Kept v0.16.0 artwork accessories, Discord Rich Presence, tutorial-only UI,
+  and non-macOS platform deployment outside the native core parity boundary.
+
 ## 2026-08-29 — bloub customization sync
 
 - Ported the customizer layer: 8 analytic body shapes, 12 colours and 16
@@ -37,4 +53,4 @@
 ## clawd-on-desk
 
 Tracked in `docs/UPSTREAM_PARITY.md` (baseline
-`a7283581f1d46421beba91ef10ffaa994bc0a52f`).
+`c8c153cce4fe1f0452e00212e0cd1d2725547f61`).

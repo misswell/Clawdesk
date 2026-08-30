@@ -52,4 +52,53 @@ final class EventStateReducerTests: XCTestCase {
         XCTAssertEqual(transition.sessions.first?.state, .typing)
         XCTAssertEqual(transition.sessions.first?.lastEvent, "PreCompress")
     }
+
+    func testClaudeStopWaitsForBackgroundSubagentsBeforeCompletion() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(
+            sessionID: "claude-session",
+            agentID: "claude-code",
+            eventName: "PreToolUse"
+        ))
+
+        let held = store.apply(AgentEvent(
+            sessionID: "claude-session",
+            agentID: "claude-code",
+            eventName: "Stop",
+            backgroundTasksCount: 1,
+            backgroundSubagentCount: 1
+        ))
+        XCTAssertEqual(held.state, .juggling)
+        XCTAssertEqual(held.sessions.first?.subagentCount, 1)
+
+        let completed = store.apply(AgentEvent(
+            sessionID: "claude-session",
+            agentID: "claude-code",
+            eventName: "Stop",
+            backgroundTasksCount: 0,
+            backgroundSubagentCount: 0
+        ))
+        XCTAssertEqual(completed.state, .attention)
+        XCTAssertEqual(completed.sessions.first?.subagentCount, 0)
+    }
+
+    func testClaudeStopWaitsForCronOrBackgroundShellWithoutInventingSubagent() {
+        let store = SessionStore()
+        let held = store.apply(AgentEvent(
+            sessionID: "claude-session",
+            agentID: "claude-code",
+            eventName: "Stop",
+            backgroundTasksCount: 1,
+            sessionCronsCount: 1
+        ))
+        XCTAssertEqual(held.state, .typing)
+        XCTAssertEqual(held.sessions.first?.subagentCount, 0)
+    }
+
+    func testTraeCodeKeepsFirstDerivedSessionTitle() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(sessionID: "traecode:s", agentID: "traecode", eventName: "UserPromptSubmit", title: "First task"))
+        let followup = store.apply(AgentEvent(sessionID: "traecode:s", agentID: "traecode", eventName: "UserPromptSubmit", title: "Follow-up"))
+        XCTAssertEqual(followup.sessions.first?.title, "First task")
+    }
 }

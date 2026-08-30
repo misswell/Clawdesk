@@ -1,7 +1,7 @@
 # Upstream parity map
 
-Source baseline: `a7283581f1d46421beba91ef10ffaa994bc0a52f`
-Latest local upstream inspection: `a7283581`
+Source baseline: `c8c153cce4fe1f0452e00212e0cd1d2725547f61` (upstream v0.16.0)
+Latest local upstream inspection: `c8c153cc` on 2026-08-30
 
 Clawdesk ports the behavior described by the upstream project while replacing
 Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework.
@@ -23,15 +23,16 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Free Roam with roam fence | `RoamPlanner` + `RoamFenceCoordinator` + Settings overlay | Implemented: the pet periodically walks to a whole-window target inside a user-selected work-area rectangle stored in `~/.clawd/roam-area.json`; malformed input keeps the previous fence and deletion only counts after two consecutive checks |
 | Pet-attached quota ring (Orbit) | `QuotaRingGeometry` + `QuotaRingView` + pet-attached window | Implemented: one coin per provider with an outer rolling-window ring and an inner weekly ring, a 4-coin cap with a "+N" overflow row, attached to the pet's left side, repositioned with it, and hidden when there is nothing to draw |
 | Interface language (en / zh-Hans / zh-Hant / ja / ko / es) | `Localization` table + `AppPreferences.language` | Implemented: settings (all tabs' visible chrome), menus, dashboard, window titles, permission bubble, and About page switch immediately; long explanatory paragraphs and credential placeholders fall back to English |
-| Settings, Dashboard, permission bubble | SwiftUI windows | Implemented: the permission bubble renders the agent's concrete allow/deny suggestions alongside Allow/Deny |
+| Settings, Dashboard, permission bubble | SwiftUI windows | Implemented: the permission window renders concrete agent suggestions alongside Allow/Deny, keeps every simultaneous request reachable in a bounded scroll queue, expands action/command/input details, supports fixed four-corner or follow-pet placement, and can be disabled per permission-capable agent |
 | Doctor local integration diagnostics | `AgentDoctor` + Settings → Doctor | Implemented: read-only checks of registered agent config files for Clawdesk-managed entries and hook-script presence, with per-agent Fix actions; plugin-only integrations report not checked |
 | Startup integration sync | `ClawdeskModel` + `AgentDoctor` + `HookInstaller` | Implemented: explicitly installed agents persist enabled intent; upgrades discover ownership markers and repair managed integrations after launch without creating unrelated agent configs; Kimi profile repair remains existing-only |
 | Global allow/deny shortcuts | `GlobalShortcutManager` | Implemented |
 | Permission automation policy (off / auto-tools / unattended) | `PermissionPolicy` + preferences | Implemented with fail-closed semantics: auto-tools auto-approves only clearly read-only tool names and defers the rest to the bubble; unattended denies unknown requests instead of guessing |
 | Sessions menu with terminal focus | pet/status menu + `TerminalFocusService` | Implemented: right-click and tray Sessions submenus list live sessions (debounced tray rebuild) and focus the owning terminal window |
-| Startup recovery + process liveness | `AgentProcessProbe` + `ClawdeskModel` | Implemented: at boot the model probes for supported CLI agents (upstream's needle table: claude-code, codex, copilot, codebuddy, kimi-code, zcode.cjs, pi) and holds the sleep sequence for up to five minutes while one runs — real session events cancel it, an empty probe ends it early; sessions pinned to a terminal PID are pruned as soon as that process dies (`kill(pid, 0)` + EPERM semantics) instead of waiting out the stale window |
-| Session HUD | `SessionHUDWindowController` + `SessionHUDView` | Implemented: click the pet to reveal a low-overhead native HUD near it, show up to three live sessions plus an overflow row, click a row to focus its terminal, pin it open, and keep it reachable through the upstream-style pet/HUD hot-zone grace; context-usage chips remain pending |
-| Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for the registered Claude-compatible, JSON/TOML, and plugin adapters. Plugin identities, extension directories, and the Kiro managed agent use Clawdesk's own names (never the upstream product id), so the two integrations cannot collide or impersonate each other |
+| Startup recovery + process liveness | `AgentProcessProbe` + `ClawdeskModel` | Implemented: at boot the model probes for supported CLI agents (upstream's needle table: claude-code, codex, copilot, codebuddy, kimi-code, zcode.cjs, pi) and holds the sleep sequence for up to five minutes while one runs — real session events cancel it, an empty probe ends it early; sessions pinned to a terminal PID are pruned as soon as that process dies (`kill(pid, 0)` + EPERM semantics). A silent active Codex turn has its own 20-minute guard and settles to idle before ordinary idle cleanup instead of being deleted at the generic timeout |
+| Session HUD | `SessionHUDWindowController` + `SessionHUDView` | Implemented: click the pet to reveal a low-overhead native HUD near it, show up to three live sessions plus an overflow row, click a row to focus its terminal, pin it open, keep it reachable through the upstream-style pet/HUD hot-zone grace, and optionally show bounded context-usage chips |
+| Other agent hook formats | adapter seam + generic HTTP endpoint | Implemented for every v0.16.0 registered macOS agent, including TraeCode (Trae CN) state-only hooks with documented nested JSON shape, fail-closed schema checks, `{}` stdout, session namespacing and first-safe-prompt title derivation. Plugin identities, extension directories, and the Kiro managed agent use Clawdesk's own names (never the upstream product id), so the two integrations cannot collide or impersonate each other |
+| Claude background completion gate | `LocalEventServer` + `SessionStore` | Implemented: exact typed background-subagent counts, background task counts, session crons and active Stop hooks keep the main Claude session working; an authoritative zero releases the hold and only then shows completion. Private task IDs, descriptions and commands are not retained |
 | ZCode manual `PermissionRequest` approval | `AdditionalHookAdapters` + `AgentEventAdapters` | Implemented: the config adapter installs the blocking hook, Allow/Deny uses ZCode's strict `hookSpecificOutput` schema, and unknown/oversized tool input returns `204` so ZCode keeps its native permission UI |
 | Codex `request_user_input` | `DefaultAgentEventAdapter` + `CodexLogMonitor` + read-only card | Implemented: bounded question/options preview parsed in the adapter; answers stay in Codex and the matching output clears the card |
 | Gemini `AfterAgent` / `PreCompress` semantics | `EventStateMapper` | Implemented: AfterAgent returns idle; PreCompress is recorded without forcing sweeping |
@@ -40,7 +41,7 @@ Electron/DOM rendering with AppKit, CoreGraphics, SwiftUI, and Network.framework
 | Mobile read-only PWA | LAN companion seam | Implemented: token-gated HTTP fallback, v1 WebSocket snapshots, state/deletion broadcasts, pairing URL, and bounded clients/rate limits |
 | Codex JSONL fallback and quota rings | session/telemetry adapters | Implemented: bounded JSONL fallback, Claude statusline quota, Codex/Codex Spark windows, dashboard rings |
 | SSH / WSL deployment | transport adapters | Implemented for native macOS Remote SSH: profile-bound loopback ingress, nonce validation, atomic remote hook repair, Copilot registration, optional Codex fallback monitor, automatic/single-session transport mode, and reverse tunnel. WSL is outside the macOS product boundary |
-| Custom animated asset packs | theme importer seam | Implemented for validated folder/ZIP themes with ImageIO animation plus static SVG fallback, per-theme idle visual selection, theme sounds (`complete`/`confirm`/`error` in a sibling `sounds/` directory, falling back to system cues), and bounded frame caching (downsampled frames, per-animation and total cache byte budgets); upstream Codex Pet atlas/capability schema is not bundled. The built-in pet is the bloub character (MIT, jeremy-prt/bloub) driven by the native `Pet/Bloub/BloubEngine` and mapped from agent semantics through `Pet/BloubStateMapper` — no upstream clawd-on-desk artwork or character names are reused |
+| Custom animated asset packs | theme importer seam | Behavior-complete for validated folder/ZIP themes with ImageIO animation plus static SVG fallback, per-theme idle visual selection, theme sounds (`complete`/`confirm`/`error` in a sibling `sounds/` directory, falling back to system cues), and bounded frame caching (downsampled frames, per-animation and total cache byte budgets). Upstream Codex Pet atlas/capability packs and the new independent head/mouth accessory slots are not bundled. The built-in pet is the bloub character (MIT, jeremy-prt/bloub) driven by the native `Pet/Bloub/BloubEngine` and mapped from agent semantics through `Pet/BloubStateMapper` — no upstream clawd-on-desk artwork or character names are reused |
 | Auto-update | `ClawdeskSoftwareUpdater` + `ClawdeskUpdater` helper | Implemented: automatic check on launch (opt-out), GitHub Release discovery with SHA-256 digest requirement, download, archive/signature/team/Gatekeeper validation, then an atomic in-place replace by a separate updater process with launch verification and rollback. Reachable from Settings → Software Update and the tray/pet "Check for Updates…" menus. Only Developer-ID-signed and notarized packages are accepted |
 
 ## Current integration boundary
@@ -61,8 +62,10 @@ implement it behind a new transport seam rather than coupling it to the
 CoreGraphics pet renderer.
 
 The remaining upstream-specific boundaries are intentionally isolated from the
-renderer and state model: WSL is not part of this macOS target, and the native
-renderer does not bundle the upstream Codex Pet atlas/capability schema.
+renderer and state model: Windows/WSL/Linux packaging is not part of this native
+macOS target; remote approval is optional for the current product goal; Discord
+Rich Presence, the tutorial window, Codex Pet atlas imports, and head/mouth
+accessory slots are non-core extensions rather than agent lifecycle paths.
 Artwork from the upstream repository is not bundled here because its
 `assets/LICENSE` reserves the artwork separately from the source-code license.
 

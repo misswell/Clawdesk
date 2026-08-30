@@ -69,6 +69,7 @@ public final class AgentDoctor {
         case "qoderwork": return [home.appendingPathComponent(".qoderwork/settings.json")]
         case "qwenwork": return [home.appendingPathComponent(".QwenWorkCN/settings.json")]
         case "reasonix": return [home.appendingPathComponent(".reasonix/settings.json")]
+        case "traecode": return [home.appendingPathComponent(".trae-cn/hooks.json")]
         case "zcode": return [home.appendingPathComponent(".zcode/cli/config.json")]
         case "codewhale": return [home.appendingPathComponent(".codewhale/config.toml")]
         case "opencode": return [

@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The 0.1.20 release keeps the native Session HUD and upstream theme-driven sleep sequence: after the
+The current 0.1.23 build keeps the native Session HUD and upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
@@ -45,6 +45,13 @@ curl -X POST http://127.0.0.1:37777/state \
 Install Claude Code or Codex hooks from Settings → Agents. The installer
 merges only Clawdesk-owned entries, preserves existing hooks, and leaves a
 backup before changing a configuration file.
+
+The v0.16.0 upstream sync also covers TraeCode (Trae CN) state-only hooks,
+Claude background-subagent completion gating, a separate long-running Codex
+silence timeout, and the current permission experience: simultaneous requests
+stay reachable in a scroll queue, request details can expand, placement can be
+fixed to any screen corner or follow the pet, and bubbles can be disabled per
+permission-capable agent.
 
 The same installer seam also covers the registered JSON/TOML and plugin-based
 agent integrations. Generated plugins read the current local port from

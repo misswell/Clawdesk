@@ -160,6 +160,38 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(sessionStart.contains { ($0["command"] as? String)?.contains(HookInstaller.marker) == true })
     }
 
+    func testTraeCodeAdapterUsesDocumentedStateOnlyShapeAndPreservesUserHooks() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-traecode-hook-test-\(UUID().uuidString)")
+        let configURL = root.appendingPathComponent(".trae-cn/hooks.json")
+        try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let initial: [String: Any] = [
+            "version": 1,
+            "hooks": [
+                "SessionStart": [["matcher": "", "hooks": [["type": "command", "command": "echo keep-me"]]]]
+            ]
+        ]
+        try JSONSerialization.data(withJSONObject: initial).write(to: configURL)
+
+        let installer = HookInstaller(homeDirectory: root)
+        XCTAssertTrue(try installer.install(agentID: "traecode", port: 37_812).changed)
+        XCTAssertFalse(try installer.install(agentID: "traecode", port: 37_812).changed)
+
+        let installed = try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as! [String: Any]
+        XCTAssertEqual(installed["version"] as? Int, 1)
+        let hooks = installed["hooks"] as! [String: Any]
+        XCTAssertEqual(Set(hooks.keys), Set(["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "Notification"]))
+        let startEntries = hooks["SessionStart"] as! [[String: Any]]
+        XCTAssertTrue(startEntries.contains { (($0["hooks"] as? [[String: Any]])?.first?["command"] as? String) == "echo keep-me" })
+        XCTAssertTrue(startEntries.contains { (($0["hooks"] as? [[String: Any]])?.first?["command"] as? String)?.contains("traecode") == true })
+        let managed = try XCTUnwrap(startEntries.first { (($0["hooks"] as? [[String: Any]])?.first?["command"] as? String)?.contains("traecode") == true })
+        XCTAssertEqual(managed["matcher"] as? String, "")
+        XCTAssertNil(((managed["hooks"] as? [[String: Any]])?.first)?["name"])
+
+        let script = try String(contentsOf: installer.hookScript, encoding: .utf8)
+        XCTAssertTrue(script.contains("[ \"$AGENT\" = \"traecode\" ]"))
+        XCTAssertTrue(script.contains("printf '%s' '{}'"))
+    }
+
     func testZCodeAdapterUsesNestedProcessHookAndUninstallKeepsUserHook() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-zcode-hook-test-\(UUID().uuidString)")
         let configURL = root.appendingPathComponent(".zcode/cli/config.json")

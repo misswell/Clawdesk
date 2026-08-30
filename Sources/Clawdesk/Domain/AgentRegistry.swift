@@ -41,6 +41,7 @@ public enum AgentRegistry {
         AgentDescriptor(id: "qwenwork", displayName: "QwenWork", detail: "State-only hooks + HUD", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "reasonix", displayName: "Reasonix CLI", detail: "State-only command hooks", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "deepseek-harness", displayName: "DeepSeek Harness", detail: "Web profile bridge", permissionApproval: true),
+        AgentDescriptor(id: "traecode", displayName: "TraeCode", detail: "Trae CN state-only hooks", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "custom", displayName: "Custom HTTP agent", detail: "POST lifecycle events to Clawdesk", permissionApproval: false, stateOnly: true)
     ]
 

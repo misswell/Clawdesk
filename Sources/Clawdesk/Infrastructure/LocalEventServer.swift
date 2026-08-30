@@ -405,13 +405,24 @@ public final class LocalEventServer: @unchecked Sendable {
             return false
         }
 
+        func arrayCount(_ keys: [String]) -> Int? {
+            for key in keys {
+                if let value = object[key] as? [Any] { return value.count }
+            }
+            return nil
+        }
+
         let rawSessionID = string(["session_id", "sessionId", "session", "id"]) ?? query["session_id"] ?? query["sessionId"] ?? UUID().uuidString
-        let remotePrefix = query["remote_prefix"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let sessionID = remotePrefix.isEmpty ? rawSessionID : "\(remotePrefix):\(rawSessionID)"
         let queryAgent = [query["agent_id"], query["agent"]]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty }
         let agentID = queryAgent ?? string(["agent_id", "agentId", "source", "agent"]) ?? "custom"
+        let normalizedAgentID = agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let namespacedSessionID = normalizedAgentID == "traecode" && !rawSessionID.hasPrefix("traecode:")
+            ? "traecode:\(rawSessionID)"
+            : rawSessionID
+        let remotePrefix = query["remote_prefix"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let sessionID = remotePrefix.isEmpty ? namespacedSessionID : "\(remotePrefix):\(namespacedSessionID)"
         let eventName = string(["event", "event_name", "eventName", "type", "name", "state"])
             ?? fallbackEvent
             ?? (forcePermission ? "PermissionRequest" : "Notification")
@@ -464,16 +475,35 @@ public final class LocalEventServer: @unchecked Sendable {
         for (key, value) in object {
             if let stringValue = value as? String { payload[key] = stringValue }
         }
+        let suppliedTitle = string(["title", "session_title", "sessionTitle"])
+        let eventTitle = suppliedTitle ?? traecodePromptTitle(
+            object: object,
+            agentID: normalizedAgentID,
+            eventName: eventName
+        )
+        let backgroundTasks = object["background_tasks"] as? [Any]
+        let backgroundSubagentCount = backgroundTasks.map { tasks in
+            tasks.reduce(into: 0) { count, entry in
+                guard let task = entry as? [String: Any],
+                      let type = task["type"] as? String,
+                      type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "subagent" else { return }
+                count += 1
+            }
+        }
         return AgentEvent(
             sessionID: sessionID,
             agentID: agentID,
             eventName: eventName,
             stateHint: adapterResult.immediateNotification ? .notification : hint,
             toolName: string(["tool_name", "toolName", "tool"]),
-            title: string(["title", "session_title", "sessionTitle"]),
+            title: eventTitle,
             folder: string(["folder", "cwd", "working_directory", "workingDirectory"]),
             terminalPID: int(["pid", "terminal_pid", "terminalPid"]),
             subagentCount: int(["subagent_count", "subagentCount", "subagents"]) ?? 0,
+            backgroundTasksCount: backgroundTasks?.count ?? int(["background_tasks_count", "backgroundTasksCount"]),
+            backgroundSubagentCount: backgroundSubagentCount ?? int(["background_subagents_count", "backgroundSubagentsCount"]),
+            sessionCronsCount: arrayCount(["session_crons"]) ?? int(["session_crons_count", "sessionCronsCount"]),
+            stopHookActive: bool(["stop_hook_active", "stopHookActive"]),
             permission: permission,
             question: adapterResult.question,
             quota: quota,
@@ -487,6 +517,25 @@ public final class LocalEventServer: @unchecked Sendable {
             questionResolution: adapterResult.questionResolution,
             payload: payload
         )
+    }
+
+    private func traecodePromptTitle(object: [String: Any], agentID: String, eventName: String) -> String? {
+        guard agentID == "traecode",
+              eventName.lowercased().replacingOccurrences(of: "_", with: "") == "userpromptsubmit",
+              let prompt = object["prompt"] as? String else { return nil }
+        let secretPattern = #"(?i)\b(api[_-]?key|authorization|bearer|password|passwd|private[_-]?key|secret|token)\b|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}"#
+        for line in prompt.components(separatedBy: .newlines) {
+            let candidate = line
+                .components(separatedBy: .controlCharacters)
+                .joined(separator: " ")
+                .split(whereSeparator: \Character.isWhitespace)
+                .joined(separator: " ")
+            guard !candidate.isEmpty else { continue }
+            guard candidate.range(of: secretPattern, options: .regularExpression) == nil else { return nil }
+            if candidate.count <= 40 { return candidate }
+            return String(candidate.prefix(39)) + "…"
+        }
+        return nil
     }
 
     private static func number(_ value: Any?) -> Double? {

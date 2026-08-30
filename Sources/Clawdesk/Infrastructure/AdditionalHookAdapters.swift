@@ -10,7 +10,8 @@ extension HookInstaller {
         "claude-code", "codex", "copilot-cli", "gemini-cli", "antigravity-cli",
         "cursor-agent", "codebuddy", "workbuddy", "kiro-cli", "kimi-cli",
         "qwen-code", "zcode", "codewhale", "qoder", "qoderwork", "qwenwork",
-        "reasonix", "opencode", "mimocode", "openclaw", "hermes", "pi", "deepseek-harness"
+        "reasonix", "opencode", "mimocode", "openclaw", "hermes", "pi", "deepseek-harness",
+        "traecode"
     ]
 
     func installAdditionalAgentHooks(agentID: String, port: UInt16) throws -> HookInstallResult {
@@ -70,6 +71,7 @@ extension HookInstaller {
         _ = port
         let configURL = homeDirectory.appendingPathComponent(spec.relativeConfigPath)
         var settings = try readJSON(at: configURL)
+        if spec.agentID == "traecode" { try validateTraeCodeConfig(settings, at: configURL) }
         var hookMap = dictionaryAtPath(settings, keys: spec.hookPath)
         var changed = false
         var permissionConflict = false
@@ -126,6 +128,7 @@ extension HookInstaller {
         }
 
         var settings = try readJSON(at: configURL)
+        if spec.agentID == "traecode" { try validateTraeCodeConfig(settings, at: configURL) }
         var hookMap = dictionaryAtPath(settings, keys: spec.hookPath)
         var changed = false
         for event in spec.events {
@@ -314,8 +317,14 @@ extension HookInstaller {
             -H 'Content-Type: application/json' --data-binary @- "$URL" 2>/dev/null || \
             printf '%s' '{"behavior":"ask","approved":false}'
         else
-          printf '%s' "$BODY" | /usr/bin/curl --silent --max-time 5 --connect-timeout 1 \
-            -H 'Content-Type: application/json' --data-binary @- "$URL" >/dev/null 2>&1 || true
+          if [ "$AGENT" = "traecode" ]; then
+            printf '%s' "$BODY" | /usr/bin/curl --silent --max-time 0.5 --connect-timeout 0.2 \
+              -H 'Content-Type: application/json' --data-binary @- "$URL" >/dev/null 2>&1 || true
+            printf '%s' '{}'
+          else
+            printf '%s' "$BODY" | /usr/bin/curl --silent --max-time 5 --connect-timeout 1 \
+              -H 'Content-Type: application/json' --data-binary @- "$URL" >/dev/null 2>&1 || true
+          fi
         fi
         exit 0
         """
@@ -336,6 +345,16 @@ extension HookInstaller {
             throw HookInstallerError.invalidConfiguration(url)
         }
         return object
+    }
+
+    private func validateTraeCodeConfig(_ settings: [String: Any], at url: URL) throws {
+        if let version = settings["version"] as? NSNumber, version.intValue != 1 {
+            throw HookInstallerError.invalidConfiguration(url)
+        }
+        guard let hooks = settings["hooks"] else { return }
+        guard let map = hooks as? [String: Any], map.values.allSatisfy({ $0 is [Any] }) else {
+            throw HookInstallerError.invalidConfiguration(url)
+        }
     }
 
     private func writeJSON(_ object: [String: Any], to url: URL) throws {
@@ -499,6 +518,7 @@ private enum AgentHookShape: Sendable {
     case direct
     case copilot
     case zcode
+    case traecode
 }
 
 private struct AgentHookSpec: Sendable {
@@ -548,6 +568,9 @@ private struct AgentHookSpec: Sendable {
         case "zcode":
             displayName = "ZCode"; relativeConfigPath = ".zcode/cli/config.json"; hookPath = ["hooks", "events"]; shape = .zcode
             events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"]
+        case "traecode":
+            displayName = "TraeCode"; relativeConfigPath = ".trae-cn/hooks.json"; hookPath = ["hooks"]; shape = .traecode
+            events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "Notification"]
         default:
             return nil
         }
@@ -586,6 +609,14 @@ private struct AgentHookSpec: Sendable {
             ]
             if event != "UserPromptSubmit" && event != "Stop" { entry["matcher"] = "*" }
             return entry
+        case .traecode:
+            return [
+                "matcher": "",
+                "hooks": [[
+                    "type": "command",
+                    "command": command
+                ]]
+            ]
         }
     }
 }

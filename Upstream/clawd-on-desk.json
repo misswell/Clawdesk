@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/rullerzhou-afk/clawd-on-desk",
   "branch": "main",
-  "lastSyncedCommit": "a7283581f1d46421beba91ef10ffaa994bc0a52f",
+  "lastSyncedCommit": "c8c153cce4fe1f0452e00212e0cd1d2725547f61",
   "role": "agent integration behavior",
   "license": "source behavior reference; upstream artwork is NOT bundled (its assets/LICENSE reserves artwork separately)",
   "tracking": [
