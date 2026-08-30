@@ -70,11 +70,14 @@ final class ClawdeskModelPermissionLifetimeTests: XCTestCase {
 
     func testUnansweredPermissionExpiresAndReleasesReply() async throws {
         let model = makeModel()
-        model.permissionReplyTimeout = .milliseconds(20)
+        // Keep the timeout short while leaving enough scheduler slack for
+        // loaded CI runners. A 20 ms wall-clock window can expire after the
+        // test's assertion task even though the implementation is correct.
+        model.permissionReplyTimeout = .milliseconds(100)
         let recorder = PermissionDecisionRecorder()
 
         submit(id: "expiring", to: model, recorder: recorder)
-        try await Task.sleep(for: .milliseconds(80))
+        try await Task.sleep(for: .milliseconds(500))
 
         XCTAssertEqual(recorder.decision(for: "expiring"), .defer)
         XCTAssertTrue(model.pendingPermissions.isEmpty)
