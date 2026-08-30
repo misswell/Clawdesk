@@ -30,7 +30,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
-        NSApp.applicationIconImage = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Clawdesk")
+        NSApp.applicationIconImage = RobotIcon.applicationImage()
 
         petWindow = PetWindowController(model: model)
         permissionBubbles = PermissionBubbleController(model: model)
@@ -87,8 +87,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Clawdesk")
-        statusItem.button?.image?.isTemplate = true
+        statusItem.button?.image = RobotIcon.menuBarImage()
         statusItem.menu = makeStatusMenu()
     }
 
