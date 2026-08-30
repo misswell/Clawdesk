@@ -4,6 +4,12 @@ import XCTest
 
 final class PetInteractionTests: XCTestCase {
     @MainActor
+    func testPointerPollingDropsFurtherInLowPowerMode() {
+        XCTAssertEqual(PetTimerScheduler.pointerFrequency(lowPower: false), 30)
+        XCTAssertEqual(PetTimerScheduler.pointerFrequency(lowPower: true), 12)
+    }
+
+    @MainActor
     func testPetRenderTimerRunsDuringTrackingRunLoopMode() {
         var fireCount = 0
         let timer = PetTimerScheduler.schedule(interval: 0.001, repeats: true) {

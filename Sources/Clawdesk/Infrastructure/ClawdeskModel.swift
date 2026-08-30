@@ -31,6 +31,10 @@ public final class ClawdeskModel: ObservableObject {
     public var onError: ((String) -> Void)?
 
     private var replies: [String: PermissionReply] = [:]
+    private var permissionExpiryTasks: [String: Task<Void, Never>] = [:]
+    private var permissionOrder: [String] = []
+    var maximumPendingPermissionCount = 32
+    var permissionReplyTimeout: Duration = .seconds(300)
     private var completionTask: Task<Void, Never>?
     private var kimiSuspectTasks: [String: Task<Void, Never>] = [:]
     private var kimiGateOrder: [String: [String]] = [:]
@@ -88,6 +92,7 @@ public final class ClawdeskModel: ObservableObject {
     private var healthTimer: Timer?
     private var startupSyncTask: Task<Void, Never>?
     private var sleepTransitionTask: Task<Void, Never>?
+    private var isStarted = false
 
     public init(
         preferences: AppPreferences = AppPreferences(),
@@ -150,6 +155,8 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func start() {
+        guard !isStarted else { return }
+        isStarted = true
         eventServer.start()
         beginStartupRecovery()
         if preferences.mobileEnabled { mobileBridge.start() }
@@ -178,6 +185,13 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func stop() {
+        isStarted = false
+        for id in Array(replies.keys) {
+            resolvePermission(id: id, decision: .defer)
+        }
+        permissionExpiryTasks.values.forEach { $0.cancel() }
+        permissionExpiryTasks.removeAll()
+        permissionOrder.removeAll()
         completionTask?.cancel()
         sleepTransitionTask?.cancel()
         sleepTransitionTask = nil
@@ -241,7 +255,7 @@ public final class ClawdeskModel: ObservableObject {
                 agentID: event.agentID,
                 title: "Agent is waiting for permission"
             )
-            replies[request.id] = reply
+            retainPermissionReply(reply, for: request.id)
             apply(event)
             if preferences.doNotDisturb {
                 resolvePermission(id: request.id, decision: .defer)
@@ -320,6 +334,8 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func resolvePermission(id: String, decision: PermissionDecision) {
+        permissionExpiryTasks.removeValue(forKey: id)?.cancel()
+        permissionOrder.removeAll { $0 == id }
         remoteNotifier.cancelApproval(id: id)
         replies.removeValue(forKey: id)?.resolve(decision)
         pendingPermissions.removeAll { $0.id == id }
@@ -331,6 +347,28 @@ public final class ClawdeskModel: ObservableObject {
     public func resolveLatestPermission(decision: PermissionDecision) {
         guard let request = pendingPermissions.first else { return }
         resolvePermission(id: request.id, decision: decision)
+    }
+
+    private func retainPermissionReply(_ reply: PermissionReply, for id: String) {
+        permissionExpiryTasks.removeValue(forKey: id)?.cancel()
+        permissionOrder.removeAll { $0 == id }
+        replies.removeValue(forKey: id)?.resolve(.defer)
+        replies[id] = reply
+        permissionOrder.append(id)
+        let timeout = permissionReplyTimeout
+        permissionExpiryTasks[id] = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: timeout)
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled, self.replies[id] != nil else { return }
+            self.resolvePermission(id: id, decision: .defer)
+        }
+        let limit = max(1, maximumPendingPermissionCount)
+        while permissionOrder.count > limit, let oldest = permissionOrder.first {
+            resolvePermission(id: oldest, decision: .defer)
+        }
     }
 
     public func setTheme(_ id: String) {

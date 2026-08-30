@@ -85,9 +85,14 @@ public final class LocalEventServer: @unchecked Sendable {
     public func stop() {
         queue.async { [weak self] in
             guard let self else { return }
+            self.listener?.stateUpdateHandler = nil
+            self.listener?.newConnectionHandler = nil
             self.listener?.cancel()
             self.listener = nil
-            for listener in self.remoteIngressListeners.values { listener.cancel() }
+            for listener in self.remoteIngressListeners.values {
+                listener.newConnectionHandler = nil
+                listener.cancel()
+            }
             self.remoteIngressListeners.removeAll()
             self.remoteIngressPorts.removeAll()
         }
@@ -109,7 +114,10 @@ public final class LocalEventServer: @unchecked Sendable {
     public func stopRemoteIngress(nonce: String) {
         queue.async { [weak self] in
             guard let self else { return }
-            self.remoteIngressListeners.removeValue(forKey: nonce)?.cancel()
+            if let listener = self.remoteIngressListeners.removeValue(forKey: nonce) {
+                listener.newConnectionHandler = nil
+                listener.cancel()
+            }
             self.remoteIngressPorts.removeValue(forKey: nonce)
             self.unregisterRemoteNonce(nonce)
         }
@@ -147,8 +155,8 @@ public final class LocalEventServer: @unchecked Sendable {
             parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: nwPort)
             do {
                 let candidateListener = try NWListener(using: parameters)
-                candidateListener.stateUpdateHandler = { [weak self] state in
-                    if case .ready = state, let actual = candidateListener.port?.rawValue {
+                candidateListener.stateUpdateHandler = { [weak self, weak candidateListener] state in
+                    if case .ready = state, let actual = candidateListener?.port?.rawValue {
                         self?.port = actual
                     }
                 }
@@ -233,8 +241,8 @@ public final class LocalEventServer: @unchecked Sendable {
     }
 
     private func accept(_ connection: NWConnection, requiredRemoteNonce: String? = nil) {
-        connection.stateUpdateHandler = { state in
-            if case .failed = state { connection.cancel() }
+        connection.stateUpdateHandler = { [weak connection] state in
+            if case .failed = state { connection?.cancel() }
         }
         connection.start(queue: queue)
         receive(on: connection, buffer: Data(), requiredRemoteNonce: requiredRemoteNonce)

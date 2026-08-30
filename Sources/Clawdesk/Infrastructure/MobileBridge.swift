@@ -81,6 +81,8 @@ public final class MobileBridge: @unchecked Sendable {
             self?.closeAllWebSocketClients(code: 1001, reason: "Server shutting down")
             self?.heartbeatTimer?.cancel()
             self?.heartbeatTimer = nil
+            self?.listener?.stateUpdateHandler = nil
+            self?.listener?.newConnectionHandler = nil
             self?.listener?.cancel()
             self?.listener = nil
             self?.setRunning(false)
@@ -166,8 +168,8 @@ public final class MobileBridge: @unchecked Sendable {
             parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "0.0.0.0", port: candidate)
             do {
                 let candidateListener = try NWListener(using: parameters)
-                candidateListener.stateUpdateHandler = { [weak self] state in
-                    if case .ready = state, let actual = candidateListener.port?.rawValue {
+                candidateListener.stateUpdateHandler = { [weak self, weak candidateListener] state in
+                    if case .ready = state, let actual = candidateListener?.port?.rawValue {
                         self?.setPort(actual)
                     }
                 }
@@ -185,10 +187,10 @@ public final class MobileBridge: @unchecked Sendable {
     }
 
     private func accept(_ connection: NWConnection) {
-        connection.stateUpdateHandler = { state in
+        connection.stateUpdateHandler = { [weak connection] state in
             switch state {
             case .failed, .cancelled:
-                connection.cancel()
+                connection?.cancel()
             default:
                 break
             }
