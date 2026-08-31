@@ -368,4 +368,21 @@ final class HookInstallerTests: XCTestCase {
         let restored = try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as! [String: Any]
         XCTAssertEqual((restored["plugin"] as? [String]), ["user-plugin"])
     }
+
+    func testGeneratedHookUsesTheAvailableMacOSCatPath() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-hook-runtime-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let installer = HookInstaller(homeDirectory: root)
+        _ = try installer.install(agentID: "codex", port: 37_809)
+        let codexSource = try String(contentsOf: installer.hookScript, encoding: .utf8)
+
+        XCTAssertTrue(codexSource.contains("/bin/cat"), "The hook must read agent JSON from stdin on macOS")
+        XCTAssertFalse(codexSource.contains("/usr/bin/cat"), "macOS ships cat at /bin/cat")
+
+        _ = try installer.install(agentID: "cursor-agent", port: 37_809)
+        let additionalSource = try String(contentsOf: installer.hookScript, encoding: .utf8)
+        XCTAssertTrue(additionalSource.contains("/bin/cat"), "Additional adapters must read agent JSON from stdin on macOS")
+        XCTAssertFalse(additionalSource.contains("/usr/bin/cat"), "Additional adapters must not use the unavailable /usr/bin/cat path")
+    }
 }

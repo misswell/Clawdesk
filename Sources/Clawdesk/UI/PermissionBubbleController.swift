@@ -74,7 +74,7 @@ public final class PermissionBubbleController: NSObject {
             let screen = NSScreen.screens.first { $0.visibleFrame.contains(petOrigin) } ?? NSScreen.main
             guard let screen else { return }
             let frame = screen.visibleFrame
-            let petWidth = 190 * model.preferences.petScale
+            let petWidth = PetSizing.bubbleAnchorWidth * CGFloat(model.preferences.petScale)
             let preferredX = petOrigin.x + petWidth + 12
             let x = min(max(frame.minX + 12, preferredX), frame.maxX - panel.frame.width - 12)
             let y = min(max(frame.minY + 12, petOrigin.y), frame.maxY - panel.frame.height - 12)

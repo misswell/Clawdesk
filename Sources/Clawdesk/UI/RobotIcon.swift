@@ -1,62 +1,46 @@
 import AppKit
 import CoreGraphics
 
-/// The Clawdesk robot-head icon, drawn programmatically so the status item
-/// and the Dock match the pet's own visual language: one rounded head, two
-/// capsule eyes (the same stadium shape the bloub engine renders), one
-/// antenna. No bitmap asset to keep in sync.
+/// The Clawdesk pet icon, drawn programmatically so the status item and Dock
+/// share the pet's own visual language: one rounded head and two capsule eyes
+/// (the same stadium shape the bloub engine renders). The Dock version also
+/// carries the original antenna; the menu-bar version stays a compact face.
 enum RobotIcon {
-    /// Menu bar template image: pure black + alpha, ~17 pt tall. At status
-    /// bar size a filled head turns into a blob, so this variant draws the
-    /// head as an outline with solid eyes and an antenna — the parts that
-    /// still read as a robot at 18 pt.
+    /// Menu bar template image matching the pet's neutral face: a filled
+    /// circular body with two capsule-shaped eye holes. The transparent eyes
+    /// reveal the menu bar behind the template image in either system theme.
     static func menuBarImage() -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            let lineWidth: CGFloat = 1.6
-
-            // Antenna: stem plus a dot.
-            let centerX = rect.midX
-            let headTop = rect.midY + rect.height * 0.28
-            context.setStrokeColor(NSColor.black.cgColor)
-            context.setFillColor(NSColor.black.cgColor)
-            context.setLineWidth(lineWidth)
-            context.setLineCap(.round)
-            context.move(to: CGPoint(x: centerX, y: headTop))
-            context.addLine(to: CGPoint(x: centerX, y: headTop + 2.6))
-            context.strokePath()
-            context.fillEllipse(in: CGRect(
-                x: centerX - 1.5,
-                y: headTop + 2.2,
-                width: 3,
-                height: 3
-            ))
-
-            // Head outline: rounded square.
-            let head = CGRect(
-                x: rect.midX - 5.6,
-                y: rect.midY - 5.2,
-                width: 11.2,
-                height: 10.4
+            let diameter = min(rect.width, rect.height) * 0.76
+            let face = CGRect(
+                x: rect.midX - diameter / 2,
+                y: rect.midY - diameter / 2,
+                width: diameter,
+                height: diameter
             )
-            context.addPath(CGPath(
-                roundedRect: head,
-                cornerWidth: 3.4,
-                cornerHeight: 3.4,
-                transform: nil
-            ))
-            context.strokePath()
 
-            // Two solid capsule eyes.
+            // The status item is a template image, so the body is the only
+            // painted colour. Clearing the eyes makes them read as the
+            // paper-coloured eyes of the pet without hard-coding a light or
+            // dark menu-bar colour.
+            context.setFillColor(NSColor.black.cgColor)
+            context.fillEllipse(in: face)
+
+            let eyeWidth = diameter * 0.13
+            let eyeHeight = diameter * 0.31
+            let eyeOffset = diameter * 0.19
+            context.saveGState()
+            context.setBlendMode(.clear)
             for side in [-1.0, 1.0] {
-                let eyeCenterX = centerX + CGFloat(side) * 2.4
-                let eyeCenterY = rect.midY + 0.4
-                let capsule = BloubPaths.capsule(width: 2.2, height: 3.8)
+                let eyeCenterX = rect.midX + CGFloat(side) * eyeOffset
+                let eyeCenterY = rect.midY
+                let capsule = BloubPaths.capsule(width: eyeWidth, height: eyeHeight)
                 let transform = CGAffineTransform(translationX: eyeCenterX, y: eyeCenterY)
                 context.addPath(capsule.transformed(transform))
-                context.setFillColor(NSColor.black.cgColor)
                 context.fillPath()
             }
+            context.restoreGState()
             return true
         }
         image.isTemplate = true

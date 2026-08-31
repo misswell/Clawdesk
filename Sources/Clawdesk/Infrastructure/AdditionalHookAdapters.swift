@@ -310,7 +310,7 @@ extension HookInstaller {
           --permission-mode=suspect|--permission-mode=explicit) MODE_QUERY="&clawdesk-kimi-permission-mode=${MODE_FLAG#*=}" ;;
         esac
         URL="http://127.0.0.1:${PORT}/${ROUTE}?event=${EVENT}&agent=${AGENT}&clawdesk-hook-v1=1${MODE_QUERY}"
-        BODY=$(/usr/bin/cat)
+        BODY=$(/bin/cat)
         [ -z "$BODY" ] && BODY='{}'
         if [ "$ROUTE" = "permission" ]; then
           printf '%s' "$BODY" | /usr/bin/curl --silent --show-error --max-time 540 --connect-timeout 1 \

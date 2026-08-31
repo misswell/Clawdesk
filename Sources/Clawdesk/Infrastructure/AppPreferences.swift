@@ -98,7 +98,9 @@ public final class AppPreferences: ObservableObject {
         serverPort = UInt16(defaults.integer(forKey: "serverPort")) == 0 ? 37777 : UInt16(defaults.integer(forKey: "serverPort"))
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
-        petScale = min(2.0, max(0.4, defaults.object(forKey: "petScale") as? Double ?? 1.0))
+        petScale = PetSizing.clampedScale(
+            defaults.object(forKey: "petScale") as? Double ?? PetSizing.defaultScale
+        )
         freeRoamEnabled = defaults.bool(forKey: "freeRoam")
         collectClaudeUsage = defaults.object(forKey: "collectClaudeUsage") as? Bool ?? false
         autoCheckForUpdates = defaults.object(forKey: "autoCheckForUpdates") as? Bool ?? true

@@ -47,9 +47,15 @@ final class AppPreferencesTests: XCTestCase {
 
     func testPetScaleIsClampedOnLoad() {
         let high = makePreferences(suite: "clawdesk-scale-high-\(UUID().uuidString)", petScale: 5.0)
-        XCTAssertEqual(high.petScale, 2.0)
+        XCTAssertEqual(high.petScale, PetSizing.maximumScale)
         let low = makePreferences(suite: "clawdesk-scale-low-\(UUID().uuidString)", petScale: 0.05)
-        XCTAssertEqual(low.petScale, 0.4)
+        XCTAssertEqual(low.petScale, PetSizing.minimumScale)
+    }
+
+    func testPetPresentationUsesTheReducedBaseWindowSize() {
+        XCTAssertEqual(PetSizing.baseWindowSize, 120)
+        XCTAssertEqual(PetSizing.baseWindowSize / 240, 0.5, accuracy: 0.001)
+        XCTAssertEqual(PetSizing.bubbleAnchorWidth, 95)
     }
 
     func testSessionHUDDefaultsAndPersists() {

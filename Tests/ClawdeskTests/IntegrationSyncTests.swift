@@ -49,4 +49,21 @@ final class IntegrationSyncTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: extensionDirectory.appendingPathComponent(".clawdesk-managed.json").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(".claude/settings.json").path))
     }
+
+    func testPublishedEventStateReachesPetCanvas() {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = ClawdeskModel(preferences: makePreferences(home: root))
+        let controller = PetWindowController(model: model)
+        defer { controller.stop() }
+
+        model.accept(AgentEvent(
+            sessionID: "pet-binding-session",
+            agentID: "codex",
+            eventName: "UserPromptSubmit"
+        ))
+
+        XCTAssertEqual(model.petState, .thinking)
+        XCTAssertEqual((controller.window?.contentView as? PetCanvasView)?.petState, .thinking)
+    }
 }

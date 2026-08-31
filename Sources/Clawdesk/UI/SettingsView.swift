@@ -76,7 +76,7 @@ private struct GeneralSettingsView: View {
                 }
                 HStack {
                     Text(model.preferences.text("Pet size"))
-                    Slider(value: $model.preferences.petScale, in: 0.4...2.0)
+                    Slider(value: $model.preferences.petScale, in: PetSizing.scaleRange)
                     Text("\(Int((model.preferences.petScale * 100).rounded()))%")
                         .font(.caption.monospacedDigit())
                         .frame(width: 46, alignment: .trailing)

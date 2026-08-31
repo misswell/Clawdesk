@@ -36,7 +36,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         self.model = model
         quotaRing = QuotaRingWindowController(model: model)
         sessionHUD = SessionHUDWindowController(model: model)
-        let base = 240.0 * model.preferences.petScale
+        let base = PetSizing.baseWindowSize * CGFloat(model.preferences.petScale)
         petView = PetCanvasView(frame: NSRect(x: 0, y: 0, width: base, height: base))
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: base, height: base),
@@ -526,13 +526,16 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Continuously resizes the pet window from the 240-point logical canvas.
+    /// Continuously resizes the pet window from the reduced 120-point base.
     /// The bottom-center of the pet stays anchored so enlarging or shrinking
     /// feels like the pet itself is scaling in place.
     private func applyScale(_ scale: Double, animate: Bool) {
         guard let window else { return }
-        let clamped = min(2.0, max(0.4, scale))
-        let size = NSSize(width: 240 * clamped, height: 240 * clamped)
+        let clamped = PetSizing.clampedScale(scale)
+        let size = NSSize(
+            width: PetSizing.baseWindowSize * CGFloat(clamped),
+            height: PetSizing.baseWindowSize * CGFloat(clamped)
+        )
         let current = window.frame
         let target = NSRect(
             x: current.midX - size.width / 2,

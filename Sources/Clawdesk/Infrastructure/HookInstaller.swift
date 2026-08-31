@@ -301,7 +301,7 @@ public final class HookInstaller {
           *permission*|permissionrequest) ROUTE="permission" ;;
         esac
         URL="http://127.0.0.1:${PORT}/${ROUTE}?event=${EVENT}&agent=${AGENT}&clawdesk-hook-v1=1"
-        BODY=$(/usr/bin/cat)
+        BODY=$(/bin/cat)
         [ -z "$BODY" ] && BODY='{}'
         if [ "$ROUTE" = "permission" ]; then
           PERMISSION_TIMEOUT=540
