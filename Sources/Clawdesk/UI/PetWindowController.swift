@@ -244,6 +244,15 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         cancelIdleAnimation(resetCycle: true)
         petView.miniMode = enabled
+        // @Published sends its current value immediately when the controller
+        // subscribes during init. Sync the visual flag, but defer docking and
+        // persistence until the real startup path has restored the position.
+        guard isStarted else {
+            if enabled, model.petState == .idle {
+                setPetVisualState(.miniIdle)
+            }
+            return
+        }
         if enabled {
             // Park the normal-mode position: entering mini mode re-docks the
             // pet, and leaving must bring it back where the user had it.
@@ -553,7 +562,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
         if model.preferences.isMiniMode {
             moveToMiniEdge(animated: animate)
-        } else if !isDragging {
+        } else if isStarted && !isDragging {
             model.preferences.windowOrigin = target.origin
         }
         refreshSessionHUD()
@@ -625,6 +634,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     @objc private func quit() { onQuit?() ?? NSApp.terminate(nil) }
 
     public func windowDidMove(_ notification: Notification) {
+        guard isStarted else { return }
         guard !isDragging else { return }
         refreshQuotaRing()
         refreshSessionHUD()

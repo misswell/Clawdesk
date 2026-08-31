@@ -66,4 +66,39 @@ final class IntegrationSyncTests: XCTestCase {
         XCTAssertEqual(model.petState, .thinking)
         XCTAssertEqual((controller.window?.contentView as? PetCanvasView)?.petState, .thinking)
     }
+
+    func testSavedPetPositionSurvivesWindowControllerStartup() {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = makePreferences(home: root)
+        let savedOrigin = CGPoint(x: 640, y: 220)
+        preferences.windowOrigin = savedOrigin
+        XCTAssertEqual(preferences.windowOrigin, savedOrigin)
+        let model = ClawdeskModel(preferences: preferences)
+        let controller = PetWindowController(model: model)
+        defer { controller.stop() }
+
+        controller.start()
+
+        XCTAssertEqual(controller.window?.frame.origin, savedOrigin)
+        XCTAssertEqual(preferences.windowOrigin, savedOrigin)
+    }
+
+    func testSavedMiniPetPositionSurvivesWindowControllerStartup() {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = makePreferences(home: root)
+        let savedOrigin = CGPoint(x: 640, y: 220)
+        preferences.isMiniMode = true
+        preferences.windowOrigin = savedOrigin
+        XCTAssertEqual(preferences.windowOrigin, savedOrigin)
+        let model = ClawdeskModel(preferences: preferences)
+        let controller = PetWindowController(model: model)
+        defer { controller.stop() }
+
+        controller.start()
+
+        XCTAssertEqual(controller.window?.frame.origin, savedOrigin)
+        XCTAssertEqual(preferences.windowOrigin, savedOrigin)
+    }
 }
