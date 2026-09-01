@@ -9,12 +9,26 @@ public struct QuotaCoin: Equatable, Sendable {
     public let label: String
     public let outerPercent: Int
     public let innerPercent: Int?
+    public let outerWindow: String
+    public let innerWindow: String?
+    public let icon: AgentIconDescriptor
 
-    public init(providerID: String, label: String, outerPercent: Int, innerPercent: Int?) {
+    public init(
+        providerID: String,
+        label: String,
+        outerPercent: Int,
+        innerPercent: Int?,
+        outerWindow: String = "",
+        innerWindow: String? = nil,
+        icon: AgentIconDescriptor? = nil
+    ) {
         self.providerID = providerID
         self.label = label
         self.outerPercent = outerPercent
         self.innerPercent = innerPercent
+        self.outerWindow = outerWindow
+        self.innerWindow = innerWindow
+        self.icon = icon ?? AgentRegistry.icon(for: providerID)
     }
 }
 
@@ -43,7 +57,10 @@ public enum QuotaRingGeometry {
             providerID: report.providerID,
             label: report.displayName,
             outerPercent: outer.usedPercent,
-            innerPercent: inner.map { $0.usedPercent }
+            innerPercent: inner.map { $0.usedPercent },
+            outerWindow: outer.displayWindow,
+            innerWindow: inner?.displayWindow,
+            icon: AgentRegistry.icon(for: report.providerID)
         )
     }
 

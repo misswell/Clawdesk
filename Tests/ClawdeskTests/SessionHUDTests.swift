@@ -3,20 +3,50 @@ import XCTest
 @testable import Clawdesk
 
 final class SessionHUDTests: XCTestCase {
-    func testRowsHideSleepingSessionsAndFoldAfterThreeVisibleRows() {
+    func testRowsHideSleepingSessionsAndFoldAfterFiveVisibleRows() {
         let sessions = [
             makeSession(id: "one", state: .typing),
             makeSession(id: "two", state: .idle),
             makeSession(id: "sleep", state: .sleeping),
             makeSession(id: "three", state: .thinking),
-            makeSession(id: "four", state: .juggling)
+            makeSession(id: "four", state: .juggling),
+            makeSession(id: "five", state: .building),
+            makeSession(id: "six", state: .attention)
         ]
 
         let rows = SessionHUDGeometry.rows(from: sessions)
 
-        XCTAssertEqual(rows.sessions.map(\.id), ["one", "two", "three"])
+        XCTAssertEqual(rows.sessions.map(\.id), ["one", "two", "three", "four", "five"])
         XCTAssertEqual(rows.overflowCount, 1)
-        XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 184))
+        XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 268))
+    }
+
+    func testStatusPresentationKeepsStateOutOfTheSessionTitle() {
+        let working = makeSession(id: "working", state: .typing)
+        let idle = makeSession(id: "idle", state: .idle)
+
+        let workingStatus = SessionHUDPresentation.status(for: working)
+
+        XCTAssertEqual(workingStatus?.label, "Working")
+        XCTAssertEqual(workingStatus?.kind, .working)
+        XCTAssertNil(SessionHUDPresentation.status(for: idle))
+    }
+
+    func testStatusPresentationUsesEventSpecificLabels() {
+        var compacting = makeSession(id: "compacting", state: .sweeping)
+        compacting.lastEvent = "PreCompact"
+        var permission = makeSession(id: "permission", state: .notification)
+        permission.lastEvent = "PermissionRequest"
+
+        XCTAssertEqual(SessionHUDPresentation.status(for: compacting)?.kind, .compacting)
+        XCTAssertEqual(SessionHUDPresentation.status(for: permission)?.kind, .attention)
+    }
+
+    func testAgentIconCatalogDistinguishesKnownAgentsAndHasFallback() {
+        XCTAssertEqual(AgentRegistry.icon(for: "claude-code").kind, .claude)
+        XCTAssertEqual(AgentRegistry.icon(for: "codex").kind, .codex)
+        XCTAssertEqual(AgentRegistry.icon(for: "deepseek-harness").kind, .deepSeek)
+        XCTAssertEqual(AgentRegistry.icon(for: "unknown-agent").kind, .generic)
     }
 
     func testContextUsagePresentationUsesPercentageAndWarningThresholds() {

@@ -58,9 +58,34 @@ public struct QuotaReport: Codable, Equatable, Sendable, Identifiable {
 }
 
 public final class QuotaStore {
-    private var reportsByProvider: [String: QuotaReport] = [:]
+    private struct PersistedState: Codable {
+        let version: Int
+        let reports: [QuotaReport]
+    }
 
-    public init() {}
+    private var reportsByProvider: [String: QuotaReport] = [:]
+    private let persistenceURL: URL?
+    private let fileManager: FileManager
+
+    private static let defaultPersistenceURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".clawd/account-quota.json")
+    private static let maximumPersistedBytes = 1_000_000
+    private static let maximumPersistedReports = 64
+
+    /// The normal store survives relaunches so a recently reported balance is
+    /// available before the next statusline or Codex rollout event arrives.
+    /// Tests and embedders can pass `nil` for an in-memory store.
+    public init() {
+        self.persistenceURL = Self.defaultPersistenceURL
+        self.fileManager = .default
+        load()
+    }
+
+    public init(persistenceURL: URL?, fileManager: FileManager = .default) {
+        self.persistenceURL = persistenceURL
+        self.fileManager = fileManager
+        load()
+    }
 
     public var reports: [QuotaReport] {
         reportsByProvider.values.sorted { lhs, rhs in
@@ -75,11 +100,54 @@ public final class QuotaStore {
             return reports
         }
         reportsByProvider[report.providerID] = report
+        persist()
         return reports
     }
 
     public func removeAll() {
         reportsByProvider.removeAll()
+        persist()
+    }
+
+    private func load() {
+        guard let persistenceURL,
+              let attributes = try? fileManager.attributesOfItem(atPath: persistenceURL.path),
+              let byteCount = attributes[.size] as? NSNumber,
+              byteCount.intValue <= Self.maximumPersistedBytes,
+              let data = try? Data(contentsOf: persistenceURL) else { return }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let loaded: [QuotaReport]?
+        if let state = try? decoder.decode(PersistedState.self, from: data), state.version == 1 {
+            loaded = state.reports
+        } else {
+            loaded = try? decoder.decode([QuotaReport].self, from: data)
+        }
+        for report in (loaded ?? []).prefix(Self.maximumPersistedReports) {
+            if let existing = reportsByProvider[report.providerID], existing.capturedAt >= report.capturedAt {
+                continue
+            }
+            reportsByProvider[report.providerID] = report
+        }
+    }
+
+    private func persist() {
+        guard let persistenceURL else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let state = PersistedState(version: 1, reports: reports)
+        guard let data = try? encoder.encode(state) else { return }
+        do {
+            try fileManager.createDirectory(
+                at: persistenceURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: persistenceURL, options: [.atomic])
+        } catch {
+            // Quota is advisory. A read-only home or a transient disk error
+            // must never interfere with lifecycle events or the HUD.
+        }
     }
 }
 

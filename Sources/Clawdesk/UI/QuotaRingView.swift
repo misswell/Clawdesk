@@ -34,17 +34,66 @@ public final class QuotaRingView: NSView {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let outerRadius = rect.width / 2 - 3
         let innerRadius = outerRadius * 0.62
+        let outerColor = color(for: coin.outerPercent)
+        drawTrack(
+            center: center,
+            radius: outerRadius,
+            width: 6,
+            color: outerColor.withAlphaComponent(0.22),
+            context: context
+        )
         drawRing(center: center, radius: outerRadius, percent: coin.outerPercent, width: 6, context: context)
         if let innerPercent = coin.innerPercent {
+            let innerColor = color(for: innerPercent)
+            drawTrack(
+                center: center,
+                radius: innerRadius,
+                width: 5,
+                color: innerColor.withAlphaComponent(0.22),
+                context: context
+            )
             drawRing(center: center, radius: innerRadius, percent: innerPercent, width: 5, context: context)
         }
-        (String(coin.outerPercent) + "%" as NSString).draw(
-            at: NSPoint(x: rect.maxX + 5, y: rect.midY - 7),
-            withAttributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-                .foregroundColor: NSColor.labelColor
-            ]
+        AgentIconRenderer.draw(
+            coin.icon,
+            in: rect.insetBy(dx: 7, dy: 7),
+            context: context
         )
+        let readoutX = rect.maxX + 5
+        drawText(
+            "\(coin.outerPercent)%",
+            at: NSPoint(x: readoutX, y: rect.midY + 1),
+            font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
+            color: .labelColor
+        )
+        let window = coin.outerWindow.isEmpty ? coin.label : coin.outerWindow
+        drawText(
+            window,
+            at: NSPoint(x: readoutX, y: rect.midY - 11),
+            font: NSFont.systemFont(ofSize: 9, weight: .regular),
+            color: .secondaryLabelColor
+        )
+    }
+
+    private func drawTrack(
+        center: CGPoint,
+        radius: CGFloat,
+        width: CGFloat,
+        color: NSColor,
+        context: CGContext
+    ) {
+        let path = CGMutablePath()
+        path.addEllipse(in: CGRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        ))
+        context.addPath(path)
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(width)
+        context.setLineCap(.round)
+        context.strokePath()
     }
 
     private func drawRing(center: CGPoint, radius: CGFloat, percent: Int, width: CGFloat, context: CGContext) {
@@ -53,15 +102,24 @@ public final class QuotaRingView: NSView {
         let path = CGMutablePath()
         path.addArc(center: center, radius: radius, startAngle: start, endAngle: end, clockwise: true)
         context.addPath(path)
-        context.setStrokeColor(color(for: percent))
+        context.setStrokeColor(color(for: percent).cgColor)
         context.setLineWidth(width)
         context.setLineCap(.round)
         context.strokePath()
     }
 
-    private func color(for percent: Int) -> CGColor {
-        let color: NSColor = percent > 85 ? .systemRed : percent >= 60 ? .systemOrange : .systemGreen
-        return color.cgColor
+    private func drawText(_ text: String, at point: NSPoint, font: NSFont, color: NSColor) {
+        (text as NSString).draw(
+            at: point,
+            withAttributes: [
+                .font: font,
+                .foregroundColor: color
+            ]
+        )
+    }
+
+    private func color(for percent: Int) -> NSColor {
+        percent > 85 ? .systemRed : percent >= 60 ? .systemOrange : .systemGreen
     }
 }
 

@@ -14,6 +14,9 @@ public final class SessionHUDView: NSView {
     public var showContextUsage = true {
         didSet { needsDisplay = true }
     }
+    public var language = "en" {
+        didSet { needsDisplay = true }
+    }
 
     public var onSessionSelected: ((SessionSnapshot) -> Void)?
     public var onOverflowSelected: (() -> Void)?
@@ -146,12 +149,28 @@ public final class SessionHUDView: NSView {
         context.setFillColor(color(for: session.state).cgColor)
         context.fillEllipse(in: dotRect)
 
+        let iconRect = CGRect(
+            x: dotRect.maxX + 8,
+            y: rect.midY - 12,
+            width: 24,
+            height: 24
+        )
+        AgentIconRenderer.draw(
+            AgentRegistry.icon(for: session.agentID),
+            in: iconRect,
+            context: context
+        )
+
         let titleFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        let textX = dotRect.maxX + 8
+        let textX = iconRect.maxX + 8
+        let status = SessionHUDPresentation.status(for: session)
+        let statusFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        let statusRect: CGRect?
         let usage = showContextUsage
             ? ContextUsageFormatter.presentation(for: session.contextUsage)
             : nil
         let usageRect: CGRect?
+        var rightEdge = rect.maxX - rightInset
         if let usage {
             let chipFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
             let measured = (usage.label as NSString).size(withAttributes: [.font: chipFont]).width
@@ -166,13 +185,30 @@ public final class SessionHUDView: NSView {
             )
             drawUsageChip(usage, in: chipRect, context: context)
             usageRect = chipRect
+            rightEdge = chipRect.minX - SessionHUDGeometry.usageChipGap
         } else {
             usageRect = nil
         }
 
-        let titleMaximumX = usageRect?.minX ?? rect.maxX - rightInset
+        if let status {
+            let label = localized(status.label)
+            let measured = (label as NSString).size(withAttributes: [.font: statusFont]).width
+            let chipWidth = ceil(measured) + SessionHUDGeometry.usageChipGap * 2
+            let chipRect = CGRect(
+                x: rightEdge - chipWidth,
+                y: rect.midY - SessionHUDGeometry.statusChipHeight / 2,
+                width: chipWidth,
+                height: SessionHUDGeometry.statusChipHeight
+            )
+            drawStatusChip(status, label: label, in: chipRect, context: context)
+            statusRect = chipRect
+        } else {
+            statusRect = nil
+        }
+
+        let titleMaximumX = statusRect?.minX ?? usageRect?.minX ?? rect.maxX - rightInset
         let title = clippedToWidth(
-            (session.title.isEmpty ? session.agentID : session.title) + " · " + session.state.displayName,
+            session.title.isEmpty ? session.agentID : session.title,
             maximumWidth: max(20, titleMaximumX - SessionHUDGeometry.usageChipGap - textX),
             font: titleFont
         )
@@ -193,6 +229,30 @@ public final class SessionHUDView: NSView {
             at: NSPoint(x: textX, y: rect.midY - 13),
             font: detailFont,
             color: .secondaryLabelColor
+        )
+    }
+
+    private func drawStatusChip(
+        _ status: SessionHUDStatus,
+        label: String,
+        in rect: CGRect,
+        context: CGContext
+    ) {
+        let color = statusColor(for: status.kind)
+        let path = CGPath(
+            roundedRect: rect,
+            cornerWidth: rect.height / 2,
+            cornerHeight: rect.height / 2,
+            transform: nil
+        )
+        context.addPath(path)
+        context.setFillColor(color.withAlphaComponent(0.18).cgColor)
+        context.fillPath()
+        drawText(
+            label,
+            at: NSPoint(x: rect.minX + SessionHUDGeometry.usageChipGap, y: rect.minY + 3),
+            font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+            color: color
         )
     }
 
@@ -270,6 +330,24 @@ public final class SessionHUDView: NSView {
         case .sweeping, .carrying: return .systemPurple
         default: return .secondaryLabelColor
         }
+    }
+
+    private func statusColor(for kind: SessionHUDStatusKind) -> NSColor {
+        switch kind {
+        case .thinking: return .systemIndigo
+        case .working: return .systemGreen
+        case .building: return .systemBlue
+        case .juggling: return .systemPurple
+        case .compacting: return .systemPurple
+        case .preparing: return .systemOrange
+        case .complete: return .systemGreen
+        case .attention: return .systemOrange
+        case .error: return .systemRed
+        }
+    }
+
+    private func localized(_ value: String) -> String {
+        Localization.string(value, language: language) ?? value
     }
 }
 
@@ -383,6 +461,7 @@ public final class SessionHUDWindowController {
         view.rows = rows
         view.isPinned = isPinned
         view.showContextUsage = showContextUsage
+        view.language = model.preferences.resolvedLanguage
         panel?.setContentSize(size)
         panel?.setFrame(frame, display: true)
         panel?.orderFrontRegardless()

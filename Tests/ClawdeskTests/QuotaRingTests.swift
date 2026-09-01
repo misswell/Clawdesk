@@ -16,6 +16,9 @@ final class QuotaRingTests: XCTestCase {
         let coin = QuotaRingGeometry.coin(for: r)
         XCTAssertEqual(coin?.outerPercent, 50)
         XCTAssertEqual(coin?.innerPercent, 30)
+        XCTAssertEqual(coin?.outerWindow, "5h")
+        XCTAssertEqual(coin?.innerWindow, "7d")
+        XCTAssertEqual(coin?.icon.kind, .claude)
     }
 
     func testCoinWithoutWeeklyOnlyDrawsOuter() {

@@ -1,5 +1,34 @@
 import Foundation
 
+public enum AgentIconKind: String, Equatable, Hashable, Sendable {
+    case claude
+    case codex
+    case deepSeek
+    case copilot
+    case gemini
+    case antigravity
+    case cursor
+    case kimi
+    case qwen
+    case zcode
+    case openCode
+    case pi
+    case generic
+}
+
+/// The HUD deliberately keeps agent identity in a tiny native descriptor. It
+/// is rendered with CoreGraphics instead of shipping third-party brand assets,
+/// while the stable kind lets the UI and tests agree on the mapping.
+public struct AgentIconDescriptor: Equatable, Hashable, Sendable {
+    public let kind: AgentIconKind
+    public let glyph: String
+
+    public init(kind: AgentIconKind, glyph: String) {
+        self.kind = kind
+        self.glyph = glyph
+    }
+}
+
 public struct AgentDescriptor: Identifiable, Equatable, Hashable, Sendable {
     public let id: String
     public let displayName: String
@@ -47,5 +76,62 @@ public enum AgentRegistry {
 
     public static func descriptor(for id: String) -> AgentDescriptor? {
         all.first { $0.id == id }
+    }
+
+    public static func icon(for agentID: String) -> AgentIconDescriptor {
+        let normalized = agentID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+
+        let kind: AgentIconKind
+        switch normalized {
+        case let value where value.contains("claude"):
+            kind = .claude
+        case let value where value.contains("codex"):
+            kind = .codex
+        case let value where value.contains("deepseek"):
+            kind = .deepSeek
+        case let value where value.contains("copilot"):
+            kind = .copilot
+        case let value where value.contains("gemini"):
+            kind = .gemini
+        case let value where value.contains("antigravity"):
+            kind = .antigravity
+        case let value where value.contains("cursor"):
+            kind = .cursor
+        case let value where value.contains("kimi"):
+            kind = .kimi
+        case let value where value.contains("qwen"):
+            kind = .qwen
+        case let value where value.contains("zcode"):
+            kind = .zcode
+        case let value where value.contains("opencode") || value.contains("mimocode"):
+            kind = .openCode
+        case "pi":
+            kind = .pi
+        default:
+            kind = .generic
+        }
+
+        return AgentIconDescriptor(kind: kind, glyph: glyph(for: kind))
+    }
+
+    private static func glyph(for kind: AgentIconKind) -> String {
+        switch kind {
+        case .claude: return "✳"
+        case .codex: return "◎"
+        case .deepSeek: return "D"
+        case .copilot: return "⌁"
+        case .gemini: return "✦"
+        case .antigravity: return "✧"
+        case .cursor: return "↗"
+        case .kimi: return "K"
+        case .qwen: return "Q"
+        case .zcode: return "Z"
+        case .openCode: return "O"
+        case .pi: return "π"
+        case .generic: return "•"
+        }
     }
 }

@@ -111,6 +111,10 @@ public final class ClawdeskModel: ObservableObject {
         claudeHookHealth = ClaudeHookHealthMonitor(installer: installer)
         softwareUpdater = ClawdeskSoftwareUpdater()
         serverPort = preferences.serverPort
+        // QuotaStore restores the last account reports before any new hook or
+        // rollout event arrives, so Orbit can show the previous balance on
+        // the first frame after relaunch.
+        quotaReports = quotaStore.reports
         eventServer.onMessage = { [weak self] message in
             Task { @MainActor [weak self] in
                 self?.receive(message)

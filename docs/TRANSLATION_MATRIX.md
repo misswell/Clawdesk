@@ -16,8 +16,8 @@ Status legend:
 | `server.js`, `server-route-state.js`, `server-route-permission.js`, `server-hook-events.js`, `server-permission-utils.js`, `server-agent-id.js` | Done | `LocalEventServer` |
 | `server-codex-official-turns.js` | Partial | Codex official hook path + JSONL fallback |
 | `state.js`, `state-priority.js`, `state-session-events.js`, `state-session-snapshot.js`, `state-stale-cleanup.js`, `state-session-dedupe.js` | Done | `EventStateReducer` / `SessionStore` |
-| `state-visual-resolver.js`, `state-agent-icons.js`, `state-hitbox-resolver.js` | Partial | visual mapping done; agent icons/hitboxes pending |
-| `state-account-quota.js` | Partial | `QuotaStore`; account-level persistence pending |
+| `state-visual-resolver.js`, `state-agent-icons.js`, `state-hitbox-resolver.js` | Partial | native state/agent icon mapping done; upstream remote source metadata and hitbox resolver remain outside the compact native seam |
+| `state-account-quota.js` | Partial | `QuotaStore` persists and restores the latest local provider reports; full upstream source/provider grouping and stale-window arbitration remain pending |
 | `subagent-lifecycle.js`, `server-windows-process-metadata.js` | Done / Excluded | identity/count tiers and Claude typed background-subagent completion holds are native; Windows process metadata is outside the macOS target |
 | `transcript-path.js`, `codex-monitor-callback.js`, `codex-official-activity.js`, `codex-assistant-output.js`, `codex-session-index.js`, `codex-user-input.js`, `codex-subagent-fields.js`, `codex-turn-id.js`, `codex-turn-fence.js`, `codex-originator.js` | Partial | `CodexLogMonitor` + adapters |
 | `session-alias.js`, `session-key.js`, `session-open-folder.js`, `session-recovery-loader.js`, `session-focus*.js`, `session-ipc.js`, `session-hud*.js` | Done | Dashboard/Sessions focus + native click-reveal Session HUD with pinning, hot-zone grace, context usage and bounded overflow |

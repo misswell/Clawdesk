@@ -53,7 +53,10 @@ public enum SessionHUDVisibility {
 }
 
 public enum SessionHUDGeometry {
-    public static let maximumVisibleRows = 3
+    /// The upstream keeps five rows when status labels are enabled. The native
+    /// HUD always renders those labels, so the same limit avoids hiding active
+    /// agents behind an overflow row on ordinary multi-agent work.
+    public static let maximumVisibleRows = 5
     public static let rowHeight: CGFloat = 42
     public static let contentWidth: CGFloat = 286
     public static let horizontalPadding: CGFloat = 12
@@ -61,6 +64,7 @@ public enum SessionHUDGeometry {
     public static let petGap: CGFloat = 8
     public static let edgeMargin: CGFloat = 10
     public static let usageChipHeight: CGFloat = 18
+    public static let statusChipHeight: CGFloat = 18
     public static let usageChipMinWidth: CGFloat = 34
     public static let usageChipGap: CGFloat = 6
 

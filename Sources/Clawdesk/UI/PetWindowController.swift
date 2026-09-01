@@ -150,6 +150,11 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         isStarted = true
         restorePosition()
         window?.orderFrontRegardless()
+        // The quota store may have restored the last account report before
+        // this controller was created; draw that balance immediately instead
+        // of waiting for the next hook/statusline event.
+        refreshQuotaRing()
+        refreshSessionHUD()
         restartAnimationTimer()
         restartPointerTimer()
         sleepTimer = PetTimerScheduler.schedule(

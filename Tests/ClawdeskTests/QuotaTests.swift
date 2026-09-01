@@ -33,7 +33,7 @@ final class QuotaTests: XCTestCase {
     }
 
     func testQuotaStoreRejectsOlderReports() {
-        let store = QuotaStore()
+        let store = QuotaStore(persistenceURL: nil)
         let newer = QuotaReport(
             providerID: "codex",
             displayName: "Codex",
@@ -50,5 +50,25 @@ final class QuotaTests: XCTestCase {
         _ = store.apply(newer)
         _ = store.apply(older)
         XCTAssertEqual(store.reports.first?.buckets.first?.usedPercent, 40)
+    }
+
+    func testQuotaStorePersistsLatestReportForTheNextLaunch() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk-quota-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let report = QuotaReport(
+            providerID: "codex",
+            displayName: "Codex",
+            buckets: [QuotaBucket(id: "fiveHour", usedPercent: 22, windowMinutes: 300)],
+            capturedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        _ = QuotaStore(persistenceURL: url).apply(report)
+
+        let reloaded = QuotaStore(persistenceURL: url)
+
+        XCTAssertEqual(reloaded.reports.first?.providerID, "codex")
+        XCTAssertEqual(reloaded.reports.first?.buckets.first?.usedPercent, 22)
+        XCTAssertEqual(reloaded.reports.first?.buckets.first?.displayWindow, "5h")
     }
 }
