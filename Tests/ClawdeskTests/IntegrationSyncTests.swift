@@ -84,6 +84,23 @@ final class IntegrationSyncTests: XCTestCase {
         XCTAssertEqual(preferences.windowOrigin, savedOrigin)
     }
 
+    func testSavedPetPositionSurvivesDelayedStartupWindowCallbacks() async throws {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = makePreferences(home: root)
+        let savedOrigin = CGPoint(x: 640, y: 220)
+        preferences.windowOrigin = savedOrigin
+        let model = ClawdeskModel(preferences: preferences)
+        let controller = PetWindowController(model: model)
+        defer { controller.stop() }
+
+        controller.start()
+        try await Task.sleep(for: .milliseconds(400))
+
+        XCTAssertEqual(controller.window?.frame.origin, savedOrigin)
+        XCTAssertEqual(preferences.windowOrigin, savedOrigin)
+    }
+
     func testSavedMiniPetPositionSurvivesWindowControllerStartup() {
         let root = makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

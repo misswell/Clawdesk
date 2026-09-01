@@ -107,7 +107,14 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.updateStateAssetOverride()
         }.store(in: &cancellables)
         model.preferences.$petScale.sink { [weak self] scale in
-            self?.applyScale(scale, animate: true)
+            guard let self else { return }
+            // @Published replays the current value when this controller is
+            // created. Before start() that callback is only a size sync; an
+            // animation launched here can finish after restorePosition() and
+            // move the freshly restored window back to its initial (0, 0)
+            // frame. Startup must be synchronous; later user changes may
+            // animate normally.
+            self.applyScale(scale, animate: self.isStarted)
         }.store(in: &cancellables)
         model.$quotaReports.sink { [weak self] _ in
             self?.refreshQuotaRing()
@@ -480,7 +487,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             persistCurrentWindowOrigin()
             return
         }
-        if let screen = NSScreen.main {
+        if let screen = screenForWindow(window) {
             let frame = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30))
             persistCurrentWindowOrigin()
