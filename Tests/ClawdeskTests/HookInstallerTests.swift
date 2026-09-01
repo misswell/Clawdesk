@@ -385,4 +385,83 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(additionalSource.contains("/bin/cat"), "Additional adapters must read agent JSON from stdin on macOS")
         XCTAssertFalse(additionalSource.contains("/usr/bin/cat"), "Additional adapters must not use the unavailable /usr/bin/cat path")
     }
+
+    func testCoreAgentHookCommandsQuoteTheApplicationSupportPath() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk hook quoting-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let installer = HookInstaller(homeDirectory: root)
+        _ = try installer.installClaudeHooks(port: 37_820)
+        let claudeURL = root.appendingPathComponent(".claude/settings.json")
+        let claude = try JSONSerialization.jsonObject(with: Data(contentsOf: claudeURL)) as! [String: Any]
+        let claudeHooks = claude["hooks"] as! [String: Any]
+        let claudeStart = claudeHooks["SessionStart"] as! [[String: Any]]
+        let claudeCommand = try XCTUnwrap(
+            claudeStart
+                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+                .compactMap { $0["command"] as? String }
+                .first { $0.contains(HookInstaller.marker) }
+        )
+        XCTAssertEqual(claudeCommand, "'\(installer.hookScript.path)' SessionStart claude-code")
+
+        _ = try installer.installCodexHooks(port: 37_820)
+        let codexURL = root.appendingPathComponent(".codex/hooks.json")
+        let codex = try JSONSerialization.jsonObject(with: Data(contentsOf: codexURL)) as! [String: Any]
+        let codexHooks = codex["hooks"] as! [String: Any]
+        let codexStart = codexHooks["SessionStart"] as! [[String: Any]]
+        let codexCommand = try XCTUnwrap(
+            codexStart
+                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+                .compactMap { $0["command"] as? String }
+                .first { $0.contains(HookInstaller.marker) }
+        )
+        XCTAssertEqual(codexCommand, "'\(installer.hookScript.path)' SessionStart codex")
+    }
+
+    func testExistingCoreAgentHookCommandsAreRepairedWhenTheyAreUnquoted() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk hook repair quoting-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let installer = HookInstaller(homeDirectory: root)
+        let oldCommand = "\(installer.hookScript.path) SessionStart"
+        let claudeURL = root.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: claudeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "hooks": ["SessionStart": [["matcher": "", "hooks": [["type": "command", "command": oldCommand]]]]]
+        ]).write(to: claudeURL)
+
+        let first = try installer.installClaudeHooks(port: 37_821)
+        XCTAssertTrue(first.changed)
+        let claude = try JSONSerialization.jsonObject(with: Data(contentsOf: claudeURL)) as! [String: Any]
+        let claudeHooks = claude["hooks"] as! [String: Any]
+        let claudeStart = claudeHooks["SessionStart"] as! [[String: Any]]
+        let repairedClaude = try XCTUnwrap(
+            claudeStart
+                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+                .compactMap { $0["command"] as? String }
+                .first { $0.contains(HookInstaller.marker) }
+        )
+        XCTAssertEqual(repairedClaude, "'\(installer.hookScript.path)' SessionStart claude-code")
+
+        let codexURL = root.appendingPathComponent(".codex/hooks.json")
+        try FileManager.default.createDirectory(at: codexURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "hooks": ["SessionStart": [["hooks": [["type": "command", "command": oldCommand]]]]]
+        ]).write(to: codexURL)
+
+        let second = try installer.installCodexHooks(port: 37_821)
+        XCTAssertTrue(second.changed)
+        let codex = try JSONSerialization.jsonObject(with: Data(contentsOf: codexURL)) as! [String: Any]
+        let codexHooks = codex["hooks"] as! [String: Any]
+        let codexStart = codexHooks["SessionStart"] as! [[String: Any]]
+        let repairedCodex = try XCTUnwrap(
+            codexStart
+                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+                .compactMap { $0["command"] as? String }
+                .first { $0.contains(HookInstaller.marker) }
+        )
+        XCTAssertEqual(repairedCodex, "'\(installer.hookScript.path)' SessionStart codex")
+    }
 }

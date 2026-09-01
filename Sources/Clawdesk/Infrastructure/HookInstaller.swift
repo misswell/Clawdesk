@@ -170,13 +170,18 @@ public final class HookInstaller {
         ]
         var changed = false
         for event in stateEvents {
-            let command = "\(hookScript.path) \(event)"
+            let command = coreHookCommand(event: event, agentID: "claude-code")
             let desired: [String: Any] = [
                 "matcher": "",
                 "hooks": [["type": "command", "command": command, "async": true, "timeout": 5]]
             ]
             var entries = normalizedEntries(hooks[event])
-            if !containsManagedEntry(entries) {
+            if containsManagedEntry(entries) {
+                let repaired = replaceManagedHookCommand(in: entries, with: command)
+                entries = repaired.entries
+                changed = changed || repaired.changed
+                hooks[event] = entries
+            } else {
                 entries.append(desired)
                 hooks[event] = entries
                 changed = true
@@ -216,9 +221,14 @@ public final class HookInstaller {
         var hooks = (settings["hooks"] as? [String: Any]) ?? [:]
         var changed = false
         for event in ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop"] {
-            let command = "\(hookScript.path) \(event)"
+            let command = coreHookCommand(event: event, agentID: "codex")
             var entries = normalizedEntries(hooks[event])
-            if !containsManagedEntry(entries) {
+            if containsManagedEntry(entries) {
+                let repaired = replaceManagedHookCommand(in: entries, with: command)
+                entries = repaired.entries
+                changed = changed || repaired.changed
+                hooks[event] = entries
+            } else {
                 entries.append(["hooks": [["type": "command", "command": command, "timeout": 5]]])
                 hooks[event] = entries
                 changed = true
@@ -356,6 +366,43 @@ public final class HookInstaller {
         if let entries = value as? [[String: Any]] { return entries }
         if let entry = value as? [String: Any] { return [entry] }
         return []
+    }
+
+    private func coreHookCommand(event: String, agentID: String) -> String {
+        // The Application Support path contains a space on macOS. These
+        // commands are executed by agent shells, so leaving the path raw
+        // silently turns one hook into several nonexistent path segments.
+        "\(hookScript.path.shellQuoted) \(event) \(agentID)"
+    }
+
+    private func replaceManagedHookCommand(
+        in entries: [[String: Any]],
+        with command: String
+    ) -> (entries: [[String: Any]], changed: Bool) {
+        var changed = false
+        let updated = entries.map { original -> [String: Any] in
+            var entry = original
+            if var nested = entry["hooks"] as? [[String: Any]] {
+                for index in nested.indices {
+                    var hook = nested[index]
+                    guard let existing = hook["command"] as? String,
+                          existing.contains(Self.marker) else { continue }
+                    if existing != command {
+                        hook["command"] = command
+                        nested[index] = hook
+                        changed = true
+                    }
+                }
+                entry["hooks"] = nested
+            } else if let existing = entry["command"] as? String,
+                      existing.contains(Self.marker),
+                      existing != command {
+                entry["command"] = command
+                changed = true
+            }
+            return entry
+        }
+        return (updated, changed)
     }
 
     private func flattenHookEntries(_ entry: [String: Any]) -> [[String: Any]] {

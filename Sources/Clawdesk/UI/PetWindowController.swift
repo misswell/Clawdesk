@@ -223,6 +223,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func stop() {
+        // Persist the last on-screen frame before disabling the delegate
+        // callbacks and closing the panel. This is especially important for
+        // mini mode, where a move can happen without a later mouse-up.
+        persistCurrentWindowOrigin(allowDragging: true)
         isStarted = false
         animationTimer?.invalidate()
         pointerTimer?.invalidate()
@@ -261,9 +265,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             moveToMiniEdge(animated: animate)
             if model.petState == .idle { setPetVisualState(.miniIdle) }
         } else {
-            if let parked = model.preferences.preMiniWindowOrigin {
+            if let parked = model.preferences.preMiniWindowOrigin,
+               !isLegacyStartupParkedOrigin(parked) {
                 window.setFrameOrigin(parked)
                 model.preferences.windowOrigin = parked
+                model.preferences.preMiniWindowOrigin = nil
+            } else if let saved = model.preferences.windowOrigin {
+                // A pre-0.1.27 startup callback could save the controller's
+                // initial (0, 0) frame as the parked position. Keep the last
+                // real position rather than reviving that lower-left value.
+                window.setFrameOrigin(saved)
+                model.preferences.windowOrigin = saved
                 model.preferences.preMiniWindowOrigin = nil
             } else {
                 moveBackFromMini()
@@ -455,15 +467,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         // was docked or dragged when the session ended.
         if let saved = model.preferences.windowOrigin {
             window.setFrameOrigin(saved)
+            persistCurrentWindowOrigin()
             return
         }
         if model.preferences.isMiniMode {
             moveToMiniEdge(animated: false)
+            persistCurrentWindowOrigin()
             return
         }
         if let screen = NSScreen.main {
             let frame = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30))
+            persistCurrentWindowOrigin()
         }
     }
 
@@ -478,6 +493,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             }
         } else {
             window.setFrameOrigin(target)
+            persistCurrentWindowOrigin()
         }
     }
 
@@ -486,8 +502,22 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         let frame = screen.visibleFrame
         let target = NSPoint(x: frame.maxX - window.frame.width - 26, y: max(frame.minY + 30, window.frame.minY))
         window.setFrameOrigin(target)
-        model.preferences.windowOrigin = target
+        persistCurrentWindowOrigin()
         sessionHUD.hide()
+    }
+
+    private func isLegacyStartupParkedOrigin(_ origin: CGPoint) -> Bool {
+        origin == .zero
+            && model.preferences.windowOrigin != nil
+            && model.preferences.windowOrigin != .zero
+    }
+
+    private func persistCurrentWindowOrigin(allowDragging: Bool = false) {
+        guard isStarted,
+              let window,
+              (allowDragging || !isDragging),
+              !isRoaming else { return }
+        model.preferences.windowOrigin = window.frame.origin
     }
 
     private func checkRoam() {
@@ -530,7 +560,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             window.animator().setFrameOrigin(newOrigin)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in
-                self?.isRoaming = false
+                guard let self else { return }
+                self.isRoaming = false
+                self.persistCurrentWindowOrigin()
             }
         }
     }
@@ -638,8 +670,11 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard !isDragging else { return }
         refreshQuotaRing()
         refreshSessionHUD()
-        guard !model.preferences.isMiniMode, !isRoaming else { return }
-        model.preferences.windowOrigin = window?.frame.origin
+        persistCurrentWindowOrigin()
+    }
+
+    public func windowWillClose(_ notification: Notification) {
+        persistCurrentWindowOrigin(allowDragging: true)
     }
 
     private func refreshQuotaRing() {

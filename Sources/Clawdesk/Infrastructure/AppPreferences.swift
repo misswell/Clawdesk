@@ -127,6 +127,17 @@ public final class AppPreferences: ObservableObject {
             preMiniWindowOrigin = nil
         }
         customThemes = Self.loadCustomThemes(from: customThemesDirectory)
+        // Before startup position restoration was guarded, the initial panel
+        // frame could be recorded as the parked normal-mode position. A
+        // non-zero saved frame paired with preMini=(0, 0) is that legacy
+        // signature; discard only that combination so a real lower-left
+        // position (which is also stored as windowOrigin=(0, 0)) survives.
+        if isMiniMode,
+           preMiniWindowOrigin == .zero,
+           let windowOrigin,
+           windowOrigin != .zero {
+            preMiniWindowOrigin = nil
+        }
         isLoading = false
     }
 
