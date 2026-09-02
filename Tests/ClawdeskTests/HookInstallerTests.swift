@@ -100,6 +100,24 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(config.contains("model = \"gpt-5.3\""))
     }
 
+    func testCodexDesktopAndCLIUseOneCanonicalIntegrationAndRespectCODEXHOME() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-client-test-\(UUID().uuidString)")
+        let codexHome = root.appendingPathComponent("codex-data", isDirectory: true)
+        let installer = HookInstaller(
+            homeDirectory: root,
+            environment: ["CODEX_HOME": codexHome.path]
+        )
+
+        let result = try installer.install(agentID: "codex-cli", port: 37_803)
+
+        XCTAssertEqual(result.agentID, "codex")
+        XCTAssertEqual(result.configPath, codexHome.appendingPathComponent("hooks.json"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: result.configPath.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(".codex/hooks.json").path))
+        XCTAssertEqual(AgentRegistry.descriptor(for: "codex-desktop")?.id, "codex")
+        XCTAssertEqual(AgentRegistry.descriptor(for: "codex")?.displayName, "Codex")
+    }
+
     func testLegacyKimiHooksPersistAndPreservePermissionMode() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-kimi-hook-test-\(UUID().uuidString)")
         let configURL = root.appendingPathComponent(".kimi/config.toml")

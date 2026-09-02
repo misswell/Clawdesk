@@ -424,7 +424,8 @@ public final class LocalEventServer: @unchecked Sendable {
         let queryAgent = [query["agent_id"], query["agent"]]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty }
-        let agentID = queryAgent ?? string(["agent_id", "agentId", "source", "agent"]) ?? "custom"
+        let rawAgentID = queryAgent ?? string(["agent_id", "agentId", "source", "agent"]) ?? "custom"
+        let agentID = AgentRegistry.canonicalID(for: rawAgentID)
         let normalizedAgentID = agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let namespacedSessionID = normalizedAgentID == "traecode" && !rawSessionID.hasPrefix("traecode:")
             ? "traecode:\(rawSessionID)"

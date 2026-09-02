@@ -26,14 +26,21 @@ public final class HookInstaller {
 
     let fileManager: FileManager
     let homeDirectory: URL
+    /// Codex may be redirected with CODEX_HOME. Its config must follow that
+    /// same directory while Clawdesk's runtime stays under the normal home.
+    let codexHomeDirectory: URL
     let appSupportDirectory: URL
 
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        codexHomeDirectory: URL? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.homeDirectory = homeDirectory
         self.fileManager = fileManager
+        self.codexHomeDirectory = codexHomeDirectory
+            ?? Self.resolveCodexHomeDirectory(homeDirectory: homeDirectory, environment: environment)
         appSupportDirectory = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk", isDirectory: true)
     }
 
@@ -59,7 +66,7 @@ public final class HookInstaller {
     }
 
     public func install(agentID: String, port: UInt16) throws -> HookInstallResult {
-        switch agentID {
+        switch AgentRegistry.canonicalID(for: agentID) {
         case "claude-code": return try installClaudeHooks(port: port)
         case "codex": return try installCodexHooks(port: port)
         default: return try installAdditionalAgentHooks(agentID: agentID, port: port)
@@ -71,14 +78,15 @@ public final class HookInstaller {
     /// in the config they merge; Kimi needs a separate path to avoid creating
     /// its legacy profile while repairing the modern profile.
     public func repairExistingAgent(agentID: String, port: UInt16) throws -> HookInstallResult {
-        if agentID == "kimi-cli" {
+        let canonicalID = AgentRegistry.canonicalID(for: agentID)
+        if canonicalID == "kimi-cli" {
             return try repairKimiHooks()
         }
-        return try install(agentID: agentID, port: port)
+        return try install(agentID: canonicalID, port: port)
     }
 
     public func uninstall(agentID: String) throws -> HookInstallResult {
-        switch agentID {
+        switch AgentRegistry.canonicalID(for: agentID) {
         case "claude-code": return try uninstallClaudeHooks()
         case "codex": return try uninstallCodexHooks()
         default: return try uninstallAdditionalAgentHooks(agentID: agentID)
@@ -214,7 +222,7 @@ public final class HookInstaller {
 
     public func installCodexHooks(port: UInt16) throws -> HookInstallResult {
         try prepareHookScript()
-        let codexDirectory = homeDirectory.appendingPathComponent(".codex", isDirectory: true)
+        let codexDirectory = codexHomeDirectory
         try fileManager.createDirectory(at: codexDirectory, withIntermediateDirectories: true)
         let hooksURL = codexDirectory.appendingPathComponent("hooks.json")
         var settings = try readJSONObject(at: hooksURL)
@@ -271,7 +279,7 @@ public final class HookInstaller {
     }
 
     private func uninstallCodexHooks() throws -> HookInstallResult {
-        let url = homeDirectory.appendingPathComponent(".codex/hooks.json")
+        let url = codexHomeDirectory.appendingPathComponent("hooks.json")
         var settings = try readJSONObject(at: url)
         var hooks = (settings["hooks"] as? [String: Any]) ?? [:]
         var changed = false
@@ -450,6 +458,21 @@ public final class HookInstaller {
         }
         let updated = source.hasSuffix("\n") ? source + "[features]\nhooks = true\n" : source + "\n[features]\nhooks = true\n"
         try updated.data(using: .utf8)?.write(to: url, options: .atomic)
+    }
+
+    private static func resolveCodexHomeDirectory(
+        homeDirectory: URL,
+        environment: [String: String]
+    ) -> URL {
+        guard let raw = environment["CODEX_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return homeDirectory.appendingPathComponent(".codex", isDirectory: true)
+        }
+        let expanded = (raw as NSString).expandingTildeInPath
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded, isDirectory: true)
+        }
+        return homeDirectory.appendingPathComponent(expanded, isDirectory: true)
     }
 }
 

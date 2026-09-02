@@ -31,6 +31,10 @@ public enum AgentProcessProbe {
     public static let defaultNeedles: [AgentProcessNeedle] = [
         AgentProcessNeedle(agentID: "claude-code", commandMarker: "claude-code"),
         AgentProcessNeedle(agentID: "codex", commandMarker: "codex"),
+        // Codex Desktop's packaged macOS helpers use a capitalized `Codex`
+        // executable name, while the CLI/app-server binary is lowercase.
+        AgentProcessNeedle(agentID: "codex", executableName: "Codex"),
+        AgentProcessNeedle(agentID: "codex", executableName: "codex"),
         AgentProcessNeedle(agentID: "copilot-cli", commandMarker: "copilot"),
         AgentProcessNeedle(agentID: "codebuddy", commandMarker: "codebuddy"),
         AgentProcessNeedle(agentID: "kimi-cli", commandMarker: "kimi-code"),

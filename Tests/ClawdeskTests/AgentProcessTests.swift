@@ -20,6 +20,10 @@ final class AgentProcessTests: XCTestCase {
             needles: needles
         ))
         XCTAssertTrue(AgentProcessProbe.isRunningAgent(
+            commandLines: ["/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/151.0.7922.174/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer"],
+            needles: needles
+        ))
+        XCTAssertTrue(AgentProcessProbe.isRunningAgent(
             commandLines: ["node /opt/zcode/resources/glm/zcode.cjs app-server"],
             needles: needles
         ))

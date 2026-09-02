@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The current 0.1.34 build keeps the native Session HUD and upstream theme-driven sleep sequence: after the
+The current 0.1.35 build keeps the native Session HUD and upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
@@ -47,7 +47,11 @@ curl -X POST http://127.0.0.1:37777/state \
   -d '{"agent_id":"demo","session_id":"demo-1","event":"UserPromptSubmit","title":"Demo task"}'
 ```
 
-Install Claude Code or Codex hooks from Settings → Agents. The installer
+Install Claude Code or Codex (Desktop and CLI) hooks from Settings → Agents.
+Both Codex clients share one integration and one session identity; Clawdesk
+also follows date-partitioned `~/.codex/sessions/YYYY/MM/DD` rollout files,
+including conversations that continue writing to an older day directory.
+`CODEX_HOME` is honored when Codex uses a custom data directory. The installer
 merges only Clawdesk-owned entries, preserves existing hooks, and leaves a
 backup before changing a configuration file.
 
@@ -64,10 +68,10 @@ agent integrations. Generated plugins read the current local port from
 not require reinstalling hooks.
 
 Codex JSONL is monitored as a bounded fallback when official hooks miss an
-event. Codex `request_user_input` produces a read-only question card; answers
-remain in Codex and the matching output closes the card. Claude Code's
-official status-line payload and Codex rollout metadata feed the quota rings
-without retaining transcripts.
+event, for both Desktop and CLI. Codex `request_user_input` produces a
+read-only question card; answers remain in Codex and the matching output
+closes the card. Claude Code's official status-line payload and Codex rollout
+metadata feed the quota rings without retaining transcripts.
 
 Remote SSH profiles deploy Claude/Codex/Copilot hooks through the system `ssh` client.
 Each connection gets a loopback-only, profile-bound ingress and nonce, an

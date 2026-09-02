@@ -116,6 +116,20 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(reloaded.enabledAgentIDs, ["claude-code", "codex"])
     }
 
+    func testLegacyCodexClientAliasLoadsAsTheSharedCodexIntegration() {
+        let suite = "clawdesk-codex-alias-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(["codex-cli", "codex-desktop"], forKey: "enabledAgentIDs")
+
+        let preferences = AppPreferences(
+            defaults: defaults,
+            homeDirectory: FileManager.default.temporaryDirectory
+        )
+
+        XCTAssertEqual(preferences.enabledAgentIDs, ["codex"])
+    }
+
     func testWindowOriginsPersistIncludingParkedPreMiniSpot() {
         let suite = "clawdesk-position-memory-\(UUID().uuidString)"
         let prefs = makePreferences(suite: suite)

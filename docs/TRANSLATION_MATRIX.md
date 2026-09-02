@@ -30,7 +30,7 @@ Status legend:
 | Upstream | Status | Clawdesk seam |
 | --- | --- | --- |
 | claude (hook/install/statusline/rate-limits/stop-disposition), `claude-hook-health.js`, `claude-hook-operations.js`, `claude-settings-watcher.js` | Done | `HookInstaller` + `ClaudeHookHealthMonitor` |
-| codex (hook/install/rate-limits/debug/remote-monitor) | Done | `HookInstaller` + `CodexLogMonitor` |
+| codex Desktop + CLI (hook/install/rate-limits/debug/remote-monitor) | Done | `HookInstaller` + `CodexLogMonitor`; one canonical integration, `CODEX_HOME`, and date-partitioned rollout discovery |
 | copilot, gemini, antigravity, cursor, codebuddy, workbuddy, qwen, codewhale, kiro, kimi, reasonix, qoder/qoderwork/qwenwork, TraeCode | Done | `AdditionalHookAdapters` |
 | zcode lifecycle + manual `PermissionRequest` approval | Done | `AdditionalHookAdapters` + `AgentEventAdapters` strict ZCode response |
 | opencode/mimocode, openclaw, hermes, pi, dsh | Done | `PluginHookAdapters` |

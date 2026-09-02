@@ -108,12 +108,15 @@ public final class ClawdeskModel: ObservableObject {
         let server = LocalEventServer(preferredPort: preferences.serverPort)
         eventServer = server
         remoteSSHManager = RemoteSSHManager(eventServer: server)
-        let installer = providedHookInstaller ?? HookInstaller()
+        let installer = providedHookInstaller ?? HookInstaller(homeDirectory: preferences.homeDirectory)
         hookInstaller = installer
         doctor = AgentDoctor(installer: installer)
         remoteNotifier = RemoteNotifier()
         mobileBridge = MobileBridge(preferredPort: preferences.mobilePort)
-        codexLogMonitor = CodexLogMonitor()
+        codexLogMonitor = CodexLogMonitor(
+            homeDirectory: installer.homeDirectory,
+            codexHomeDirectory: installer.codexHomeDirectory
+        )
         claudeHookHealth = ClaudeHookHealthMonitor(installer: installer)
         softwareUpdater = ClawdeskSoftwareUpdater()
         serverPort = preferences.serverPort
@@ -406,28 +409,30 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func installAgent(_ agentID: String) {
+        let canonicalID = AgentRegistry.canonicalID(for: agentID)
         do {
-            let result = try hookInstaller.install(agentID: agentID, port: serverPort)
-            preferences.enabledAgentIDs.insert(agentID)
-            agentInstallStatus[agentID] = result.message
-            if agentID == "claude-code", preferences.collectClaudeUsage {
+            let result = try hookInstaller.install(agentID: canonicalID, port: serverPort)
+            preferences.enabledAgentIDs.insert(canonicalID)
+            agentInstallStatus[canonicalID] = result.message
+            if canonicalID == "claude-code", preferences.collectClaudeUsage {
                 _ = try hookInstaller.ensureClaudeStatusLine()
             }
             eventLog.insert("system · \(result.message)", at: 0)
         } catch {
-            agentInstallStatus[agentID] = error.localizedDescription
+            agentInstallStatus[canonicalID] = error.localizedDescription
             eventLog.insert("system · hook install failed: \(error.localizedDescription)", at: 0)
         }
     }
 
     public func uninstallAgent(_ agentID: String) {
+        let canonicalID = AgentRegistry.canonicalID(for: agentID)
         do {
-            let result = try hookInstaller.uninstall(agentID: agentID)
-            preferences.enabledAgentIDs.remove(agentID)
-            agentInstallStatus[agentID] = result.message
+            let result = try hookInstaller.uninstall(agentID: canonicalID)
+            preferences.enabledAgentIDs.remove(canonicalID)
+            agentInstallStatus[canonicalID] = result.message
             eventLog.insert("system · \(result.message)", at: 0)
         } catch {
-            agentInstallStatus[agentID] = error.localizedDescription
+            agentInstallStatus[canonicalID] = error.localizedDescription
             eventLog.insert("system · hook removal failed: \(error.localizedDescription)", at: 0)
         }
     }

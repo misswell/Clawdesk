@@ -50,9 +50,9 @@ public final class AgentDoctor {
 
     public func configURLs(for agentID: String) -> [URL] {
         let home = installer.homeDirectory
-        switch agentID {
+        switch AgentRegistry.canonicalID(for: agentID) {
         case "claude-code": return [home.appendingPathComponent(".claude/settings.json")]
-        case "codex": return [home.appendingPathComponent(".codex/hooks.json")]
+        case "codex": return [installer.codexHomeDirectory.appendingPathComponent("hooks.json")]
         case "copilot-cli": return [home.appendingPathComponent(".copilot/hooks/hooks.json")]
         case "gemini-cli": return [home.appendingPathComponent(".gemini/settings.json")]
         case "antigravity-cli": return [home.appendingPathComponent(".gemini/config/hooks.json")]

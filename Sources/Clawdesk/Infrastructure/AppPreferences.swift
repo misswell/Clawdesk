@@ -47,7 +47,10 @@ public enum ThemeImportError: LocalizedError {
 @MainActor
 public final class AppPreferences: ObservableObject {
     private let defaults: UserDefaults
-    private let homeDirectory: URL
+    // Keep the injected home available to coordinators so all integrations
+    // (including Codex's rollout monitor) use the same filesystem root in
+    // production and in isolated tests.
+    let homeDirectory: URL
     private let positionRecoveryURL: URL
     private var isLoading = true
 
@@ -117,7 +120,10 @@ public final class AppPreferences: ObservableObject {
         permissionBubbleCorner = PermissionBubbleCorner(
             rawValue: defaults.string(forKey: "permissionBubbleCorner") ?? "bottom-right"
         ) ?? .bottomRight
-        permissionBubbleDisabledAgentIDs = Set(defaults.stringArray(forKey: "permissionBubbleDisabledAgentIDs") ?? [])
+        permissionBubbleDisabledAgentIDs = Set(
+            (defaults.stringArray(forKey: "permissionBubbleDisabledAgentIDs") ?? [])
+                .map(AgentRegistry.canonicalID)
+        )
         serverPort = UInt16(defaults.integer(forKey: "serverPort")) == 0 ? 37777 : UInt16(defaults.integer(forKey: "serverPort"))
         mobileEnabled = defaults.bool(forKey: "mobileEnabled")
         mobilePort = UInt16(defaults.integer(forKey: "mobilePort")) == 0 ? 23334 : UInt16(defaults.integer(forKey: "mobilePort"))
@@ -131,7 +137,13 @@ public final class AppPreferences: ObservableObject {
         sessionHUDEnabled = defaults.object(forKey: "sessionHUDEnabled") as? Bool ?? true
         sessionHUDPinned = defaults.object(forKey: "sessionHUDPinned") as? Bool ?? false
         sessionHUDShowContextUsage = defaults.object(forKey: "sessionHUDShowContextUsage") as? Bool ?? true
-        enabledAgentIDs = Set(defaults.stringArray(forKey: "enabledAgentIDs") ?? [])
+        // Older builds and external hook installers may call this client
+        // `codex-cli`; migrate that alias so startup sync repairs the same
+        // canonical Codex integration instead of creating a dead preference.
+        enabledAgentIDs = Set(
+            (defaults.stringArray(forKey: "enabledAgentIDs") ?? [])
+                .map(AgentRegistry.canonicalID)
+        )
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
         if let data = defaults.data(forKey: "bloubAppearance"),
            let decoded = try? JSONDecoder().decode(BloubAppearance.self, from: data) {

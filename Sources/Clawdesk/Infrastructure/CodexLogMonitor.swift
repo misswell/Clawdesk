@@ -15,20 +15,30 @@ public final class CodexLogMonitor {
     private let fileManager: FileManager
     private var offsets: [URL: UInt64] = [:]
     private var partialLines: [URL: Data] = [:]
+    /// Desktop response items do not repeat `session_id`; their `id` is an
+    /// item/tool ID. Cache the session identity from the first session_meta
+    /// record so every later rollout event stays in the same HUD session.
+    private var sessionIDs: [URL: String] = [:]
     private var task: Task<Void, Never>?
     private static let maxTrackedFiles = 128
     private static let maxReadBytesPerScan = 256 * 1024
+    private static let maxSessionMetaBytes = 256 * 1024
     private static let maxInitialBackfillBytes: UInt64 = 1024 * 1024
     private static let maxPartialLineBytes = 512 * 1024
+    private static let activeRolloutAge: TimeInterval = 24 * 60 * 60
 
     var trackedFileCount: Int { offsets.count }
     var bufferedPartialByteCount: Int { partialLines.values.reduce(0) { $0 + $1.count } }
 
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        codexHomeDirectory: URL? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
-        sessionsDirectory = homeDirectory.appendingPathComponent(".codex/sessions", isDirectory: true)
+        let codexHome = codexHomeDirectory
+            ?? Self.resolveCodexHomeDirectory(homeDirectory: homeDirectory, environment: environment)
+        sessionsDirectory = codexHome.appendingPathComponent("sessions", isDirectory: true)
         self.fileManager = fileManager
     }
 
@@ -48,19 +58,7 @@ public final class CodexLogMonitor {
     }
 
     public func scanOnce() {
-        guard let files = try? fileManager.contentsOfDirectory(
-            at: sessionsDirectory,
-            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return }
-
-        let cutoff = Date.now.addingTimeInterval(-24 * 60 * 60)
-        let candidates = files.compactMap { file -> (URL, Date, UInt64)? in
-            guard file.pathExtension == "jsonl", file.lastPathComponent.hasPrefix("rollout-"),
-                  let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
-                  let modified = values.contentModificationDate, modified >= cutoff else { return nil }
-            return (file, modified, UInt64(values.fileSize ?? 0))
-        }
+        let candidates = rolloutCandidates()
         .sorted { $0.1 > $1.1 }
         .prefix(Self.maxTrackedFiles)
         let activeFiles = Set(candidates.map { $0.0 })
@@ -69,12 +67,43 @@ public final class CodexLogMonitor {
         }
         offsets = offsets.filter { activeFiles.contains($0.key) }
         partialLines = partialLines.filter { activeFiles.contains($0.key) }
+        sessionIDs = sessionIDs.filter { activeFiles.contains($0.key) }
+    }
+
+    /// Codex stores rollouts in `sessions/YYYY/MM/DD`, while older builds and
+    /// test fixtures may place them directly under `sessions`. Enumerating the
+    /// tree keeps both layouts working and, importantly, also finds a
+    /// long-lived Desktop conversation that continues writing to its original
+    /// date directory.
+    private func rolloutCandidates() -> [(URL, Date, UInt64)] {
+        guard let enumerator = fileManager.enumerator(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+
+        let cutoff = Date.now.addingTimeInterval(-Self.activeRolloutAge)
+        var candidates: [(URL, Date, UInt64)] = []
+        for case let file as URL in enumerator {
+            guard file.pathExtension == "jsonl", file.lastPathComponent.hasPrefix("rollout-") else { continue }
+            guard let values = try? file.resourceValues(
+                forKeys: [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
+            ), values.isRegularFile == true,
+                  let modified = values.contentModificationDate, modified >= cutoff else { continue }
+            candidates.append((file, modified, UInt64(values.fileSize ?? 0)))
+        }
+        return candidates
     }
 
     private func readNewLines(from file: URL, size: UInt64) {
         let previous = offsets[file]
         let start: UInt64
         if let previous {
+            if previous > size {
+                // The path was truncated or replaced. Its cached header may
+                // belong to the previous rollout, so force a fresh read.
+                sessionIDs.removeValue(forKey: file)
+            }
             start = previous > size ? 0 : previous
         } else {
             start = size > Self.maxInitialBackfillBytes ? size - Self.maxInitialBackfillBytes : 0
@@ -134,8 +163,13 @@ public final class CodexLogMonitor {
                 onQuota?(report)
             }
         }
-        let sessionID = string(from: object, payload: payload, keys: ["session_id", "sessionId", "conversation_id", "id"])
-            ?? file.deletingPathExtension().lastPathComponent
+        let explicitSessionID = explicitSessionID(from: object, payload: payload)
+        if let explicitSessionID, sessionIDs[file] == nil {
+            // Fixtures and older rollout formats may omit session_meta but
+            // carry the session ID on their first lifecycle record.
+            sessionIDs[file] = explicitSessionID
+        }
+        let sessionID = explicitSessionID ?? sessionID(for: file)
         if let userInput = parseUserInputRecord(object: object, payload: payload) {
             switch userInput.phase {
             case .request:
@@ -284,5 +318,72 @@ public final class CodexLogMonitor {
         }
         if let string = value as? String { return ISO8601DateFormatter().date(from: string) }
         return nil
+    }
+
+    private func explicitSessionID(from object: [String: Any], payload: [String: Any]) -> String? {
+        if let value = string(
+            from: object,
+            payload: payload,
+            keys: ["session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId"]
+        ) {
+            return value
+        }
+
+        // `id` is an item/tool ID on response_item records. It is only a
+        // session identity on the session_meta record itself.
+        let recordType = (object["type"] as? String)?.lowercased()
+        guard recordType == "session_meta" else { return nil }
+        return string(from: object, payload: payload, keys: ["id"])
+    }
+
+    private func sessionID(for file: URL) -> String {
+        if let cached = sessionIDs[file] { return cached }
+        if let headerID = sessionIDFromHeader(for: file) {
+            sessionIDs[file] = headerID
+            return headerID
+        }
+        return fallbackSessionID(for: file)
+    }
+
+    private func sessionIDFromHeader(for file: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: Self.maxSessionMetaBytes), !data.isEmpty else { return nil }
+        let line = data.firstIndex(of: 0x0A).map { data.prefix(upTo: $0) } ?? data
+        guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+              (object["type"] as? String)?.lowercased() == "session_meta",
+              let payload = object["payload"] as? [String: Any] else { return nil }
+        return explicitSessionID(from: object, payload: payload)
+    }
+
+    /// A large Codex Desktop rollout is initially tailed from its last MiB,
+    /// so the `session_meta` record at the head may not be in that read. The
+    /// UUID suffix in the rollout filename is the same session identity and
+    /// keeps tail events attached to the official-hook session.
+    private func fallbackSessionID(for file: URL) -> String {
+        let base = file.deletingPathExtension().lastPathComponent
+        // Forked Desktop rollouts can contain two UUIDs separated by `_`.
+        // The final UUID is the rollout identity used by Codex's file naming.
+        let suffix = base.split(separator: "_").last.map(String.init) ?? base
+        let parts = suffix.split(separator: "-")
+        guard parts.count >= 5 else { return base }
+        let candidate = parts.suffix(5).joined(separator: "-")
+        let uuidPattern = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
+        return candidate.range(of: uuidPattern, options: .regularExpression) != nil ? candidate : base
+    }
+
+    private static func resolveCodexHomeDirectory(
+        homeDirectory: URL,
+        environment: [String: String]
+    ) -> URL {
+        guard let raw = environment["CODEX_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return homeDirectory.appendingPathComponent(".codex", isDirectory: true)
+        }
+        let expanded = (raw as NSString).expandingTildeInPath
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded, isDirectory: true)
+        }
+        return homeDirectory.appendingPathComponent(expanded, isDirectory: true)
     }
 }

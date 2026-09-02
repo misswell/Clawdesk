@@ -48,7 +48,10 @@ public struct AgentDescriptor: Identifiable, Equatable, Hashable, Sendable {
 public enum AgentRegistry {
     public static let all: [AgentDescriptor] = [
         AgentDescriptor(id: "claude-code", displayName: "Claude Code", detail: "Command hooks + HTTP permission hooks", permissionApproval: true),
-        AgentDescriptor(id: "codex", displayName: "Codex CLI", detail: "Official hooks + JSONL fallback", permissionApproval: true),
+        // Codex CLI and Codex Desktop share the same official hook contract
+        // and rollout store. Keep one canonical integration so the two
+        // clients cannot create duplicate sessions or duplicate hook entries.
+        AgentDescriptor(id: "codex", displayName: "Codex", detail: "Desktop + CLI hooks + JSONL fallback", permissionApproval: true),
         AgentDescriptor(id: "copilot-cli", displayName: "Copilot CLI", detail: "Optional lifecycle hooks", permissionApproval: true),
         AgentDescriptor(id: "gemini-cli", displayName: "Gemini CLI", detail: "Optional lifecycle hooks", permissionApproval: false, stateOnly: true),
         AgentDescriptor(id: "antigravity-cli", displayName: "Antigravity CLI", detail: "State-only hooks", permissionApproval: false, stateOnly: true),
@@ -75,7 +78,26 @@ public enum AgentRegistry {
     ]
 
     public static func descriptor(for id: String) -> AgentDescriptor? {
-        all.first { $0.id == id }
+        let canonicalID = canonicalID(for: id)
+        return all.first { $0.id == canonicalID }
+    }
+
+    /// Normalizes the names used by Codex clients to the one agent identity
+    /// used by the event server, installer, and session store. Codex Desktop
+    /// is not a separate agent protocol: it writes the same ~/.codex data and
+    /// consumes the same hooks as Codex CLI.
+    public static func canonicalID(for id: String) -> String {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+        switch normalized {
+        case "codex", "codex-cli", "codex-desktop", "codex-app", "openai-codex":
+            return "codex"
+        default:
+            return trimmed
+        }
     }
 
     public static func icon(for agentID: String) -> AgentIconDescriptor {

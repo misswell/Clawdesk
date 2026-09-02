@@ -26,6 +26,74 @@ final class CodexLogMonitorTests: XCTestCase {
         XCTAssertNil(events.first?.payload["transcript"])
     }
 
+    func testFallbackFindsDatePartitionedCodexDesktopRollouts() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-desktop-test-\(UUID().uuidString)")
+        let directory = root.appendingPathComponent(".codex/sessions/2026/09/02", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent(
+            "rollout-2026-09-02T11-00-00-01a05734-2e4c-7163-ba6e-71e7940d01d2.jsonl"
+        )
+        let lines = [
+            #"{"type":"event_msg","payload":{"type":"task_started","cwd":"/tmp/project"}}"#,
+            #"{"type":"response_item","payload":{"type":"function_call"}}"#,
+            #"{"type":"event_msg","payload":{"type":"task_complete"}}"#
+        ].joined(separator: "\n") + "\n"
+        try lines.data(using: .utf8)?.write(to: file)
+
+        let monitor = CodexLogMonitor(homeDirectory: root)
+        var events: [AgentEvent] = []
+        monitor.onEvent = { events.append($0) }
+        monitor.scanOnce()
+
+        XCTAssertEqual(events.map(\.eventName), ["UserPromptSubmit", "PreToolUse", "Stop"])
+        XCTAssertTrue(events.allSatisfy {
+            $0.agentID == "codex" && $0.sessionID == "01a05734-2e4c-7163-ba6e-71e7940d01d2"
+        })
+    }
+
+    func testDesktopRolloutHeaderKeepsResponseItemsInTheSessionInsteadOfUsingItemIDs() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-session-header-test-\(UUID().uuidString)")
+        let directory = root.appendingPathComponent(".codex/sessions/2026/09/02", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("rollout-desktop-session.jsonl")
+        let lines = [
+            #"{"type":"session_meta","payload":{"session_id":"desktop-session","originator":"Codex Desktop","cwd":"/tmp/project"}}"#,
+            #"{"type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1"}}"#,
+            #"{"type":"response_item","payload":{"type":"custom_tool_call","id":"ctc_item_id","call_id":"call-1","name":"exec"}}"#,
+            #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}"#
+        ].joined(separator: "\n") + "\n"
+        try Data(lines.utf8).write(to: file)
+
+        let monitor = CodexLogMonitor(homeDirectory: root)
+        var events: [AgentEvent] = []
+        monitor.onEvent = { events.append($0) }
+        monitor.scanOnce()
+
+        XCTAssertEqual(events.map(\.eventName), ["SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"])
+        XCTAssertTrue(events.allSatisfy { $0.sessionID == "desktop-session" })
+    }
+
+    func testMonitorFollowsCODEXHOMEForDesktopData() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-home-test-\(UUID().uuidString)")
+        let codexHome = root.appendingPathComponent("custom-codex", isDirectory: true)
+        let directory = codexHome.appendingPathComponent("sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("rollout-custom.jsonl")
+        try Data((#"{"type":"event_msg","payload":{"type":"task_started","session_id":"custom-session"}}"# + "\n").utf8)
+            .write(to: file)
+
+        let monitor = CodexLogMonitor(
+            homeDirectory: root,
+            environment: ["CODEX_HOME": codexHome.path]
+        )
+        var events: [AgentEvent] = []
+        monitor.onEvent = { events.append($0) }
+        monitor.scanOnce()
+
+        XCTAssertEqual(monitor.sessionsDirectory, directory)
+        XCTAssertEqual(events.map(\.sessionID), ["custom-session"])
+    }
+
     func testFallbackRetriesAnIncompleteFinalJSONLineAfterTheWriterAppends() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("clawdesk-codex-partial-test-\(UUID().uuidString)")
         let directory = root.appendingPathComponent(".codex/sessions", isDirectory: true)
