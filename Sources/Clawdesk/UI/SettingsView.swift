@@ -44,10 +44,16 @@ public struct SettingsView: View {
     }
 }
 
-private struct GeneralSettingsView: View {
+struct GeneralSettingsView: View {
     @ObservedObject var model: ClawdeskModel
+    @ObservedObject private var prefs: AppPreferences
     @State private var themeStatus = ""
     @State private var roamStatus = ""
+
+    init(model: ClawdeskModel) {
+        self.model = model
+        _prefs = ObservedObject(wrappedValue: model.preferences)
+    }
 
     var body: some View {
         Form {
@@ -75,9 +81,9 @@ private struct GeneralSettingsView: View {
                     }
                 }
                 HStack {
-                    Text(model.preferences.text("Pet size"))
-                    Slider(value: $model.preferences.petScale, in: PetSizing.scaleRange)
-                    Text("\(Int((model.preferences.petScale * 100).rounded()))%")
+                    Text(prefs.text("Pet size"))
+                    Slider(value: $prefs.petScale, in: PetSizing.scaleRange)
+                    Text("\(Int((prefs.petScale * 100).rounded()))%")
                         .font(.caption.monospacedDigit())
                         .frame(width: 46, alignment: .trailing)
                 }
