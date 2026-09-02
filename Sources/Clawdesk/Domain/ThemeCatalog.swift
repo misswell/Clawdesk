@@ -49,6 +49,37 @@ public struct ThemeIdleAnimation: Equatable, Sendable {
     }
 }
 
+/// A state entry in the upstream theme manifest. The original schema allows
+/// either a string/array of files or an object with an explicit fallback.
+/// Keeping the complete file list is important for themes that provide a
+/// short animation or several visual variants for one logical state.
+public struct ThemeStateBinding: Equatable, Sendable {
+    public let files: [String]
+    public let fallbackTo: String?
+
+    public init(files: [String], fallbackTo: String? = nil) {
+        self.files = files.filter(ThemeAssetPathPolicy.isSafeRelativePath)
+        let trimmed = fallbackTo?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        self.fallbackTo = trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    public init(file: String, fallbackTo: String? = nil) {
+        self.init(files: [file], fallbackTo: fallbackTo)
+    }
+}
+
+/// A working/juggling tier from the upstream manifest. The largest matching
+/// `minSessions` wins, so manifests can add as many tiers as they need.
+public struct ThemeTier: Equatable, Sendable {
+    public let minSessions: Int
+    public let file: String
+
+    public init(minSessions: Int, file: String) {
+        self.minSessions = max(1, minSessions)
+        self.file = file
+    }
+}
+
 public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let id: String
     public let displayName: String
@@ -56,6 +87,18 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public let supportsEyeTracking: Bool
     public let assetDirectory: URL?
     public let stateFiles: [String: String]
+    public let stateBindings: [String: ThemeStateBinding]
+    /// Assets declared under the upstream `miniMode.states` namespace. Keep
+    /// them separate from normal states: a mini idle file must never become
+    /// the full-size idle visual, and a normal `idle` fallback must not hide a
+    /// dedicated mini animation.
+    public let miniStateFiles: [String: String]
+    public let miniStateBindings: [String: ThemeStateBinding]
+    public let workingTiers: [ThemeTier]
+    public let jugglingTiers: [ThemeTier]
+    public let fallbackTo: [String: String]
+    public let displayHintMap: [String: String]
+    public let updateVisuals: [String: String]
     public let idleVisualFiles: [String]
     public let idleAnimations: [ThemeIdleAnimation]
     public let timings: ThemeTimings
@@ -68,6 +111,14 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         supportsEyeTracking: Bool = true,
         assetDirectory: URL? = nil,
         stateFiles: [String: String] = [:],
+        stateBindings: [String: ThemeStateBinding] = [:],
+        miniStateFiles: [String: String] = [:],
+        miniStateBindings: [String: ThemeStateBinding] = [:],
+        workingTiers: [ThemeTier] = [],
+        jugglingTiers: [ThemeTier] = [],
+        fallbackTo: [String: String] = [:],
+        displayHintMap: [String: String] = [:],
+        updateVisuals: [String: String] = [:],
         idleVisualFiles: [String]? = nil,
         idleAnimations: [ThemeIdleAnimation] = [],
         timings: ThemeTimings = .standard,
@@ -78,7 +129,44 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
         self.palette = palette
         self.supportsEyeTracking = supportsEyeTracking
         self.assetDirectory = assetDirectory
-        self.stateFiles = stateFiles
+        var resolvedBindings: [String: ThemeStateBinding] = [:]
+        for (state, binding) in stateBindings {
+            resolvedBindings[state.lowercased()] = binding
+        }
+        for (state, file) in stateFiles where resolvedBindings[state.lowercased()] == nil {
+            resolvedBindings[state.lowercased()] = ThemeStateBinding(file: file)
+        }
+        self.stateBindings = resolvedBindings
+        self.stateFiles = resolvedBindings.compactMapValues(\.files.first)
+        var resolvedMiniBindings: [String: ThemeStateBinding] = [:]
+        for (state, binding) in miniStateBindings {
+            resolvedMiniBindings[state.lowercased()] = binding
+        }
+        for (state, file) in miniStateFiles where resolvedMiniBindings[state.lowercased()] == nil {
+            resolvedMiniBindings[state.lowercased()] = ThemeStateBinding(file: file)
+        }
+        self.miniStateBindings = resolvedMiniBindings
+        self.miniStateFiles = resolvedMiniBindings.compactMapValues(\.files.first)
+        self.workingTiers = workingTiers
+            .filter { ThemeAssetPathPolicy.isSafeRelativePath($0.file) }
+            .sorted { $0.minSessions > $1.minSessions }
+        self.jugglingTiers = jugglingTiers
+            .filter { ThemeAssetPathPolicy.isSafeRelativePath($0.file) }
+            .sorted { $0.minSessions > $1.minSessions }
+        self.fallbackTo = fallbackTo.reduce(into: [:]) { result, entry in
+            let state = entry.key.lowercased()
+            let fallback = entry.value.lowercased()
+            guard !state.isEmpty, !fallback.isEmpty else { return }
+            result[state] = fallback
+        }
+        self.displayHintMap = displayHintMap.filter {
+            ThemeAssetPathPolicy.isSafeRelativePath($0.key)
+                && ThemeAssetPathPolicy.isSafeRelativePath($0.value)
+        }
+        self.updateVisuals = updateVisuals.filter {
+            ThemeAssetPathPolicy.isSafeRelativePath($0.key)
+                && ThemeAssetPathPolicy.isSafeRelativePath($0.value)
+        }
         self.sounds = sounds
         self.idleAnimations = idleAnimations.filter { ThemeAssetPathPolicy.isSafeRelativePath($0.file) }
         self.timings = timings
@@ -89,29 +177,34 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     public func assetURL(
         for state: PetState,
         idleVisualFile: String? = nil,
-        stateOverrideFile: String? = nil
+        stateOverrideFile: String? = nil,
+        activeSessionCount: Int = 1,
+        subagentCount: Int = 0,
+        displayHint: String? = nil
     ) -> URL? {
-        // Hover and dragging are pointer interaction states, not theme
-        // decorations. Refusing these assets at the theme seam prevents a
-        // legacy corner marker from being loaded by any renderer path.
-        guard !state.isPointerInteraction else { return nil }
+        // Dragging is a view interaction, not a theme state. Refusing that
+        // asset at the theme seam prevents a legacy corner marker from being
+        // loaded by any renderer path. Mini peek is also pointer-driven, but
+        // unlike dragging it has an official upstream animation asset.
+        guard state != .dragging else { return nil }
         guard let assetDirectory else { return nil }
         if let stateOverrideFile, ThemeAssetPathPolicy.isSafeRelativePath(stateOverrideFile) {
             let url = assetDirectory.appendingPathComponent(stateOverrideFile)
             if FileManager.default.fileExists(atPath: url.path) { return url }
         }
         if state == .idle, let idleVisualFile, ThemeAssetPathPolicy.isSafeRelativePath(idleVisualFile) {
-            return assetDirectory.appendingPathComponent(idleVisualFile)
+            let url = assetDirectory.appendingPathComponent(idleVisualFile)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
         }
-        let candidates = [
-            state.rawValue,
-            state == .typing ? "working" : nil,
-            state == .attention ? "happy" : nil,
-            state == .miniIdle ? "idle" : nil
-        ].compactMap { $0 }
-        for key in candidates {
-            guard let file = stateFiles[key], ThemeAssetPathPolicy.isSafeRelativePath(file) else { continue }
-            return assetDirectory.appendingPathComponent(file)
+        let candidates = candidateFiles(
+            for: state,
+            activeSessionCount: activeSessionCount,
+            subagentCount: subagentCount,
+            displayHint: displayHint
+        )
+        for file in candidates {
+            let url = assetDirectory.appendingPathComponent(file)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
         }
         return nil
     }
@@ -122,19 +215,92 @@ public struct ThemeDefinition: Identifiable, Equatable, Sendable {
     /// artwork-specific transition. The built-in native renderer has a
     /// CoreGraphics fallback for every logical state, so it is considered
     /// capable even though it has no asset directory.
-    public func hasVisualAsset(for state: PetState) -> Bool {
-        guard !state.isPointerInteraction else { return false }
+    public func hasVisualAsset(
+        for state: PetState,
+        activeSessionCount: Int = 1,
+        subagentCount: Int = 0,
+        displayHint: String? = nil
+    ) -> Bool {
+        guard state != .dragging else { return false }
         guard let assetDirectory else { return true }
-        let candidates = [
-            state.rawValue,
-            state == .typing ? "working" : nil,
-            state == .attention ? "happy" : nil,
-            state == .miniIdle ? "idle" : nil
-        ].compactMap { $0 }
-        return candidates.contains { key in
-            guard let file = stateFiles[key], ThemeAssetPathPolicy.isSafeRelativePath(file) else { return false }
-            return FileManager.default.fileExists(atPath: assetDirectory.appendingPathComponent(file).path)
+        return candidateFiles(
+            for: state,
+            activeSessionCount: activeSessionCount,
+            subagentCount: subagentCount,
+            displayHint: displayHint
+        ).contains { file in
+            FileManager.default.fileExists(atPath: assetDirectory.appendingPathComponent(file).path)
         }
+    }
+
+    private func candidateFiles(
+        for state: PetState,
+        activeSessionCount: Int,
+        subagentCount: Int,
+        displayHint: String?
+    ) -> [String] {
+        if let displayHint,
+           let mapped = displayHintMap[displayHint] ?? displayHintMap[displayHint.lowercased()],
+           ThemeAssetPathPolicy.isSafeRelativePath(mapped) {
+            return [mapped]
+        }
+
+        if state.isMini {
+            return resolveBindingFiles(
+                state.rawValue,
+                bindings: miniStateBindings,
+                fallback: [:]
+            )
+        }
+
+        let sessionCount = max(1, max(activeSessionCount, subagentCount))
+        if state == .typing || state == .building {
+            let tierFiles = workingTiers
+                .filter { $0.minSessions <= sessionCount }
+                .map(\.file)
+            if !tierFiles.isEmpty { return tierFiles }
+        }
+        if state == .juggling {
+            let tierFiles = jugglingTiers
+                .filter { $0.minSessions <= sessionCount }
+                .map(\.file)
+            if !tierFiles.isEmpty { return tierFiles }
+        }
+
+        var candidates = resolveBindingFiles(
+            state.rawValue,
+            bindings: stateBindings,
+            fallback: fallbackTo
+        )
+        if state == .typing { candidates += resolveBindingFiles("working", bindings: stateBindings, fallback: fallbackTo) }
+        if state == .attention { candidates += resolveBindingFiles("happy", bindings: stateBindings, fallback: fallbackTo) }
+        return Array(NSOrderedSet(array: candidates)) as? [String] ?? candidates
+    }
+
+    private func resolveBindingFiles(
+        _ key: String,
+        bindings: [String: ThemeStateBinding],
+        fallback: [String: String],
+        visited: Set<String> = []
+    ) -> [String] {
+        let normalized = key.lowercased()
+        guard !visited.contains(normalized) else { return [] }
+        var nextVisited = visited
+        nextVisited.insert(normalized)
+        if let binding = bindings[normalized] {
+            let own = binding.files
+            if !own.isEmpty { return own + resolveBindingFiles(
+                binding.fallbackTo ?? fallback[normalized] ?? "",
+                bindings: bindings,
+                fallback: fallback,
+                visited: nextVisited
+            ) }
+            if let target = binding.fallbackTo ?? fallback[normalized] {
+                return resolveBindingFiles(target, bindings: bindings, fallback: fallback, visited: nextVisited)
+            }
+        }
+        guard let target = fallback[normalized] else { return [] }
+        return resolveBindingFiles(target, bindings: bindings, fallback: fallback, visited: nextVisited)
     }
 
 }

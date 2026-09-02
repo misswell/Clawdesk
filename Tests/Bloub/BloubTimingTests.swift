@@ -92,7 +92,9 @@ final class BloubTimingTests: XCTestCase {
         XCTAssertEqual(engine.sample(at: 0.0).arcs.count, 0)
         XCTAssertGreaterThanOrEqual(engine.sample(at: 0.5).arcs.count, 3)
         XCTAssertEqual(engine.sample(at: 1.0).arcs.count, 6)
-        XCTAssertEqual(engine.sample(at: 5.0).arcs.count, 0)
+        // Orbit is a lifecycle work state, not a one-shot. After the first
+        // pass it must keep cycling instead of freezing on a clean ball.
+        XCTAssertGreaterThan(engine.sample(at: 5.0).arcs.count, 0)
     }
 
     func testOrbitRingsSpinDeterministically() {

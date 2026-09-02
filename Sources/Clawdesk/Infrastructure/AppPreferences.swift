@@ -1,6 +1,27 @@
 import Combine
 import Foundation
 
+private struct StoredWindowPoint: Codable, Equatable {
+    let x: Double
+    let y: Double
+
+    init(_ point: CGPoint) {
+        x = Double(point.x)
+        y = Double(point.y)
+    }
+
+    var point: CGPoint? {
+        guard x.isFinite, y.isFinite else { return nil }
+        return CGPoint(x: x, y: y)
+    }
+}
+
+private struct WindowPositionRecovery: Codable, Equatable {
+    let version: Int
+    let windowOrigin: StoredWindowPoint?
+    let preMiniWindowOrigin: StoredWindowPoint?
+}
+
 public enum ThemeImportError: LocalizedError {
     case unsupportedFormat
     case unsafeArchiveEntry(String)
@@ -27,6 +48,7 @@ public enum ThemeImportError: LocalizedError {
 public final class AppPreferences: ObservableObject {
     private let defaults: UserDefaults
     private let homeDirectory: URL
+    private let positionRecoveryURL: URL
     private var isLoading = true
 
     @Published public var selectedThemeID: String { didSet { persist() } }
@@ -80,6 +102,7 @@ public final class AppPreferences: ObservableObject {
         self.defaults = defaults
         self.homeDirectory = homeDirectory
         customThemesDirectory = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk/themes", isDirectory: true)
+        positionRecoveryURL = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk/window-position.json")
         selectedThemeID = defaults.string(forKey: "theme") ?? "pinch"
         isMiniMode = defaults.bool(forKey: "miniMode")
         doNotDisturb = defaults.bool(forKey: "doNotDisturb")
@@ -116,17 +139,43 @@ public final class AppPreferences: ObservableObject {
         } else {
             bloubAppearance = .standard
         }
-        if defaults.object(forKey: "windowX") != nil, defaults.object(forKey: "windowY") != nil {
-            windowOrigin = CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
+        let defaultsWindowOrigin: CGPoint? = if defaults.object(forKey: "windowX") != nil,
+                                                defaults.object(forKey: "windowY") != nil {
+            CGPoint(x: defaults.double(forKey: "windowX"), y: defaults.double(forKey: "windowY"))
         } else {
-            windowOrigin = nil
+            nil
         }
-        if defaults.object(forKey: "preMiniX") != nil, defaults.object(forKey: "preMiniY") != nil {
-            preMiniWindowOrigin = CGPoint(x: defaults.double(forKey: "preMiniX"), y: defaults.double(forKey: "preMiniY"))
+        let defaultsPreMiniOrigin: CGPoint? = if defaults.object(forKey: "preMiniX") != nil,
+                                                  defaults.object(forKey: "preMiniY") != nil {
+            CGPoint(x: defaults.double(forKey: "preMiniX"), y: defaults.double(forKey: "preMiniY"))
         } else {
-            preMiniWindowOrigin = nil
+            nil
+        }
+        // The recovery file is intentionally authoritative when present. It
+        // survives preference-domain migrations and captures the last frame
+        // even when AppKit emits a startup move callback for the panel's
+        // initial lower-left frame.
+        let hasRecoveryFile: Bool
+        if let recovery = Self.loadWindowPosition(from: positionRecoveryURL) {
+            windowOrigin = recovery.windowOrigin?.point
+            preMiniWindowOrigin = recovery.preMiniWindowOrigin?.point
+            hasRecoveryFile = true
+        } else {
+            windowOrigin = Self.finitePoint(defaultsWindowOrigin)
+            preMiniWindowOrigin = Self.finitePoint(defaultsPreMiniOrigin)
+            hasRecoveryFile = false
         }
         customThemes = Self.loadCustomThemes(from: customThemesDirectory)
+        // Versions before the recovery file could persist AppKit's initial
+        // panel frame as (0, 0). Once that value was stored, every subsequent
+        // launch treated the bad frame as a real saved position and stayed in
+        // the lower-left corner. A real (0, 0) chosen in the current version
+        // is always represented by the recovery file, so discard only the
+        // legacy defaults value here.
+        if !hasRecoveryFile {
+            if windowOrigin == .zero { windowOrigin = nil }
+            if preMiniWindowOrigin == .zero { preMiniWindowOrigin = nil }
+        }
         // Before startup position restoration was guarded, the initial panel
         // frame could be recorded as the parked normal-mode position. A
         // non-zero saved frame paired with preMini=(0, 0) is that legacy
@@ -187,6 +236,8 @@ public final class AppPreferences: ObservableObject {
 
     public func resetPosition() {
         windowOrigin = nil
+        preMiniWindowOrigin = nil
+        removeWindowPositionRecovery()
     }
 
     public func importTheme(from source: URL) throws {
@@ -270,6 +321,48 @@ public final class AppPreferences: ObservableObject {
             defaults.removeObject(forKey: "preMiniX")
             defaults.removeObject(forKey: "preMiniY")
         }
+        persistWindowPositionRecovery()
+    }
+
+    private static func finitePoint(_ point: CGPoint?) -> CGPoint? {
+        guard let point, point.x.isFinite, point.y.isFinite else { return nil }
+        return point
+    }
+
+    private static func loadWindowPosition(from url: URL) -> WindowPositionRecovery? {
+        guard let data = try? Data(contentsOf: url),
+              let recovery = try? JSONDecoder().decode(WindowPositionRecovery.self, from: data),
+              recovery.version == 1 else { return nil }
+        return recovery
+    }
+
+    private func persistWindowPositionRecovery() {
+        guard windowOrigin != nil || preMiniWindowOrigin != nil else {
+            removeWindowPositionRecovery()
+            return
+        }
+        let recovery = WindowPositionRecovery(
+            version: 1,
+            windowOrigin: windowOrigin.map(StoredWindowPoint.init),
+            preMiniWindowOrigin: preMiniWindowOrigin.map(StoredWindowPoint.init)
+        )
+        guard let data = try? JSONEncoder().encode(recovery) else { return }
+        let fileManager = FileManager.default
+        do {
+            try fileManager.createDirectory(
+                at: positionRecoveryURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: positionRecoveryURL, options: [.atomic])
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: positionRecoveryURL.path)
+        } catch {
+            // Preferences remain the fallback if the recovery file cannot be
+            // written (for example, a read-only home directory).
+        }
+    }
+
+    private func removeWindowPositionRecovery() {
+        try? FileManager.default.removeItem(at: positionRecoveryURL)
     }
 
     private static func loadCustomThemes(from directory: URL) -> [ThemeDefinition] {
@@ -291,7 +384,11 @@ public final class AppPreferences: ObservableObject {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw ThemeImportError.missingManifest
         }
-        let rawID = (object["id"] as? String) ?? (object["_id"] as? String) ?? ""
+        // The shipped clawd theme has no explicit id. The upstream loader
+        // uses the theme directory as its stable identity in that case.
+        let rawID = (object["id"] as? String)
+            ?? (object["_id"] as? String)
+            ?? directory.lastPathComponent
         let id = rawID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isSafeThemeID(id), !ThemeCatalog.builtIn.contains(where: { $0.id == id }) else {
             throw ThemeImportError.invalidIdentifier
@@ -309,29 +406,70 @@ public final class AppPreferences: ObservableObject {
         let timings = themeTimings(
             object["timings"] as? [String: Any],
             sleepSequence: object["sleepSequence"] as? [String: Any],
+            miniMode: object["miniMode"] as? [String: Any],
             directory: directory
         )
 
         var stateFiles: [String: String] = [:]
+        var stateBindings: [String: ThemeStateBinding] = [:]
+        var fallbackTo: [String: String] = [:]
+        var miniStateFiles: [String: String] = [:]
+        var miniStateBindings: [String: ThemeStateBinding] = [:]
         var idleVisualFiles: [String] = []
         var idleAnimations: [ThemeIdleAnimation] = []
+
+        func manifestFiles(_ value: Any) -> ([String], String?) {
+            if let value = value as? String { return ([value], nil) }
+            if let values = value as? [Any] {
+                return (values.compactMap { $0 as? String }, nil)
+            }
+            if let value = value as? [String: Any] {
+                let rawFiles: [String]
+                if let file = value["file"] as? String {
+                    rawFiles = [file]
+                } else if let fileValues = value["files"] as? [Any] {
+                    rawFiles = fileValues.compactMap { $0 as? String }
+                } else if let file = value["files"] as? String {
+                    rawFiles = [file]
+                } else {
+                    rawFiles = []
+                }
+                return (rawFiles, value["fallbackTo"] as? String)
+            }
+            return ([], nil)
+        }
+
+        func validBinding(_ value: Any) -> ThemeStateBinding? {
+            let (files, fallback) = manifestFiles(value)
+            let validFiles = files.filter {
+                ThemeAssetPathPolicy.isSafeRelativePath($0)
+                    && FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
+            }
+            guard !validFiles.isEmpty || fallback?.isEmpty == false else { return nil }
+            return ThemeStateBinding(files: validFiles, fallbackTo: fallback)
+        }
+
         if let states = object["states"] as? [String: Any] {
             for (state, value) in states {
-                let files: [String]
-                if let value = value as? String {
-                    files = [value]
-                } else if let values = value as? [Any] {
-                    files = values.compactMap { $0 as? String }
-                } else {
-                    files = []
-                }
-                let validFiles = files.filter {
-                    ThemeAssetPathPolicy.isSafeRelativePath($0) && FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
-                }
-                guard let file = validFiles.first else { continue }
                 let normalizedState = state.lowercased()
-                stateFiles[normalizedState] = file
-                if normalizedState == "idle" { idleVisualFiles.append(contentsOf: validFiles) }
+                guard let binding = validBinding(value) else { continue }
+                stateBindings[normalizedState] = binding
+                if let file = binding.files.first { stateFiles[normalizedState] = file }
+                if let fallback = binding.fallbackTo { fallbackTo[normalizedState] = fallback }
+                if normalizedState == "idle" { idleVisualFiles.append(contentsOf: binding.files) }
+            }
+        }
+        // The upstream theme schema keeps mini artwork in a nested
+        // `miniMode.states` table. Parse it independently so a mini asset is
+        // selected only while the window is docked; falling back to a normal
+        // state here would make mini mode show a full-size animation.
+        if let miniMode = object["miniMode"] as? [String: Any],
+           let states = miniMode["states"] as? [String: Any] {
+            for (state, value) in states {
+                guard let binding = validBinding(value) else { continue }
+                let normalizedState = state.lowercased()
+                miniStateBindings[normalizedState] = binding
+                if let file = binding.files.first { miniStateFiles[normalizedState] = file }
             }
         }
         if let animations = object["idleAnimations"] as? [[String: Any]] {
@@ -355,10 +493,31 @@ public final class AppPreferences: ObservableObject {
                 sounds[name] = file
             }
         }
-        guard !stateFiles.isEmpty else { throw ThemeImportError.invalidManifest }
+        guard !stateBindings.isEmpty else { throw ThemeImportError.invalidManifest }
         let eyeTracking = (object["supportsEyeTracking"] as? Bool)
             ?? ((object["eyeTracking"] as? [String: Any])?["enabled"] as? Bool)
             ?? true
+        func manifestStringMap(_ value: Any?) -> [String: String] {
+            guard let values = value as? [String: Any] else { return [:] }
+            return values.reduce(into: [:]) { result, entry in
+                guard let value = entry.value as? String else { return }
+                result[entry.key] = value
+            }
+        }
+
+        func manifestTiers(_ value: Any?) -> [ThemeTier] {
+            guard let values = value as? [[String: Any]] else { return [] }
+            return values.compactMap { entry in
+                guard let file = entry["file"] as? String,
+                      let minimum = (entry["minSessions"] as? NSNumber)?.intValue,
+                      ThemeAssetPathPolicy.isSafeRelativePath(file),
+                      FileManager.default.fileExists(atPath: directory.appendingPathComponent(file).path) else {
+                    return nil
+                }
+                return ThemeTier(minSessions: minimum, file: file)
+            }
+        }
+
         return ThemeDefinition(
             id: id,
             displayName: name.isEmpty ? id : String(name.prefix(80)),
@@ -366,6 +525,14 @@ public final class AppPreferences: ObservableObject {
             supportsEyeTracking: eyeTracking,
             assetDirectory: directory,
             stateFiles: stateFiles,
+            stateBindings: stateBindings,
+            miniStateFiles: miniStateFiles,
+            miniStateBindings: miniStateBindings,
+            workingTiers: manifestTiers(object["workingTiers"]),
+            jugglingTiers: manifestTiers(object["jugglingTiers"]),
+            fallbackTo: fallbackTo,
+            displayHintMap: manifestStringMap(object["displayHintMap"]),
+            updateVisuals: manifestStringMap(object["updateVisuals"]),
             idleVisualFiles: idleVisualFiles,
             idleAnimations: idleAnimations,
             timings: timings,
@@ -443,6 +610,7 @@ public final class AppPreferences: ObservableObject {
     private static func themeTimings(
         _ object: [String: Any]?,
         sleepSequence: [String: Any]?,
+        miniMode: [String: Any]?,
         directory: URL
     ) -> ThemeTimings {
         let defaults = ThemeTimings.standard
@@ -452,6 +620,39 @@ public final class AppPreferences: ObservableObject {
             guard milliseconds.isFinite else { return fallback }
             return milliseconds / 1_000
         }
+        let dizzyDuration: TimeInterval = {
+            if object?["dizzyDuration"] is NSNumber {
+                return seconds("dizzyDuration", fallback: defaults.dizzyDuration)
+            }
+            guard let autoReturn = object?["autoReturn"] as? [String: Any],
+                  let raw = autoReturn["dizzy"] as? NSNumber,
+                  raw.doubleValue.isFinite else {
+                return defaults.dizzyDuration
+            }
+            return raw.doubleValue / 1_000
+        }()
+        func timingMap(_ value: Any?) -> [String: TimeInterval] {
+            guard let values = value as? [String: Any] else { return [:] }
+            return values.reduce(into: [:]) { result, entry in
+                guard let raw = entry.value as? NSNumber,
+                      raw.doubleValue.isFinite,
+                      raw.doubleValue >= 0 else { return }
+                let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                guard !key.isEmpty else { return }
+                result[key] = min(86_400, raw.doubleValue / 1_000)
+            }
+        }
+        let minDisplay = timingMap(object?["minDisplay"])
+        let autoReturn = timingMap(object?["autoReturn"])
+        let miniTimingOverrides: ThemeTimingOverrides? = {
+            guard let miniTimings = miniMode?["timings"] as? [String: Any] else {
+                return nil
+            }
+            return ThemeTimingOverrides(
+                minDisplay: timingMap(miniTimings["minDisplay"]),
+                autoReturn: timingMap(miniTimings["autoReturn"])
+            )
+        }()
         let mode = (sleepSequence?["mode"] as? String)
             .flatMap { ThemeSleepMode(rawValue: $0.lowercased()) }
             ?? defaults.sleepMode
@@ -469,6 +670,7 @@ public final class AppPreferences: ObservableObject {
             yawnDuration: seconds("yawnDuration", fallback: defaults.yawnDuration),
             collapseDuration: seconds("collapseDuration", fallback: defaults.collapseDuration),
             wakeDuration: seconds("wakeDuration", fallback: defaults.wakeDuration),
+            dizzyDuration: dizzyDuration,
             deepSleepTimeout: seconds("deepSleepTimeout", fallback: defaults.deepSleepTimeout),
             dndSleepTransitionFile: dndTransitionFile,
             dndSleepTransitionDuration: seconds(
@@ -476,7 +678,10 @@ public final class AppPreferences: ObservableObject {
                 fallback: defaults.dndSleepTransitionDuration
             ),
             sleepMode: mode,
-            dndSkipYawn: (object?["dndSkipYawn"] as? Bool) ?? false
+            dndSkipYawn: (object?["dndSkipYawn"] as? Bool) ?? false,
+            minDisplay: minDisplay,
+            autoReturn: autoReturn,
+            miniMode: miniTimingOverrides
         )
     }
 }

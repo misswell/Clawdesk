@@ -32,7 +32,7 @@ requirements for a native Swift macOS implementation.
 | 11 | Per-agent bubble control, shortcuts and automation policy | agent switches, global shortcuts, fail-closed policy tests | Complete |
 | 12 | Dashboard, Session HUD and terminal focus | window controllers, HUD geometry/context tests | Complete |
 | 13 | Context and subscription quota display | statusline/Codex adapters, quota/ring tests | Complete |
-| 14 | Startup recovery, process liveness and Codex active timeout | process probe and cleanup tests | Complete |
+| 14 | Startup recovery, process liveness and active-work retention | process probe and cleanup tests | Complete |
 | 15 | Local hook server and startup integration repair | bounded local server, doctor, sync/health tests | Complete |
 | 16 | Mobile read-only PWA/WebSocket companion | token, rate-limit and protocol tests | Complete |
 | 17 | Native Remote SSH transport | profile-bound nonce, hook deployment and tunnel tests | Complete |

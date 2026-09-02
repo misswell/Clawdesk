@@ -1,14 +1,16 @@
 import CoreGraphics
 import Foundation
 
-/// The bloub state catalogue: one shape morphing through 14 measured states
-/// plus `swirl`, an interface-only transition.
+/// The bloub state catalogue: one shape morphing through the measured states
+/// plus the runtime `dizzy` reaction and `swirl`, an interface-only
+/// transition.
 ///
 /// Every pose below is a pure function of local state time: identical state +
 /// parameters + time always produce an identical pose, which is what keeps
 /// pause/resume/seek/preview/testable rendering possible.
 public enum BloubState: String, CaseIterable, Sendable, Equatable {
     case idle
+    case roam
     case thinking
     case wink
     case wide
@@ -16,12 +18,38 @@ public enum BloubState: String, CaseIterable, Sendable, Equatable {
     case notify
     case exclaim
     case sleep
+    /// Clawdesk's full idle-sleep sequence. The upstream bloub catalogue has
+    /// one sleeping-dot state; these native overlays preserve the agent
+    /// runtime's yawn/doze/collapse/wake phases when no theme asset exists.
+    case yawning
+    case dozing
+    case collapsing
+    case sleeping
+    case waking
+    case wakingFromDoze
+    /// Continuous lifecycle actions. These are separate from the original
+    /// sequence's one-shot hexagon/egg/comet showcase states so a long-lived
+    /// agent never freezes on a settled pose.
+    case building
+    case carrying
+    case sweeping
     case egg
     case hexagon
     case play
     case orbit
     case burst
     case comet
+    case miniIdle
+    case miniPeek
+    case miniAlert
+    case miniHappy
+    case miniWorking
+    case miniCrabwalk
+    case miniEnter
+    case miniEnterSleep
+    case miniSleep
+    /// Runtime reaction shown after the cursor circles the pet twice.
+    case dizzy
     /// Interface transition, not a catalogue animation (excluded from
     /// `sequence`, like upstream).
     case swirl
@@ -33,6 +61,7 @@ public enum BloubState: String, CaseIterable, Sendable, Equatable {
 public enum BloubPoseBook {
     public static let time: [BloubState: TimeInterval] = [
         .idle: 1,
+        .roam: 0.55,
         .thinking: 1.1,
         .wink: 0.8,
         .wide: 0.8,
@@ -40,13 +69,32 @@ public enum BloubPoseBook {
         .notify: 0.9,
         .exclaim: 0.8,
         .sleep: 0.45,
+        .yawning: 0.7,
+        .dozing: 0.65,
+        .collapsing: 0.7,
+        .sleeping: 0.45,
+        .waking: 0.75,
+        .wakingFromDoze: 0.35,
+        .building: 0.9,
+        .carrying: 0.8,
+        .sweeping: 1.1,
         .egg: 0.8,
         .hexagon: 0.8,
         .play: 0.9,
         .orbit: 1.2,
         .swirl: 0.5,
         .burst: 0.45,
-        .comet: 1.15
+        .comet: 1.15,
+        .dizzy: 1.2,
+        .miniIdle: 0.8,
+        .miniPeek: 0.8,
+        .miniAlert: 0.7,
+        .miniHappy: 0.8,
+        .miniWorking: 0.8,
+        .miniCrabwalk: 0.45,
+        .miniEnter: 0.6,
+        .miniEnterSleep: 0.6,
+        .miniSleep: 0.35
     ]
 }
 
@@ -151,8 +199,9 @@ public struct BloubPose: Equatable, Sendable {
 }
 
 public enum BloubStates {
-    /// Reading order of the complete sequence, modelled on the reference video.
-    /// `swirl` is deliberately absent: it is an interface transition.
+    /// Reading order of the original bloub sequence. Clawdesk's lifecycle
+    /// sleep overlays, mini states and reactions are runtime additions and
+    /// intentionally stay out of this montage order.
     public static let sequence: [BloubState] = [
         .idle, .thinking, .wink, .wide, .alert, .notify, .exclaim, .sleep,
         .egg, .hexagon, .play, .orbit, .burst, .comet
@@ -203,6 +252,53 @@ public enum BloubStates {
         return BloubEase.clamp01(k * 2)
     }
 
+    /// Wrap a looping state without putting mutable clock state in the
+    /// renderer. The first and last frames of the continuous work cycles are
+    /// authored to meet, so a long-running hook never freezes on a one-shot's
+    /// final frame.
+    private static func loopTime(_ t: CGFloat, period: CGFloat) -> CGFloat {
+        guard period > 0 else { return 0 }
+        let wrapped = t.truncatingRemainder(dividingBy: period)
+        return wrapped < 0 ? wrapped + period : wrapped
+    }
+
+    /// Native counterparts for clawd-on-desk's mini-mode assets. The native
+    /// renderer does not copy the upstream SVG files, but keeping these as
+    /// real catalogue states means a custom theme can still replace them and
+    /// the built-in renderer never falls back to an unrelated full-size pose.
+    private static func miniRestPose() -> BloubPose {
+        var pose = BloubPose()
+        pose.gaze = BloubMotion.restGaze
+        return pose
+    }
+
+    private static func miniAlertPose(at t: CGFloat) -> BloubPose {
+        let p = BloubEase.clamp01(t / 0.45)
+        let pop = 1 + (BloubDecor.notifPop - 1) * sin(p * .pi) * (1 - p * 0.35)
+        let r = BloubDecor.notifR * (p < 1 ? pop : 1)
+        let angle = BloubDecor.notifAngle * .pi / 180
+        var pose = BloubPose()
+        pose.gaze = BloubGaze(yaw: -18, pitch: -5, roll: -8)
+        pose.notification = BloubNotification(
+            x: cos(angle) * BloubDecor.notifDist,
+            y: sin(angle) * BloubDecor.notifDist,
+            r: r,
+            notch: r + BloubDecor.notifMargin
+        )
+        return pose
+    }
+
+    private static func miniHappyPose(at t: CGFloat) -> BloubPose {
+        let collapse = 1 - 0.72 * BloubEase.easeOutQuint(BloubEase.clamp01(t / 0.45))
+        let regrow = BloubEase.easeOutQuint(BloubEase.clamp01((t - 0.9) / 0.65))
+        var pose = BloubPose()
+        pose.body = BloubBody(profile: .circle(collapse + (1 - collapse) * regrow))
+        pose.eyeOpacity = BloubEase.clamp01((t - 1.05) / 0.3)
+        pose.dots = BloubDecor.burstParticles(at: t)
+        pose.dotsBehind = true
+        return pose
+    }
+
     public static let catalog: [BloubState: BloubStateDefinition] = [
         .idle: BloubStateDefinition(
             id: .idle,
@@ -213,6 +309,28 @@ public enum BloubStates {
             baseFace: true,
             settlesAt: 0  // static pose
         ) { _ in BloubPose() },
+
+        .roam: BloubStateDefinition(
+            id: .roam,
+            duration: 1.2,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 0.8)
+            let stride = sin(phase * .pi * 2)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                rotation: stride * 0.045,
+                center: CGPoint(x: stride * 0.025, y: abs(stride) * 0.07),
+                scale: CGSize(width: 1 + abs(stride) * 0.025, height: 1 - abs(stride) * 0.025)
+            )
+            pose.gaze = BloubGaze(yaw: 10, pitch: -4, roll: -2)
+            return pose
+        },
 
         .thinking: BloubStateDefinition(
             id: .thinking,
@@ -389,6 +507,236 @@ public enum BloubStates {
             return pose
         },
 
+        // The following six states are Clawdesk lifecycle overlays. They
+        // retain the same low-detail native language as bloub while keeping
+        // the original clawd-on-desk sleep sequence observable when a theme
+        // does not provide its own SVG for the phase.
+        .yawning: BloubStateDefinition(
+            id: .yawning,
+            duration: 3.0,
+            morph: 0.45,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 3.0)
+            let mouth = sin(phase * .pi / 3)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                center: CGPoint(x: 0, y: abs(mouth) * 0.025),
+                scale: CGSize(width: 1 + abs(mouth) * 0.015, height: 1 - abs(mouth) * 0.03)
+            )
+            pose.gaze = BloubGaze(yaw: -4, pitch: 9 + mouth * 6, roll: 0)
+            pose.eyes = .mirrored(0.19, 0.28, 0, 0.9 - abs(mouth) * 0.55)
+            return pose
+        },
+
+        .dozing: BloubStateDefinition(
+            id: .dozing,
+            duration: 2.4,
+            morph: 0.4,
+            blinkIn: false,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: 0.8
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 2.4)
+            let breath = sin(phase * .pi * 2 / 2.4)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                center: CGPoint(x: 0, y: 0.015 + breath * 0.012),
+                scale: CGSize(width: 1.01, height: 0.985)
+            )
+            pose.gaze = BloubGaze(yaw: 0, pitch: 11, roll: 0)
+            pose.eyes = .mirrored(0.19, 0.24, 0, 0.28)
+            return pose
+        },
+
+        .collapsing: BloubStateDefinition(
+            id: .collapsing,
+            duration: 1.0,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: 1.0
+        ) { t in
+            let progress = BloubEase.easeInOutCubic(BloubEase.clamp01(t / 1.0))
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(BloubEase.lerp(1, BloubDecor.cometDot, progress)),
+                center: CGPoint(x: 0, y: BloubEase.lerp(0, 0.11, progress))
+            )
+            pose.eyeOpacity = 1 - BloubEase.clamp01((progress - 0.55) / 0.45)
+            return pose
+        },
+
+        .sleeping: BloubStateDefinition(
+            id: .sleeping,
+            duration: 2.4,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(BloubDecor.cometDot),
+                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.19)
+            )
+            pose.eyeOpacity = 0
+            return pose
+        },
+
+        .waking: BloubStateDefinition(
+            id: .waking,
+            duration: 1.3,
+            morph: 0.3,
+            blinkIn: true,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: 1.3
+        ) { t in
+            let progress = BloubEase.easeOutCubic(BloubEase.clamp01(t / 1.3))
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(BloubEase.lerp(BloubDecor.cometDot, 1, progress)),
+                center: CGPoint(x: 0, y: BloubEase.lerp(0.11, 0, progress))
+            )
+            pose.eyeOpacity = BloubEase.clamp01((progress - 0.45) / 0.35)
+            pose.arcs = BloubDecor.rings.prefix(3).enumerated().map { index, seed in
+                BloubArcRequest(
+                    id: "wk\(index)",
+                    seed: seed,
+                    t: t,
+                    opacity: BloubEase.clamp01((t - CGFloat(index) * 0.08) / 0.16)
+                        * BloubEase.clamp01((1.22 - t) / 0.28)
+                )
+            }
+            return pose
+        },
+
+        .wakingFromDoze: BloubStateDefinition(
+            id: .wakingFromDoze,
+            duration: 0.6,
+            morph: 0.25,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: 0.6
+        ) { t in
+            let progress = BloubEase.easeOutCubic(BloubEase.clamp01(t / 0.6))
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                center: CGPoint(x: 0, y: (1 - progress) * 0.02),
+                scale: CGSize(width: 1 + progress * 0.01, height: 0.985 + progress * 0.015)
+            )
+            pose.gaze = BloubGaze(yaw: 0, pitch: 8 - progress * 8, roll: 0)
+            pose.eyes = .mirrored(0.19, 0.35, 0, 0.2 + progress * 0.8)
+            return pose
+        },
+
+        .building: BloubStateDefinition(
+            id: .building,
+            duration: 2.8,
+            morph: 0.45,
+            blinkIn: true,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 2.8)
+            let wave = sin(phase * .pi * 2 / 2.8)
+            let rotation = wave * 0.16
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: BloubProfileFixture.hexagon,
+                rotation: rotation,
+                center: CGPoint(x: wave * 0.035, y: abs(wave) * 0.025),
+                scale: CGSize(width: 1 + abs(wave) * 0.035, height: 1 - abs(wave) * 0.025)
+            )
+            pose.gaze = BloubGaze(yaw: 22 + wave * 10, pitch: 20 - wave * 8, roll: -12 + wave * 4)
+            pose.split = 13.37
+            pose.eyes = .pair(0.177, 0.411)
+            pose.arcs = BloubDecor.swoosh.enumerated().map { index, seed in
+                BloubArcRequest(
+                    id: "bd\(index)",
+                    seed: seed,
+                    t: phase,
+                    opacity: 0.25 + 0.55 * BloubEase.clamp01(
+                        0.5 + 0.5 * sin(phase * .pi * 2 / 2.8 + CGFloat(index) * 0.8)
+                    )
+                )
+            }
+            return pose
+        },
+
+        .carrying: BloubStateDefinition(
+            id: .carrying,
+            duration: 2.2,
+            morph: 0.4,
+            blinkIn: true,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 2.2)
+            let bob = sin(phase * .pi * 2 / 2.2)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: BloubProfileFixture.egg,
+                rotation: -0.12 + bob * 0.08,
+                center: CGPoint(x: bob * 0.025, y: 0.04 + abs(bob) * 0.025),
+                scale: CGSize(width: 0.96 + abs(bob) * 0.035, height: 1 - abs(bob) * 0.02)
+            )
+            pose.gaze = BloubGaze(yaw: 20 + bob * 12, pitch: 24 - bob * 8, roll: -17 + bob * 5)
+            pose.split = 11.07
+            pose.eyes = .pair(0.164, 0.385)
+            pose.dots = [
+                BloubDotSpec(x: -0.38 + bob * 0.04, y: -0.62, r: 0.045, opacity: 0.5 + 0.3 * abs(bob)),
+                BloubDotSpec(x: 0.42 - bob * 0.04, y: -0.58, r: 0.035, opacity: 0.45 + 0.25 * abs(bob))
+            ]
+            return pose
+        },
+
+        .sweeping: BloubStateDefinition(
+            id: .sweeping,
+            duration: 2.4,
+            morph: 0.45,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 5.2)
+            let travel = phase <= 2.6 ? phase : 5.2 - phase
+            let collapse = 1 - (1 - BloubDecor.cometDot) * BloubEase.easeOutQuint(
+                BloubEase.clamp01(travel / 0.65)
+            )
+            let regrow = BloubEase.easeOutQuint(BloubEase.clamp01((travel - 1.75) / 0.7))
+            let radius = collapse + (1 - collapse) * regrow
+            let fade = BloubEase.clamp01((travel - 0.1) / 0.25)
+                * BloubEase.clamp01((2.2 - travel) / 0.4)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(radius),
+                center: CGPoint(
+                    x: sin(travel * .pi / 2.6) * 0.035,
+                    y: sin(BloubEase.clamp01(travel / 1.8) * .pi) * 0.05
+                )
+            )
+            pose.eyeOpacity = BloubEase.clamp01((travel - 1.9) / 0.35)
+            pose.arcs = BloubDecor.cometRibbons.enumerated().map { index, seed in
+                BloubArcRequest(id: "swp\(index)", seed: seed, t: travel, opacity: fade)
+            }
+            return pose
+        },
+
         .egg: BloubStateDefinition(
             id: .egg,
             duration: 1.8,
@@ -427,14 +775,16 @@ public enum BloubStates {
         .play: BloubStateDefinition(
             id: .play,
             duration: 2,
+            minDuration: nil,
             morph: 0.5,
             blinkIn: true,
             baseBody: false,
             baseFace: false,
-            settlesAt: 2.3  // bouquet faded
+            settlesAt: nil  // continuous working cycle
         ) { t in
+            let phase = loopTime(t, period: 2.4)
             // The triangle stays nearly still while the bouquet crosses it.
-            let fade = BloubEase.clamp01(t / 0.35) * BloubEase.clamp01((2.2 - t) / 0.5)
+            let fade = BloubEase.clamp01(phase / 0.35) * BloubEase.clamp01((2.2 - phase) / 0.5)
             var pose = BloubPose()
             pose.body = spinningTriangle(0)
             pose.gaze = BloubGaze(yaw: 12, pitch: -8, roll: -6)
@@ -448,9 +798,9 @@ public enum BloubStates {
                         a: seed.a, k: seed.k, tilt: seed.tilt, speed: seed.speed,
                         phase: seed.phase, sweep: seed.sweep, hue: seed.hue,
                         hueSpan: seed.hueSpan, width: seed.width,
-                        cx: 0.45 - t * 0.42, cy: seed.cy
+                        cx: 0.45 - phase * 0.42, cy: seed.cy
                     ),
-                    t: t,
+                    t: phase,
                     opacity: fade
                 )
             }
@@ -460,19 +810,24 @@ public enum BloubStates {
         .orbit: BloubStateDefinition(
             id: .orbit,
             duration: 3.4,
-            minDuration: 2.5,
+            minDuration: nil,
             morph: 0.6,
             blinkIn: false,
             baseBody: false,
             baseFace: false,
-            settlesAt: 4.6  // rings gone
+            settlesAt: nil  // continuous multi-agent cycle
         ) { t in
+            let phase = loopTime(t, period: 4.6)
+            // The measured entry relaxes triangle -> ball. Mirror that
+            // travel on the second half so the cycle returns to its exact
+            // opening silhouette instead of snapping at the wrap point.
+            let travel = phase <= 2.3 ? phase : 4.6 - phase
             // Measured rotation: ramp over 0.35 s then 1.25 turns/s
             // (counter-clockwise).
-            let ramp = BloubEase.easeInOutCubic(BloubEase.clamp01(t / 0.35))
-            let rotation = -.pi * 2 * 1.25 * t * ramp
+            let ramp = BloubEase.easeInOutCubic(BloubEase.clamp01(travel / 0.35))
+            let rotation = -.pi * 2 * 1.25 * travel * ramp
             // The body relaxes from triangle to ball during the orbit.
-            let back = BloubEase.easeInOutCubic(BloubEase.clamp01((t - 1.6) / 0.9))
+            let back = BloubEase.easeInOutCubic(BloubEase.clamp01((travel - 1.6) / 0.9))
             let tri = spinningTriangle(rotation)
             let ball = BloubBody(profile: .circle(1), rotation: rotation)
             var radii = tri.profile.radii
@@ -484,12 +839,12 @@ public enum BloubStates {
                 rotation: rotation,
                 center: CGPoint(x: tri.center.x * (1 - back), y: tri.center.y * (1 - back))
             )
-            let fade = BloubEase.clamp01(t / 0.8) * BloubEase.clamp01((3.6 - t) / 0.9)
+            let fade = BloubEase.clamp01(phase / 0.8) * BloubEase.clamp01((4.2 - phase) / 0.9)
             var pose = BloubPose()
             pose.body = body
             // The eyes race around the sphere ~3x faster than the silhouette.
             pose.gaze = BloubGaze(
-                yaw: BloubMotion.restGaze.yaw + sin(t * 6.5) * 65 * (1 - back),
+                yaw: BloubMotion.restGaze.yaw + sin(travel * 6.5) * 65 * (1 - back),
                 pitch: CGFloat(-4) + back * CGFloat(32),
                 roll: -13
             )
@@ -499,8 +854,8 @@ public enum BloubStates {
                 BloubArcRequest(
                     id: "rg\(index)",
                     seed: seed,
-                    t: t,
-                    opacity: fade * BloubEase.clamp01((t - CGFloat(index) * 0.13) / 0.3)
+                    t: phase,
+                    opacity: fade * BloubEase.clamp01((phase - CGFloat(index) * 0.13) / 0.3)
                 )
             }
             return pose
@@ -559,26 +914,234 @@ public enum BloubStates {
         .comet: BloubStateDefinition(
             id: .comet,
             duration: 2.4,
-            minDuration: 2.4,
+            minDuration: nil,
             morph: 0.45,
             blinkIn: false,
             baseBody: false,
             baseFace: false,
-            settlesAt: 2.6  // dot regrown
+            settlesAt: nil  // continuous single-agent/compaction cycle
         ) { t in
-            let collapse = 1 - (1 - BloubDecor.cometDot) * BloubEase.easeOutQuint(BloubEase.clamp01(t / 0.55))
-            let regrow = BloubEase.easeOutQuint(BloubEase.clamp01((t - 1.85) / 0.6))
-            let fade = BloubEase.clamp01((t - 0.15) / 0.25) * BloubEase.clamp01((1.95 - t) / 0.3)
+            let phase = loopTime(t, period: 5.2)
+            // Preserve the measured collapse/regrow on the first half and
+            // play it backwards on the second half, making the final dot
+            // meet the opening dot continuously at the loop boundary.
+            let travel = phase <= 2.6 ? phase : 5.2 - phase
+            let collapse = 1 - (1 - BloubDecor.cometDot) * BloubEase.easeOutQuint(BloubEase.clamp01(travel / 0.55))
+            let regrow = BloubEase.easeOutQuint(BloubEase.clamp01((travel - 1.85) / 0.6))
+            let fade = BloubEase.clamp01((travel - 0.15) / 0.25) * BloubEase.clamp01((1.95 - travel) / 0.3)
             var pose = BloubPose()
             // The dot drifts 0.035 downward then rises (measured wobble).
             pose.body = BloubBody(
                 profile: .circle(collapse + (1 - collapse) * regrow),
-                center: CGPoint(x: 0, y: sin(BloubEase.clamp01(t / 1.7) * .pi) * 0.035)
+                center: CGPoint(x: 0, y: sin(BloubEase.clamp01(travel / 1.7) * .pi) * 0.035)
             )
-            pose.eyeOpacity = BloubEase.clamp01((t - 2) / 0.35)
+            pose.eyeOpacity = BloubEase.clamp01((travel - 2) / 0.35)
             pose.arcs = BloubDecor.cometRibbons.enumerated().map { index, seed in
-                BloubArcRequest(id: "cm\(index)", seed: seed, t: t, opacity: fade)
+                BloubArcRequest(id: "cm\(index)", seed: seed, t: travel, opacity: fade)
             }
+            return pose
+        },
+
+        .dizzy: BloubStateDefinition(
+            id: .dizzy,
+            duration: 6,
+            minDuration: nil,
+            morph: 0.45,
+            blinkIn: false,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let angle = BloubStates.loopTime(t, period: 3) * .pi * 2 / 3
+            let wobble = sin(angle)
+            var pose = BloubPose()
+            // A small elliptical sway keeps the body grounded while the
+            // rings and eyes communicate the original dizzy reaction.
+            pose.body = BloubBody(
+                profile: .circle(1),
+                rotation: wobble * 0.06,
+                center: CGPoint(x: cos(angle) * 0.018, y: sin(angle) * 0.012),
+                scale: CGSize(width: 1 + wobble * 0.012, height: 1 - wobble * 0.012)
+            )
+            pose.gaze = BloubGaze(
+                yaw: sin(angle * 2) * 24,
+                pitch: cos(angle * 2) * 10,
+                roll: sin(angle) * 8
+            )
+            pose.eyes = .pair(0.18, 0.34)
+            pose.arcs = BloubDecor.rings.prefix(3).enumerated().map { index, seed in
+                BloubArcRequest(
+                    id: "dz\(index)",
+                    seed: seed,
+                    t: t,
+                    opacity: 0.78
+                )
+            }
+            return pose
+        },
+
+        .miniIdle: BloubStateDefinition(
+            id: .miniIdle,
+            duration: 2.4,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: true,
+            baseFace: true,
+            settlesAt: 0
+        ) { _ in
+            BloubStates.miniRestPose()
+        },
+
+        .miniPeek: BloubStateDefinition(
+            id: .miniPeek,
+            duration: 1.2,
+            morph: 0.3,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: 0.9
+        ) { t in
+            let wave = sin(BloubStates.loopTime(t, period: 0.9) * .pi * 2)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                rotation: wave * 0.035,
+                center: CGPoint(x: wave * 0.025, y: abs(wave) * 0.025)
+            )
+            pose.gaze = BloubGaze(yaw: -12, pitch: -4, roll: wave * 3)
+            pose.eyes = .pair(0.22, 0.42)
+            return pose
+        },
+
+        .miniAlert: BloubStateDefinition(
+            id: .miniAlert,
+            duration: 2.2,
+            morph: 0.35,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: 0.5
+        ) { t in
+            BloubStates.miniAlertPose(at: t)
+        },
+
+        .miniHappy: BloubStateDefinition(
+            id: .miniHappy,
+            duration: 2.6,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: 2.1
+        ) { t in
+            BloubStates.miniHappyPose(at: t)
+        },
+
+        .miniWorking: BloubStateDefinition(
+            id: .miniWorking,
+            duration: 2.0,
+            morph: 0.35,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 2.4)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                center: CGPoint(x: 0, y: sin(phase * .pi * 2 / 2.4) * 0.035),
+                scale: CGSize(width: 1.015, height: 0.985)
+            )
+            pose.gaze = BloubGaze(yaw: 8, pitch: -6, roll: -4)
+            pose.arcs = BloubDecor.swoosh.prefix(2).enumerated().map { index, seed in
+                BloubArcRequest(
+                    id: "mw\(index)",
+                    seed: seed,
+                    t: phase,
+                    opacity: BloubEase.clamp01(phase / 0.35)
+                        * BloubEase.clamp01((2.2 - phase) / 0.5)
+                )
+            }
+            return pose
+        },
+
+        .miniCrabwalk: BloubStateDefinition(
+            id: .miniCrabwalk,
+            duration: 1.2,
+            morph: 0.3,
+            blinkIn: false,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            let phase = BloubStates.loopTime(t, period: 0.65)
+            let stride = sin(phase * .pi * 2)
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                rotation: stride * 0.08,
+                center: CGPoint(x: stride * 0.04, y: abs(stride) * 0.06),
+                scale: CGSize(width: 1 + abs(stride) * 0.04, height: 1 - abs(stride) * 0.03)
+            )
+            pose.gaze = BloubGaze(yaw: -16, pitch: -2, roll: -4)
+            return pose
+        },
+
+        .miniEnter: BloubStateDefinition(
+            id: .miniEnter,
+            duration: 3.2,
+            morph: 0.35,
+            blinkIn: true,
+            baseBody: true,
+            baseFace: false,
+            settlesAt: 1.2
+        ) { t in
+            let progress = BloubEase.easeOutCubic(BloubEase.clamp01(t / 1.2))
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(1),
+                center: CGPoint(x: 0, y: (1 - progress) * 0.35),
+                scale: CGSize(width: 0.92 + progress * 0.08, height: 0.88 + progress * 0.12)
+            )
+            pose.gaze = BloubGaze(yaw: -8 + progress * 8, pitch: -8 + progress * 4, roll: 0)
+            return pose
+        },
+
+        .miniEnterSleep: BloubStateDefinition(
+            id: .miniEnterSleep,
+            duration: 2.4,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: 1.0
+        ) { t in
+            let progress = BloubEase.easeOutCubic(BloubEase.clamp01(t / 1.0))
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(BloubEase.lerp(1, 0.1585, progress)),
+                center: CGPoint(x: 0, y: BloubEase.lerp(0, 0.11, progress))
+            )
+            pose.eyeOpacity = 0
+            return pose
+        },
+
+        .miniSleep: BloubStateDefinition(
+            id: .miniSleep,
+            duration: 2.4,
+            morph: 0.35,
+            blinkIn: false,
+            baseBody: false,
+            baseFace: false,
+            settlesAt: nil
+        ) { t in
+            var pose = BloubPose()
+            pose.body = BloubBody(
+                profile: .circle(0.1585),
+                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.14)
+            )
+            pose.eyeOpacity = 0
             return pose
         }
     ]

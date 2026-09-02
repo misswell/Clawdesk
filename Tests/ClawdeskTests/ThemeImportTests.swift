@@ -157,6 +157,69 @@ final class ThemeImportTests: XCTestCase {
         )
     }
 
+    func testImportsUpstreamStateBindingsTiersAndMiniTimingOverrides() throws {
+        let source = root.appendingPathComponent("parity-theme", isDirectory: true)
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        let manifest: [String: Any] = [
+            "name": "Parity Theme",
+            "states": [
+                "idle": ["idle.png", "idle-alt.png"],
+                "thinking": "thinking.png",
+                "working": ["working.png"],
+                "carrying": ["missing.png"],
+                "attention": "happy.png"
+            ],
+            "workingTiers": [
+                ["minSessions": 3, "file": "building.png"],
+                ["minSessions": 2, "file": "juggling.png"],
+                ["minSessions": 1, "file": "working.png"]
+            ],
+            "jugglingTiers": [
+                ["minSessions": 2, "file": "juggling-2.png"],
+                ["minSessions": 1, "file": "juggling-1.png"]
+            ],
+            "displayHintMap": ["working.png": "juggling.png"],
+            "updateVisuals": ["checking": "thinking.png"],
+            "timings": [
+                "minDisplay": ["thinking": 1_000],
+                "autoReturn": ["attention": 4_000]
+            ],
+            "miniMode": [
+                "states": ["mini-working": ["mini-working.png", "mini-working-alt.png"]],
+                "timings": [
+                    "minDisplay": ["mini-alert": 4_000],
+                    "autoReturn": ["mini-happy": 4_000]
+                ]
+            ]
+        ]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: source.appendingPathComponent("theme.json"))
+        for file in [
+            "idle.png", "idle-alt.png", "thinking.png", "working.png", "building.png",
+            "juggling.png", "juggling-2.png", "juggling-1.png", "happy.png",
+            "mini-working.png", "mini-working-alt.png"
+        ] {
+            try Data("placeholder".utf8).write(to: source.appendingPathComponent(file))
+        }
+
+        let preferences = AppPreferences(defaults: defaults, homeDirectory: root)
+        try preferences.importTheme(from: source)
+        let theme = preferences.theme
+
+        XCTAssertEqual(theme.id, "parity-theme", "directory name supplies a missing manifest id")
+        XCTAssertEqual(theme.stateBindings["idle"]?.files, ["idle.png", "idle-alt.png"])
+        XCTAssertEqual(theme.workingTiers.map(\.minSessions), [3, 2, 1])
+        XCTAssertEqual(theme.jugglingTiers.map(\.minSessions), [2, 1])
+        XCTAssertEqual(theme.assetURL(for: .typing, activeSessionCount: 3)?.lastPathComponent, "building.png")
+        XCTAssertEqual(theme.assetURL(for: .typing, activeSessionCount: 2)?.lastPathComponent, "juggling.png")
+        XCTAssertEqual(theme.assetURL(for: .juggling, subagentCount: 2)?.lastPathComponent, "juggling-2.png")
+        XCTAssertEqual(theme.assetURL(for: .miniWorking)?.lastPathComponent, "mini-working.png")
+        XCTAssertEqual(theme.displayHintMap["working.png"], "juggling.png")
+        XCTAssertEqual(theme.updateVisuals["checking"], "thinking.png")
+        XCTAssertEqual(try XCTUnwrap(theme.timings.minDisplay["thinking"]), 1, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(theme.timings.autoReturn["attention"]), 4, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(theme.timings.miniMode?.autoReturn["mini-happy"]), 4, accuracy: 0.001)
+    }
+
     func testRejectsZipPathTraversalBeforeExtraction() throws {
         let archive = root.appendingPathComponent("unsafe.zip")
         let inner = root.appendingPathComponent("inner", isDirectory: true)

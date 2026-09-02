@@ -9,6 +9,7 @@ final class BloubSettleTests: XCTestCase {
     func testSettleTableCoversEveryState() {
         let expected: [BloubState: TimeInterval?] = [
             .idle: 0,
+            .roam: nil,
             .thinking: nil,
             .wink: 0,
             .wide: 0,
@@ -16,13 +17,32 @@ final class BloubSettleTests: XCTestCase {
             .notify: 0.5,
             .exclaim: 0,
             .sleep: nil,
+            .yawning: nil,
+            .dozing: 0.8,
+            .collapsing: 1.0,
+            .sleeping: nil,
+            .waking: 1.3,
+            .wakingFromDoze: 0.6,
+            .building: nil,
+            .carrying: nil,
+            .sweeping: nil,
             .egg: 0,
             .hexagon: 0,
-            .play: 2.3,
-            .orbit: 4.6,
+            .play: nil,
+            .orbit: nil,
             .burst: 2.5,
-            .comet: 2.6,
-            .swirl: 1.3
+            .comet: nil,
+            .swirl: 1.3,
+            .dizzy: nil,
+            .miniIdle: 0,
+            .miniPeek: 0.9,
+            .miniAlert: 0.5,
+            .miniHappy: 2.1,
+            .miniWorking: nil,
+            .miniCrabwalk: nil,
+            .miniEnter: 1.2,
+            .miniEnterSleep: 1.0,
+            .miniSleep: nil
         ]
         XCTAssertEqual(Set(expected.keys), Set(BloubState.allCases))
         for state in BloubState.allCases {
@@ -42,14 +62,13 @@ final class BloubSettleTests: XCTestCase {
         XCTAssertTrue(engine.isSettled(at: 0.5))
     }
 
-    func testOneShotStatesSettleAtTheirMeasuredEnd() {
-        // Alert keeps its sub-pixel buzz after the "!" lands; burst regrows
-        // its core; orbit fades the rings out last.
-        let cases: [(BloubState, TimeInterval)] = [
-            (.alert, 2.1), (.notify, 0.5), (.play, 2.3),
-            (.orbit, 4.6), (.burst, 2.5), (.comet, 2.6), (.swirl, 1.3)
-        ]
-        for (state, settle) in cases {
+    func testFiniteStatesSettleAtTheirMeasuredEnd() {
+        // Alert keeps its sub-pixel buzz after the "!" lands and burst
+        // regrows its core. Work cycles and the sleep dot are intentionally
+        // excluded: their catalogue settle time is nil because they loop
+        // until the lifecycle state changes.
+        for state in BloubState.allCases {
+            guard let settle = BloubStates.catalog[state]?.settlesAt else { continue }
             let engine = BloubEngine(radius: 100, initial: state)
             let morph = BloubStates.catalog[state]!.morph
             let inside = max(morph, settle) - 0.1
@@ -63,11 +82,16 @@ final class BloubSettleTests: XCTestCase {
     }
 
     func testLoopingStatesNeverSettle() {
-        for state in [BloubState.thinking, .sleep] {
+        let looping: [BloubState] = [
+            .roam, .thinking, .sleep, .yawning, .sleeping, .play, .orbit,
+            .comet, .dizzy, .building, .carrying, .sweeping, .miniWorking,
+            .miniCrabwalk, .miniSleep
+        ]
+        for state in looping {
             let engine = BloubEngine(radius: 100, initial: state)
             XCTAssertFalse(
                 engine.isSettled(at: 300),
-                "\(state.rawValue) loops forever"
+                "\(state.rawValue) must keep animating until the lifecycle state changes"
             )
         }
     }

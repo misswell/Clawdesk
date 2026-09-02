@@ -12,7 +12,7 @@ scripts/build-app.sh
 open dist/Clawdesk.app
 ```
 
-The current 0.1.30 build keeps the native Session HUD and upstream theme-driven sleep sequence: after the
+The current 0.1.31 build keeps the native Session HUD and upstream theme-driven sleep sequence: after the
 configured mouse-sleep timeout, full themes transition through yawning, dozing,
 collapsing, and sleeping, while direct themes can skip straight to sleeping.
 Wake assets, DND yawn skipping, DND-specific transition artwork, and bounded
@@ -34,6 +34,8 @@ Settings.
 It also shows each live agent's native identity mark, lifecycle status, and context
 usage in the HUD, while the Orbit quota ring restores the latest reported account
 balance across relaunches.
+Active work remains visible until an explicit completion/end hook arrives; a
+known dead terminal owner is still pruned immediately.
 
 The local bridge listens on `127.0.0.1` and writes its current port to
 `~/Library/Application Support/Clawdesk/runtime.json`.
@@ -50,8 +52,8 @@ merges only Clawdesk-owned entries, preserves existing hooks, and leaves a
 backup before changing a configuration file.
 
 The v0.16.0 upstream sync also covers TraeCode (Trae CN) state-only hooks,
-Claude background-subagent completion gating, a separate long-running Codex
-silence timeout, and the current permission experience: simultaneous requests
+Claude background-subagent completion gating, event-driven active-work
+retention, and the current permission experience: simultaneous requests
 stay reachable in a scroll queue, request details can expand, placement can be
 fixed to any screen corner or follow the pet, and bubbles can be disabled per
 permission-capable agent.

@@ -79,10 +79,6 @@ public enum SessionHUDPresentation {
     }
 
     private static func normalizedEvent(_ value: String) -> String {
-        value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "_", with: "")
-            .replacingOccurrences(of: "-", with: "")
+        EventStateMapper.normalizedEventName(value)
     }
 }

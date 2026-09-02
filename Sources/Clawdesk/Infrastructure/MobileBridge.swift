@@ -514,6 +514,22 @@ public final class MobileBridge: @unchecked Sendable {
                 safe["basename"] = URL(fileURLWithPath: folder).lastPathComponent
             }
             if let subagents = session["subagentCount"] as? Int { safe["subagentCount"] = subagents }
+            if let context = session["contextUsage"] as? [String: Any],
+               let used = context["used"] as? Double,
+               used.isFinite,
+               used >= 0 {
+                var safeContext: [String: Any] = ["used": used]
+                if let limit = context["limit"] as? Double, limit.isFinite, limit > 0 {
+                    safeContext["limit"] = limit
+                }
+                if let percent = context["percent"] as? Int {
+                    safeContext["percent"] = min(100, max(0, percent))
+                }
+                if let source = context["source"] as? String, !source.isEmpty {
+                    safeContext["source"] = String(source.prefix(40))
+                }
+                safe["contextUsage"] = safeContext
+            }
             let events = (session["recentEvents"] as? [String] ?? []).suffix(10).map { event in
                 ["event": String(event.prefix(80)), "at": safe["updatedAt"] as? Double ?? 0, "state": state] as [String: Any]
             }

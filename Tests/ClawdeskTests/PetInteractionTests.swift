@@ -147,6 +147,89 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertLessThanOrEqual(view.pointerOffset.y, 1)
     }
 
+    @MainActor
+    func testCursorCircleTriggersDizzyOnlyForDefaultFullIdle() {
+        let frame = NSRect(x: 0, y: 0, width: 240, height: 240)
+        let panel = NSPanel(
+            contentRect: frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.setFrameOrigin(NSPoint(x: 500, y: 300))
+        let view = PetCanvasView(frame: frame)
+        panel.contentView = view
+        view.petState = .idle
+
+        var triggerCount = 0
+        view.onDizzy = { triggerCount += 1 }
+        let screenRect = panel.convertToScreen(view.bounds)
+        let center = CGPoint(x: screenRect.midX, y: screenRect.midY)
+        for index in 0...32 {
+            let angle = CGFloat(index) * (.pi * 4 / 32)
+            view.setPointerLocation(
+                NSPoint(x: center.x + cos(angle) * 80, y: center.y + sin(angle) * 80),
+                at: Double(index) * 0.05
+            )
+        }
+
+        XCTAssertEqual(triggerCount, 1)
+
+        // The same gesture shape is ignored by an active state and by mini
+        // mode; returning to idle does not inherit the previous turn.
+        view.petState = .typing
+        for index in 0...32 {
+            let angle = CGFloat(index) * (.pi * 4 / 32)
+            view.setPointerLocation(
+                NSPoint(x: center.x + cos(angle) * 80, y: center.y + sin(angle) * 80),
+                at: 2 + Double(index) * 0.05
+            )
+        }
+        view.petState = .idle
+        view.miniMode = true
+        for index in 0...32 {
+            let angle = CGFloat(index) * (.pi * 4 / 32)
+            view.setPointerLocation(
+                NSPoint(x: center.x + cos(angle) * 80, y: center.y + sin(angle) * 80),
+                at: 4 + Double(index) * 0.05
+            )
+        }
+        XCTAssertEqual(triggerCount, 1)
+    }
+
+    @MainActor
+    func testCursorCircleIsDisabledForNonDefaultIdleArtwork() {
+        let frame = NSRect(x: 0, y: 0, width: 240, height: 240)
+        let panel = NSPanel(
+            contentRect: frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        panel.setFrameOrigin(NSPoint(x: 500, y: 300))
+        let view = PetCanvasView(frame: frame)
+        panel.contentView = view
+        view.theme = ThemeDefinition(
+            id: "idle-choice",
+            displayName: "Idle Choice",
+            palette: ThemeCatalog.theme(id: "pinch").palette,
+            idleVisualFiles: ["idle-follow.png", "idle-reading.png"]
+        )
+        view.idleVisualFile = "idle-reading.png"
+        var triggerCount = 0
+        view.onDizzy = { triggerCount += 1 }
+        let screenRect = panel.convertToScreen(view.bounds)
+        let center = CGPoint(x: screenRect.midX, y: screenRect.midY)
+        for index in 0...32 {
+            let angle = CGFloat(index) * (.pi * 4 / 32)
+            view.setPointerLocation(
+                NSPoint(x: center.x + cos(angle) * 80, y: center.y + sin(angle) * 80),
+                at: Double(index) * 0.05
+            )
+        }
+        XCTAssertEqual(triggerCount, 0)
+    }
+
     func testDragAnchorUsesStableScreenDelta() {
         let anchor = PetDragAnchor(
             windowOrigin: CGPoint(x: 100, y: 200),
@@ -320,6 +403,21 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertTrue(
             retained.isEmpty,
             "A transparent pet canvas must not retain previous-state pixels: \(retained.prefix(8))"
+        )
+    }
+
+    @MainActor
+    func testWorkingPetKeepsItsActionAfterTheFirstOrbitPass() {
+        let view = PetCanvasView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
+        view.petState = .thinking
+        view.advanceFrame(at: 0)
+        for timestamp in stride(from: 0.25, through: 5, by: 0.25) {
+            view.advanceFrame(at: timestamp)
+        }
+
+        XCTAssertFalse(
+            view.isResting,
+            "an active work state must keep animating after the first orbit pass"
         )
     }
 

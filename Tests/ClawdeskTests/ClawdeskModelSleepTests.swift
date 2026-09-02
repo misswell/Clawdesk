@@ -30,6 +30,7 @@ final class ClawdeskModelSleepTests: XCTestCase {
                 "yawnDuration": timings.yawnDuration * 1_000,
                 "collapseDuration": timings.collapseDuration * 1_000,
                 "wakeDuration": timings.wakeDuration * 1_000,
+                "dizzyDuration": timings.dizzyDuration * 1_000,
                 "deepSleepTimeout": timings.deepSleepTimeout * 1_000,
                 "dndSkipYawn": timings.dndSkipYawn
             ]
@@ -238,5 +239,27 @@ final class ClawdeskModelSleepTests: XCTestCase {
         XCTAssertEqual(timings.collapseDuration, 0, accuracy: 0.001)
         XCTAssertEqual(timings.wakeDuration, 0.25, accuracy: 0.001)
         XCTAssertEqual(timings.deepSleepTimeout, 86_400, accuracy: 0.001)
+    }
+
+    func testCursorDizzyReactionReturnsToIdleAfterThemeDuration() async {
+        let model = makeModel(timings: ThemeTimings(dizzyDuration: 0.25))
+
+        model.triggerDizzy()
+        XCTAssertEqual(model.petState, .dizzy)
+
+        try? await Task.sleep(for: .milliseconds(350))
+        XCTAssertEqual(model.petState, .idle)
+    }
+
+    func testAgentEventInterruptsCursorDizzyReaction() async {
+        let model = makeModel(timings: ThemeTimings(dizzyDuration: 0.25))
+
+        model.triggerDizzy()
+        XCTAssertEqual(model.petState, .dizzy)
+        model.accept(AgentEvent(sessionID: "working", eventName: "PreToolUse"))
+        XCTAssertEqual(model.petState, .typing)
+
+        try? await Task.sleep(for: .milliseconds(350))
+        XCTAssertEqual(model.petState, .typing)
     }
 }

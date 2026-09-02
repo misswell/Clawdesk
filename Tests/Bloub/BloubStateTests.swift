@@ -18,11 +18,15 @@ final class BloubStateTests: XCTestCase {
     }
 
     func testSequenceExcludesSwirl() {
-        // swirl is an interface transition, not a catalogue animation; it must
-        // never appear in the reading order nor accept catalogue blocks.
-        XCTAssertEqual(BloubStates.sequence.count, 14)
+        // swirl is an interface transition and dizzy is a runtime reaction,
+        // not a montage block; neither belongs in the reading order.
+        let expected: [BloubState] = [
+            .idle, .thinking, .wink, .wide, .alert, .notify, .exclaim, .sleep,
+            .egg, .hexagon, .play, .orbit, .burst, .comet
+        ]
+        XCTAssertEqual(BloubStates.sequence, expected)
         XCTAssertFalse(BloubStates.sequence.contains(.swirl))
-        XCTAssertEqual(Set(BloubStates.sequence), Set(BloubState.allCases).subtracting([.swirl]))
+        XCTAssertFalse(BloubStates.sequence.contains(.dizzy))
     }
 
     func testMorphDurationsAreBounded() {
@@ -36,38 +40,45 @@ final class BloubStateTests: XCTestCase {
                 XCTAssertGreaterThan(minDuration, 0, state.rawValue)
             }
         }
-        // The two measured one-shots declare their internal resolution times.
+        // The measured one-shots declare their internal resolution times.
         XCTAssertEqual(BloubStates.catalog[.alert]?.minDuration, 2)
-        XCTAssertEqual(BloubStates.catalog[.orbit]?.minDuration, 2.5)
+        XCTAssertNil(BloubStates.catalog[.orbit]?.minDuration, "orbit is a continuous multi-agent work cycle")
         XCTAssertEqual(BloubStates.catalog[.burst]?.minDuration, 2.4)
-        XCTAssertEqual(BloubStates.catalog[.comet]?.minDuration, 2.4)
+        XCTAssertNil(BloubStates.catalog[.comet]?.minDuration, "comet is a continuous work cycle")
     }
 
     func testMapperCoversEveryPetState() {
         let expected: [PetState: BloubState] = [
             .idle: .idle,
-            .miniIdle: .idle,
-            .miniPeek: .idle,
+            .roam: .roam,
             .thinking: .thinking,
-            .typing: .orbit,
-            .building: .hexagon,
+            .typing: .play,
+            .building: .building,
             .juggling: .orbit,
-            .sweeping: .comet,
-            .carrying: .egg,
+            .sweeping: .sweeping,
+            .carrying: .carrying,
             .error: .exclaim,
             .reactFlail: .exclaim,
             .attention: .burst,
-            .miniHappy: .burst,
             .notification: .notify,
-            .miniAlert: .notify,
-            .yawning: .sleep,
-            .dozing: .sleep,
-            .collapsing: .sleep,
-            .sleeping: .sleep,
-            .waking: .swirl,
-            .wakingFromDoze: .swirl,
+            .dizzy: .dizzy,
+            .yawning: .yawning,
+            .dozing: .dozing,
+            .collapsing: .collapsing,
+            .sleeping: .sleeping,
+            .waking: .waking,
+            .wakingFromDoze: .wakingFromDoze,
             .dragging: .wide,
-            .reactDouble: .wink
+            .reactDouble: .wink,
+            .miniIdle: .miniIdle,
+            .miniPeek: .miniPeek,
+            .miniAlert: .miniAlert,
+            .miniHappy: .miniHappy,
+            .miniWorking: .miniWorking,
+            .miniCrabwalk: .miniCrabwalk,
+            .miniEnter: .miniEnter,
+            .miniEnterSleep: .miniEnterSleep,
+            .miniSleep: .miniSleep
         ]
         XCTAssertEqual(Set(expected.keys), Set(PetState.allCases))
         for petState in PetState.allCases {
@@ -98,5 +109,44 @@ final class BloubStateTests: XCTestCase {
                 XCTAssertTrue(point.x.isFinite && point.y.isFinite, state.rawValue)
             }
         }
+    }
+
+    func testThinkingAndWorkingUseDistinctContinuousAnimations() {
+        let thinking = BloubEngine(radius: 100, initial: .thinking)
+        let thinkingStart = thinking.sample(at: 0.2)
+        let thinkingLater = thinking.sample(at: 0.8)
+        XCTAssertEqual(thinkingStart.dots.count, 2)
+        XCTAssertEqual(thinkingLater.dots.count, 2)
+        XCTAssertNotEqual(thinkingStart.dots, thinkingLater.dots)
+
+        let working = BloubEngine(radius: 100, initial: .play)
+        let workingFrame = working.sample(at: 0.9)
+        XCTAssertTrue(workingFrame.dots.isEmpty, "play should not use thought dots")
+        XCTAssertEqual(workingFrame.arcs.count, 4)
+
+        for (state, label) in [
+            (BloubState.thinking, "thinking"),
+            (.play, "play"),
+            (.orbit, "orbit"),
+            (.comet, "comet"),
+            (.building, "building"),
+            (.carrying, "carrying"),
+            (.sweeping, "sweeping")
+        ] {
+            let engine = BloubEngine(radius: 100, initial: state)
+            XCTAssertFalse(engine.isSettled(at: 120), "\(label) must keep animating while work is active")
+        }
+    }
+
+    func testDizzyPoseContainsMovingRingsAndBodyMotion() {
+        let engine = BloubEngine(radius: 100, initial: .dizzy)
+        let first = engine.sample(at: 0.1)
+        let second = engine.sample(at: 1.2)
+
+        XCTAssertEqual(first.arcs.count, 3)
+        XCTAssertEqual(second.arcs.count, 3)
+        XCTAssertNotEqual(first.bodyPoints, second.bodyPoints)
+        XCTAssertNotEqual(first.eyes, second.eyes)
+        XCTAssertFalse(engine.isSettled(at: 20))
     }
 }

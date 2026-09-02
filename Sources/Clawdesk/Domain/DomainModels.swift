@@ -2,6 +2,7 @@ import Foundation
 
 public enum PetState: String, CaseIterable, Codable, Sendable {
     case idle
+    case roam
     case thinking
     case typing
     case building
@@ -9,6 +10,7 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     case error
     case attention
     case notification
+    case dizzy
     case sweeping
     case carrying
     case yawning
@@ -22,13 +24,19 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     case miniPeek = "mini-peek"
     case miniAlert = "mini-alert"
     case miniHappy = "mini-happy"
+    case miniWorking = "mini-working"
+    case miniCrabwalk = "mini-crabwalk"
+    case miniEnter = "mini-enter"
+    case miniEnterSleep = "mini-enter-sleep"
+    case miniSleep = "mini-sleep"
     case reactDouble = "react-double"
     case reactFlail = "react-flail"
 
     public var isTransient: Bool {
         switch self {
-        case .thinking, .error, .attention, .notification, .sweeping, .carrying,
-             .yawning, .waking, .wakingFromDoze, .reactDouble, .reactFlail, .miniAlert, .miniHappy:
+        case .roam, .thinking, .error, .attention, .notification, .dizzy, .sweeping, .carrying,
+             .yawning, .waking, .wakingFromDoze, .reactDouble, .reactFlail, .miniAlert, .miniHappy,
+             .miniWorking, .miniCrabwalk, .miniEnter, .miniEnterSleep:
             return true
         default:
             return false
@@ -37,7 +45,8 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
 
     public var isMini: Bool {
         switch self {
-        case .miniIdle, .miniPeek, .miniAlert, .miniHappy:
+        case .miniIdle, .miniPeek, .miniAlert, .miniHappy, .miniWorking, .miniCrabwalk,
+             .miniEnter, .miniEnterSleep, .miniSleep:
             return true
         default:
             return false
@@ -58,7 +67,7 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
 
     public var isSleepSequence: Bool {
         switch self {
-        case .yawning, .dozing, .collapsing, .sleeping:
+        case .yawning, .dozing, .collapsing, .sleeping, .miniEnterSleep, .miniSleep:
             return true
         default:
             return false
@@ -68,6 +77,7 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
     public var displayName: String {
         switch self {
         case .idle: return "Idle"
+        case .roam: return "Roaming"
         case .thinking: return "Thinking"
         case .typing: return "Working"
         case .building: return "Building"
@@ -75,6 +85,7 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
         case .error: return "Error"
         case .attention: return "Complete"
         case .notification: return "Needs attention"
+        case .dizzy: return "Dizzy"
         case .sweeping: return "Compacting"
         case .carrying: return "Preparing"
         case .yawning: return "Yawning"
@@ -88,6 +99,11 @@ public enum PetState: String, CaseIterable, Codable, Sendable {
         case .miniPeek: return "Peeking"
         case .miniAlert: return "Alert"
         case .miniHappy: return "Complete"
+        case .miniWorking: return "Working"
+        case .miniCrabwalk: return "Roaming"
+        case .miniEnter: return "Entering mini mode"
+        case .miniEnterSleep: return "Entering sleep"
+        case .miniSleep: return "Sleeping"
         case .reactDouble: return "Poked"
         case .reactFlail: return "Overstimulated"
         }
@@ -202,10 +218,26 @@ public struct AgentEvent: Equatable, Sendable {
     public var folder: String?
     public var terminalPID: Int?
     public var subagentCount: Int
+    /// Stable child identity when a provider exposes one. A count alone is
+    /// insufficient to distinguish one child stopping from the last child
+    /// stopping.
+    public var subagentID: String?
+    public var subagentType: String?
+    /// Some adapters report a lifecycle event while explicitly asking the
+    /// renderer to keep the current visible state.
+    public var preserveState: Bool
     public var backgroundTasksCount: Int?
     public var backgroundSubagentCount: Int?
     public var sessionCronsCount: Int?
     public var stopHookActive: Bool
+    /// Final assistant text reported by Claude's Stop hook. A Stop with
+    /// background work is only a candidate completion when this is present;
+    /// without it the model may still be continuing in the background.
+    public var assistantLastOutput: String?
+    public var assistantLastOutputTruncated: Bool
+    /// Headless Claude sessions use the upstream quiet-window completion
+    /// debounce even when no background task list is available.
+    public var headless: Bool
     public var permission: PermissionRequest?
     public var question: QuestionPrompt?
     public var quota: QuotaReport?
@@ -230,10 +262,16 @@ public struct AgentEvent: Equatable, Sendable {
         folder: String? = nil,
         terminalPID: Int? = nil,
         subagentCount: Int = 0,
+        subagentID: String? = nil,
+        subagentType: String? = nil,
+        preserveState: Bool = false,
         backgroundTasksCount: Int? = nil,
         backgroundSubagentCount: Int? = nil,
         sessionCronsCount: Int? = nil,
         stopHookActive: Bool = false,
+        assistantLastOutput: String? = nil,
+        assistantLastOutputTruncated: Bool = false,
+        headless: Bool = false,
         permission: PermissionRequest? = nil,
         question: QuestionPrompt? = nil,
         quota: QuotaReport? = nil,
@@ -257,10 +295,16 @@ public struct AgentEvent: Equatable, Sendable {
         self.folder = folder
         self.terminalPID = terminalPID
         self.subagentCount = max(0, subagentCount)
+        self.subagentID = subagentID
+        self.subagentType = subagentType
+        self.preserveState = preserveState
         self.backgroundTasksCount = backgroundTasksCount.map { max(0, $0) }
         self.backgroundSubagentCount = backgroundSubagentCount.map { max(0, $0) }
         self.sessionCronsCount = sessionCronsCount.map { max(0, $0) }
         self.stopHookActive = stopHookActive
+        self.assistantLastOutput = assistantLastOutput
+        self.assistantLastOutputTruncated = assistantLastOutputTruncated
+        self.headless = headless
         self.permission = permission
         self.question = question
         self.quota = quota

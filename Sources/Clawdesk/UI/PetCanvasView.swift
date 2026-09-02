@@ -56,6 +56,11 @@ public final class PetCanvasView: NSView {
                 pointerKnown = false
                 updateBloubLook()
             }
+            // A circle is one continuous gesture in one visual context. Any
+            // state transition (including dizzy -> idle) breaks that context;
+            // keep the cooldown, but never carry a partial angle into the
+            // next idle period.
+            spinDetector.resetGesture()
             needsDisplay = true
         }
     }
@@ -75,6 +80,7 @@ public final class PetCanvasView: NSView {
             bloubEngine.rewindCustomization(at: 0)
             lookActive = false
             pointerKnown = false
+            spinDetector.reset()
             needsDisplay = true
         }
     }
@@ -91,7 +97,10 @@ public final class PetCanvasView: NSView {
     }
 
     public var miniMode = false {
-        didSet { needsDisplay = true }
+        didSet {
+            if miniMode { spinDetector.resetGesture() }
+            needsDisplay = true
+        }
     }
 
     /// Live subagent count selects the visual tier for the juggling state.
@@ -104,8 +113,15 @@ public final class PetCanvasView: NSView {
         }
     }
 
+    /// Number of live agent sessions. Custom themes use this independently
+    /// from `subagentCount` to select their working/juggling tier.
+    public var activeSessionCount = 0 {
+        didSet { needsDisplay = true }
+    }
+
     public var idleVisualFile: String? {
         didSet {
+            spinDetector.resetGesture()
             needsDisplay = true
         }
     }
@@ -132,6 +148,7 @@ public final class PetCanvasView: NSView {
     public var onClick: (() -> Void)?
     public var onDoubleTap: (() -> Void)?
     public var onFlail: (() -> Void)?
+    public var onDizzy: (() -> Void)?
     public var onContextMenu: ((NSPoint) -> NSMenu?)?
     public var onHoverChanged: ((Bool) -> Void)?
 
@@ -143,6 +160,7 @@ public final class PetCanvasView: NSView {
     private var animationClock = PetAnimationClock()
     private var assetClock: TimeInterval { animationClock.time }
     private var pointerKnown = false
+    private var spinDetector = CursorSpinDetector()
     /// True while the last draw served a multi-frame theme asset: those run
     /// on their own frame timeline and need the full animation frequency.
     private var assetAnimationActive = false
@@ -271,7 +289,25 @@ public final class PetCanvasView: NSView {
         // The engine samples at absolute clock time, so the delta itself needs
         // no further bookkeeping; keeping the clock monotonic is enough.
         animationClock.advance(to: timestamp)
+        replaySettledWorkAnimationIfNeeded()
         needsDisplay = true
+    }
+
+    /// `orbit` is a measured one-shot in bloub's standalone sequence, but an
+    /// agent can remain in a working state for an arbitrary amount of time.
+    /// Replay it with a short morph from the settled ball instead of allowing
+    /// the first pass to look like work has stopped. This is deliberately a
+    /// renderer concern: the agent state remains active and the Bloub engine
+    /// still owns all geometry and timing.
+    private func replaySettledWorkAnimationIfNeeded() {
+        guard petState == .thinking || petState == .typing || petState == .juggling else { return }
+        let mapped = BloubStateMapper.state(for: petState, subagentCount: subagentCount)
+        guard mapped == .orbit, bloubEngine.isSettled(at: assetClock) else { return }
+
+        // Re-enter through idle so the next orbit pass morphs from the
+        // settled ball rather than jumping directly back to its triangle.
+        bloubEngine.reset(.idle, at: assetClock)
+        bloubEngine.setState(.orbit, at: assetClock)
     }
 
     /// True when the next frame only differs through the slow rest life
@@ -293,10 +329,14 @@ public final class PetCanvasView: NSView {
         window?.displayIfNeeded()
     }
 
-    public func setPointerLocation(_ point: NSPoint) {
+    public func setPointerLocation(
+        _ point: NSPoint,
+        at time: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) {
         guard theme.supportsEyeTracking,
               (petState == .idle || petState == .miniIdle || petState == .miniPeek) else {
             if pointerOffset != .zero { pointerOffset = .zero }
+            spinDetector.resetGesture()
             return
         }
         guard let window else { return }
@@ -323,12 +363,38 @@ public final class PetCanvasView: NSView {
             dy: petRect.height * 0.18
         )
         let newForward = PetPointerMapper.forwardFactor(petRect: ballRect, cursor: point)
+
+        // Match clawd-on-desk's deliberate two-circle gesture. This is
+        // intentionally evaluated from the screen-space pet centre rather
+        // than the eye target: the window may be anywhere on any display.
+        // Non-default idle artwork is a passive visual and opts out, just as
+        // the upstream idle-reading/idle-bubble states do.
+        let spinEnabled = petState == .idle
+            && !miniMode
+            && usesDefaultIdleVisual
+        let didTriggerDizzy = spinDetector.sample(
+            cursor: point,
+            center: CGPoint(x: petRect.midX, y: petRect.midY),
+            at: time,
+            enabled: spinEnabled
+        )
+
         // A resting cursor must not churn the engine: re-posing the look
         // target every poll would keep the gaze catch-up alive forever and
         // the pet would never settle into its idle cadence.
-        guard newOffset != pointerOffset || newForward != pointerForward else { return }
-        pointerOffset = newOffset
-        pointerForward = newForward
+        if newOffset != pointerOffset || newForward != pointerForward {
+            pointerOffset = newOffset
+            pointerForward = newForward
+        }
+        if didTriggerDizzy {
+            onDizzy?()
+        }
+    }
+
+    private var usesDefaultIdleVisual: Bool {
+        guard !theme.idleVisualFiles.isEmpty else { return true }
+        guard let idleVisualFile else { return true }
+        return idleVisualFile == theme.idleVisualFiles[0]
     }
 
     public override func draw(_ dirtyRect: NSRect) {
@@ -357,7 +423,11 @@ public final class PetCanvasView: NSView {
         context.scaleBy(x: 1, y: -1)
 
         assetAnimationActive = false
-        if !petState.isPointerInteraction, drawCustomAsset(in: context) {
+        // Dragging deliberately stays native so a legacy theme cannot draw a
+        // corner marker on top of the drag affordance. Mini peek is pointer
+        // driven too, but it is an official upstream theme state and must be
+        // allowed to use `miniMode.states["mini-peek"]` when present.
+        if petState != .dragging, drawCustomAsset(in: context) {
             context.restoreGState()
             return
         }
@@ -371,7 +441,9 @@ public final class PetCanvasView: NSView {
         guard let url = theme.assetURL(
             for: petState,
             idleVisualFile: idleFile,
-            stateOverrideFile: stateAssetOverride
+            stateOverrideFile: stateAssetOverride,
+            activeSessionCount: activeSessionCount,
+            subagentCount: subagentCount
         ),
               let animation = loadAsset(at: url),
               !animation.frames.isEmpty else { return false }

@@ -40,7 +40,13 @@ final class MobileBridgeTests: XCTestCase {
                 "state": "thinking",
                 "lastEvent": "UserPromptSubmit",
                 "lastActivity": 1.0,
-                "recentEvents": ["UserPromptSubmit"]
+                "recentEvents": ["UserPromptSubmit"],
+                "contextUsage": [
+                    "used": 1_500_000.0,
+                    "limit": 200_000_000.0,
+                    "percent": 22,
+                    "source": "codex"
+                ]
             ]]
         ])
 
@@ -51,7 +57,13 @@ final class MobileBridgeTests: XCTestCase {
         let snapshot = try object(from: initial)
         XCTAssertEqual(snapshot["type"] as? String, "snapshot")
         XCTAssertEqual(snapshot["state"] as? String, "thinking")
-        XCTAssertNotNil((snapshot["sessions"] as? [String: Any])?["session-1"])
+        let initialSession = try XCTUnwrap(
+            (snapshot["sessions"] as? [String: Any])?["session-1"] as? [String: Any]
+        )
+        let contextUsage = try XCTUnwrap(initialSession["contextUsage"] as? [String: Any])
+        XCTAssertEqual(contextUsage["used"] as? Double, 1_500_000)
+        XCTAssertEqual(contextUsage["percent"] as? Int, 22)
+        XCTAssertEqual(contextUsage["source"] as? String, "codex")
 
         bridge.updateSnapshot([
             "state": "attention",

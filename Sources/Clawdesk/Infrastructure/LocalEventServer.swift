@@ -431,8 +431,18 @@ public final class LocalEventServer: @unchecked Sendable {
             : rawSessionID
         let remotePrefix = query["remote_prefix"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let sessionID = remotePrefix.isEmpty ? namespacedSessionID : "\(remotePrefix):\(namespacedSessionID)"
-        let eventName = string(["event", "event_name", "eventName", "type", "name", "state"])
-            ?? fallbackEvent
+        // `state` is a visual hint, not a lifecycle event. In particular a
+        // Claude Stop payload commonly contains `state: "working"` while
+        // the query carries the real `event=Stop`; allowing the hint into
+        // this candidate list turns a completed turn into ordinary work.
+        // Hook URLs are authoritative because the adapter that installed the
+        // hook chose that event explicitly. Only fall back to body event
+        // fields when the URL does not provide one.
+        let eventName = fallbackEvent.flatMap {
+            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+            ?? string(["event", "event_name", "eventName", "type", "name"])
             ?? (forcePermission ? "PermissionRequest" : "Notification")
         let parsedContextUsage = parseContextUsage(from: object, agentID: agentID)
         let metadataOnly = bool(["metadata_only", "metadataOnly"])
@@ -508,10 +518,22 @@ public final class LocalEventServer: @unchecked Sendable {
             folder: string(["folder", "cwd", "working_directory", "workingDirectory"]),
             terminalPID: int(["pid", "terminal_pid", "terminalPid"]),
             subagentCount: int(["subagent_count", "subagentCount", "subagents"]) ?? 0,
+            subagentID: string(["subagent_id", "subagentId", "child_id", "childId"]),
+            subagentType: string(["subagent_type", "subagentType", "child_type", "childType"]),
+            preserveState: bool(["preserve_state", "preserveState"]),
             backgroundTasksCount: backgroundTasks?.count ?? int(["background_tasks_count", "backgroundTasksCount"]),
             backgroundSubagentCount: backgroundSubagentCount ?? int(["background_subagents_count", "backgroundSubagentsCount"]),
             sessionCronsCount: arrayCount(["session_crons"]) ?? int(["session_crons_count", "sessionCronsCount"]),
             stopHookActive: bool(["stop_hook_active", "stopHookActive"]),
+            assistantLastOutput: string([
+                "assistant_last_output", "assistantLastOutput",
+                "last_assistant_output", "lastAssistantOutput"
+            ]),
+            assistantLastOutputTruncated: bool([
+                "assistant_last_output_truncated", "assistantLastOutputTruncated",
+                "last_assistant_output_truncated", "lastAssistantOutputTruncated"
+            ]),
+            headless: bool(["headless", "is_headless", "isHeadless"]),
             permission: permission,
             question: adapterResult.question,
             quota: quota,
@@ -529,7 +551,7 @@ public final class LocalEventServer: @unchecked Sendable {
 
     private func traecodePromptTitle(object: [String: Any], agentID: String, eventName: String) -> String? {
         guard agentID == "traecode",
-              eventName.lowercased().replacingOccurrences(of: "_", with: "") == "userpromptsubmit",
+              EventStateMapper.normalizedEventName(eventName) == "userpromptsubmit",
               let prompt = object["prompt"] as? String else { return nil }
         let secretPattern = #"(?i)\b(api[_-]?key|authorization|bearer|password|passwd|private[_-]?key|secret|token)\b|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}"#
         for line in prompt.components(separatedBy: .newlines) {
@@ -707,11 +729,31 @@ public final class LocalEventServer: @unchecked Sendable {
     }
 
     private func normalizeState(_ raw: String) -> PetState? {
-        if let state = PetState(rawValue: raw.lowercased()) { return state }
-        switch raw.lowercased() {
-        case "working", "work": return .typing
-        case "complete", "completed", "done": return .attention
-        case "permission", "alert": return .notification
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if let state = PetState(rawValue: value) { return state }
+        switch EventStateMapper.normalizedEventName(value) {
+        case "idle", "ready", "agentspawn": return .idle
+        case "thinking", "think", "prompt": return .thinking
+        case "working", "work", "typing": return .typing
+        case "building", "build": return .building
+        case "juggling", "subagents": return .juggling
+        case "error", "failed", "failure": return .error
+        case "complete", "completed", "done", "happy": return .attention
+        case "permission", "alert", "notification", "needsattention": return .notification
+        case "dizzy", "spinning": return .dizzy
+        case "sweeping", "compacting", "compaction": return .sweeping
+        case "carrying", "preparing": return .carrying
+        case "sleep": return .sleeping
+        case "wakingfromdoze": return .wakingFromDoze
+        case "miniidle": return .miniIdle
+        case "minipeek": return .miniPeek
+        case "minialert": return .miniAlert
+        case "minihappy": return .miniHappy
+        case "miniworking": return .miniWorking
+        case "minicrabwalk": return .miniCrabwalk
+        case "minienter": return .miniEnter
+        case "minientersleep": return .miniEnterSleep
+        case "minisleep": return .miniSleep
         default: return nil
         }
     }

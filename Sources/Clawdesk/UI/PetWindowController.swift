@@ -17,15 +17,31 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var roamTimer: Timer?
     private var idleAnimationTask: Task<Void, Never>?
     private var idleAnimationCycle = IdleAnimationCycle()
+    private var miniTransitionTask: Task<Void, Never>?
+    private var miniTransitionGeneration = 0
+    private var isMiniTransitioning = false
     private var cancellables = Set<AnyCancellable>()
     private var isDragging = false
     private var dragAnchor: PetDragAnchor?
     private var isRoaming = false
+    private var roamAnimationGeneration = 0
     private var arrivalTracker = SessionArrivalTracker()
     private var hoverRestoreTask: Task<Void, Never>?
     private var nextRoamDate = Date.distantPast
     private let roamFence = RoamFenceCoordinator()
     private var isStarted = false
+    /// AppKit can emit a delayed move notification for the panel's initial
+    /// lower-left frame while startup preferences are being applied. Keep
+    /// that callback from winning over the restored origin.
+    private var isRestoringPosition = false
+    private var positionRestoreGeneration = 0
+    /// The origin deliberately applied by the latest restore. A move callback
+    /// with this exact origin is a startup notification; another origin is a
+    /// real user move and must be retained immediately.
+    private var restoredWindowOrigin: NSPoint?
+    /// The panel's origin before restoration. AppKit may deliver this parked
+    /// origin after the restored frame has already been applied.
+    private var startupWindowOrigin: NSPoint?
 
     public var onSettings: (() -> Void)?
     public var onDashboard: (() -> Void)?
@@ -65,6 +81,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         petView.onClick = { [weak self] in self?.revealSessionHUD() }
         petView.onDoubleTap = { [weak self] in self?.showReaction(.reactDouble, duration: 1.3) }
         petView.onFlail = { [weak self] in self?.showReaction(.reactFlail, duration: 1.4) }
+        petView.onDizzy = { [weak self] in self?.model.triggerDizzy() }
         petView.onContextMenu = { [weak self] _ in self?.makeContextMenu() }
         petView.onHoverChanged = { [weak self] hovering in self?.handleHover(hovering) }
         sessionHUD.onSessionSelected = { [weak self] session in
@@ -83,6 +100,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.apply(state: state)
         }.store(in: &cancellables)
         model.$sessions.sink { [weak self] sessions in
+            self?.petView.activeSessionCount = sessions.count
             self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
             self?.refreshSessionHUD()
             self?.celebrateArrivals(in: sessions)
@@ -214,6 +232,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self.model.noteMouseActivity(at: NSEvent.mouseLocation)
             if self.model.lastPointerActivity != previousActivity {
                 self.cancelIdleAnimation(resetCycle: true)
+                if self.isRoaming { self.cancelRoamAnimation() }
             }
             guard self.petView.petState == .idle
                 || self.petView.petState == .miniIdle
@@ -238,7 +257,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         // Persist the last on-screen frame before disabling the delegate
         // callbacks and closing the panel. This is especially important for
         // mini mode, where a move can happen without a later mouse-up.
-        persistCurrentWindowOrigin(allowDragging: true)
+        persistCurrentWindowOrigin(
+            allowDragging: true,
+            allowRestoring: true,
+            allowRoaming: true,
+            allowTransition: true
+        )
         isStarted = false
         animationTimer?.invalidate()
         pointerTimer?.invalidate()
@@ -248,6 +272,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         pointerTimer = nil
         sleepTimer = nil
         roamTimer = nil
+        cancelMiniTransition()
+        cancelRoamAnimation()
         cancelIdleAnimation(resetCycle: true)
         dragAnchor = nil
         hoverRestoreTask?.cancel()
@@ -259,60 +285,159 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     public func setMiniMode(_ enabled: Bool, animate: Bool) {
         guard let window else { return }
         cancelIdleAnimation(resetCycle: true)
-        petView.miniMode = enabled
         // @Published sends its current value immediately when the controller
         // subscribes during init. Sync the visual flag, but defer docking and
         // persistence until the real startup path has restored the position.
         guard isStarted else {
-            if enabled, model.petState == .idle {
-                setPetVisualState(.miniIdle)
-            }
+            petView.miniMode = enabled
+            updateStateAssetOverride()
+            setPetVisualState(visualState(for: model.petState, mini: enabled))
             return
         }
+
+        if petView.miniMode == enabled, !isMiniTransitioning {
+            setPetVisualState(visualState(for: model.petState, mini: enabled))
+            return
+        }
+
+        cancelMiniTransition()
         if enabled {
             // Park the normal-mode position: entering mini mode re-docks the
             // pet, and leaving must bring it back where the user had it.
             model.preferences.preMiniWindowOrigin = window.frame.origin
             sessionHUD.hide()
-            moveToMiniEdge(animated: animate)
-            if model.petState == .idle { setPetVisualState(.miniIdle) }
-        } else {
-            if let parked = model.preferences.preMiniWindowOrigin,
-               !isLegacyStartupParkedOrigin(parked) {
-                window.setFrameOrigin(parked)
-                model.preferences.windowOrigin = parked
-                model.preferences.preMiniWindowOrigin = nil
-            } else if let saved = model.preferences.windowOrigin {
-                // A pre-0.1.27 startup callback could save the controller's
-                // initial (0, 0) frame as the parked position. Keep the last
-                // real position rather than reviving that lower-left value.
-                window.setFrameOrigin(saved)
-                model.preferences.windowOrigin = saved
-                model.preferences.preMiniWindowOrigin = nil
-            } else {
-                moveBackFromMini()
+            petView.miniMode = true
+            updateStateAssetOverride()
+            isMiniTransitioning = true
+            let generation = miniTransitionGeneration
+            // The original enters mini mode with a short crab-walk before the
+            // body slides into its docked position. Keep that intermediate
+            // action visible while the window is moving, then play the
+            // dedicated mini-enter (or mini-enter-sleep) animation in place.
+            if animate { setPetVisualState(.miniCrabwalk) }
+            moveToMiniEdge(animated: animate) { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self, self.isMiniTransitioning,
+                          self.miniTransitionGeneration == generation else { return }
+                    self.beginMiniEntry(generation: generation)
+                }
             }
-            setPetVisualState(model.petState)
+        } else {
+            isMiniTransitioning = true
+            let generation = miniTransitionGeneration
+            let target = miniExitOrigin(for: window)
+            moveBackFromMini(to: target, animated: animate) { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self, self.isMiniTransitioning,
+                          self.miniTransitionGeneration == generation else { return }
+                    self.finishMiniExit(target: target)
+                }
+            }
         }
     }
 
     private func apply(state: PetState) {
         guard !isDragging else { return }
+        // A real hook/status change must win over a background roam walk.
+        // AppKit's animator completion can otherwise put the window back at
+        // the old target after the new state has already been rendered.
+        if isRoaming { cancelRoamAnimation() }
+        // During mini entry/exit the window and renderer are in a deliberate
+        // transition. Defer external state application until it settles so a
+        // hook arriving during the handoff cannot replace mini-enter midway.
+        if isMiniTransitioning { return }
         updateStateAssetOverride(for: state)
         let wasResting = petView.petState == .idle || petView.petState == .miniIdle
         if state != .idle || !wasResting {
             cancelIdleAnimation(resetCycle: true)
         }
-        if model.preferences.isMiniMode {
-            switch state {
-            case .notification: setPetVisualState(.miniAlert)
-            case .attention: setPetVisualState(.miniHappy)
-            case .idle: setPetVisualState(.miniIdle)
-            default: setPetVisualState(state)
-            }
-        } else {
-            setPetVisualState(state)
+        setPetVisualState(visualState(for: state, mini: model.preferences.isMiniMode))
+    }
+
+    /// Converts the agent lifecycle state to the renderer state for the
+    /// current window mode. The model stays in the full semantic vocabulary;
+    /// mini mode deliberately has its own artwork and motion for every
+    /// working, sleeping, completion and notification path.
+    private func visualState(for state: PetState, mini: Bool) -> PetState {
+        guard mini else { return state }
+        switch state {
+        case .idle, .miniIdle:
+            return .miniIdle
+        case .notification, .miniAlert, .error:
+            return .miniAlert
+        case .attention, .reactDouble, .miniHappy:
+            return .miniHappy
+        case .thinking, .typing, .building, .juggling, .sweeping, .carrying, .miniWorking:
+            return .miniWorking
+        case .roam, .miniCrabwalk:
+            return .miniCrabwalk
+        case .yawning, .dozing, .collapsing, .sleeping, .miniEnterSleep, .miniSleep:
+            return .miniSleep
+        case .waking, .wakingFromDoze:
+            return .miniIdle
+        case .dizzy, .reactFlail:
+            return .miniAlert
+        case .dragging:
+            return .dragging
+        case .miniPeek:
+            return .miniPeek
+        case .miniEnter:
+            return .miniEnter
         }
+    }
+
+    private func miniEntryState(for state: PetState) -> PetState {
+        if model.preferences.doNotDisturb || state.isSleepSequence {
+            return .miniEnterSleep
+        }
+        return .miniEnter
+    }
+
+    private func miniTransitionDuration(for state: PetState) -> TimeInterval {
+        guard let definition = BloubStates.catalog[
+            BloubStateMapper.state(for: state)
+        ] else { return 1.2 }
+        return max(definition.morph, definition.settlesAt ?? definition.duration)
+    }
+
+    private func beginMiniEntry(generation: Int) {
+        guard isMiniTransitioning, miniTransitionGeneration == generation else { return }
+        let entry = miniEntryState(for: model.petState)
+        setPetVisualState(entry)
+        miniTransitionTask?.cancel()
+        let duration = miniTransitionDuration(for: entry)
+        miniTransitionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(max(1, Int(duration * 1_000))))
+            guard let self, !Task.isCancelled,
+                  self.isMiniTransitioning,
+                  self.miniTransitionGeneration == generation else { return }
+            self.miniTransitionTask = nil
+            self.isMiniTransitioning = false
+            self.model.preferences.windowOrigin = self.window?.frame.origin
+            self.persistCurrentWindowOrigin(allowDragging: true, allowTransition: true)
+            self.apply(state: self.model.petState)
+        }
+    }
+
+    private func finishMiniExit(target: NSPoint) {
+        miniTransitionTask?.cancel()
+        miniTransitionTask = nil
+        petView.miniMode = false
+        model.preferences.windowOrigin = target
+        model.preferences.preMiniWindowOrigin = nil
+        isMiniTransitioning = false
+        updateStateAssetOverride()
+        setPetVisualState(visualState(for: model.petState, mini: false))
+        persistCurrentWindowOrigin(allowDragging: true, allowTransition: true)
+        refreshQuotaRing()
+        refreshSessionHUD()
+    }
+
+    private func cancelMiniTransition() {
+        miniTransitionGeneration &+= 1
+        miniTransitionTask?.cancel()
+        miniTransitionTask = nil
+        isMiniTransitioning = false
     }
 
     private func setPetVisualState(_ state: PetState) {
@@ -342,6 +467,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func drag(to screenPoint: CGPoint) {
         guard let window, let dragAnchor else { return }
         window.setFrameOrigin(dragAnchor.windowOrigin(for: screenPoint))
+        // Do not wait for mouse-up: a crash, quit, or mode change during a
+        // drag must still leave the latest position recoverable.
+        persistCurrentWindowOrigin(allowDragging: true)
     }
 
     private func endDrag() {
@@ -390,8 +518,13 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard model.preferences.isMiniMode, !isDragging else { return }
         hoverRestoreTask?.cancel()
         if hovering {
+            // The upstream peek is a resting/sleep affordance. It must not
+            // interrupt mini-working, mini-alert or mini-happy animations.
+            guard petView.petState == .miniIdle || petView.petState == .miniSleep
+                || petView.petState == .miniPeek else { return }
             setPetVisualState(.miniPeek)
         } else {
+            guard petView.petState == .miniPeek else { return }
             hoverRestoreTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
                 guard let self, !Task.isCancelled else { return }
@@ -474,48 +607,125 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func restorePosition() {
         guard let window else { return }
+        positionRestoreGeneration &+= 1
+        let generation = positionRestoreGeneration
+        isRestoringPosition = true
+
         // Position memory (upstream parity, including mini mode): the last
         // spot the pet appeared at wins — in mini mode that is wherever it
-        // was docked or dragged when the session ended.
+        // was docked or dragged when the session ended. Compute the target
+        // first and publish it before moving the NSWindow; this closes the
+        // race where AppKit reports the panel's initial lower-left frame.
+        startupWindowOrigin = window.frame.origin
+        let target: NSPoint
         if let saved = model.preferences.windowOrigin {
-            window.setFrameOrigin(saved)
-            persistCurrentWindowOrigin()
-            return
-        }
-        if model.preferences.isMiniMode {
-            moveToMiniEdge(animated: false)
-            persistCurrentWindowOrigin()
-            return
-        }
-        if let screen = screenForWindow(window) {
+            target = saved
+        } else if model.preferences.isMiniMode {
+            target = miniDockOrigin(for: window)
+        } else if let screen = screenForWindow(window) {
             let frame = screen.visibleFrame
-            window.setFrameOrigin(NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30))
-            persistCurrentWindowOrigin()
+            target = NSPoint(x: frame.maxX - window.frame.width - 26, y: frame.minY + 30)
+        } else {
+            target = window.frame.origin
+        }
+        restoredWindowOrigin = target
+        window.setFrameOrigin(target)
+
+        // `persistCurrentWindowOrigin` deliberately ignores the guarded move
+        // above. Save the final restored frame explicitly, then release the
+        // guard on the next run-loop turn so AppKit's startup move callback
+        // cannot overwrite it with the panel's initial (0, 0) origin.
+        if isStarted {
+            model.preferences.windowOrigin = target
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, self.positionRestoreGeneration == generation else { return }
+            self.isRestoringPosition = false
+            self.startupWindowOrigin = nil
+            // A user can drag the pet before the deferred startup callback
+            // runs. Preserve that move instead of letting the guard silently
+            // discard it; the stop/close path also force-saves this frame.
+            if let window = self.window,
+               let restored = self.restoredWindowOrigin,
+               window.frame.origin != restored {
+                self.persistCurrentWindowOrigin(
+                    allowDragging: true,
+                    allowRestoring: true,
+                    allowTransition: true
+                )
+            }
         }
     }
 
-    private func moveToMiniEdge(animated: Bool) {
-        guard let window, let screen = screenForWindow(window) else { return }
-        let frame = screen.visibleFrame
-        let target = NSPoint(x: frame.maxX - window.frame.width * 0.48, y: max(frame.minY + 16, window.frame.minY))
+    private func moveToMiniEdge(animated: Bool, completion: (@Sendable () -> Void)? = nil) {
+        guard let window else { return }
+        let target = miniDockOrigin(for: window)
         if animated {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.28
                 window.animator().setFrameOrigin(target)
+            } completionHandler: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.persistCurrentWindowOrigin(allowDragging: true)
+                    completion?()
+                }
             }
         } else {
             window.setFrameOrigin(target)
-            persistCurrentWindowOrigin()
+            persistCurrentWindowOrigin(allowDragging: true)
+            completion?()
         }
     }
 
-    private func moveBackFromMini() {
-        guard let window, let screen = screenForWindow(window) else { return }
+    private func miniDockOrigin(for window: NSWindow) -> NSPoint {
+        guard let screen = screenForWindow(window) else { return window.frame.origin }
         let frame = screen.visibleFrame
-        let target = NSPoint(x: frame.maxX - window.frame.width - 26, y: max(frame.minY + 30, window.frame.minY))
-        window.setFrameOrigin(target)
-        persistCurrentWindowOrigin()
+        return NSPoint(
+            x: frame.maxX - window.frame.width * 0.48,
+            y: max(frame.minY + 16, window.frame.minY)
+        )
+    }
+
+    private func miniExitOrigin(for window: NSWindow) -> NSPoint {
+        if let parked = model.preferences.preMiniWindowOrigin,
+           !isLegacyStartupParkedOrigin(parked) {
+            return parked
+        }
+        if let saved = model.preferences.windowOrigin {
+            // A pre-0.1.27 startup callback could save the initial (0, 0)
+            // frame as the parked position. Keep the last real position rather
+            // than reviving that lower-left value.
+            return saved
+        }
+        guard let screen = screenForWindow(window) else { return window.frame.origin }
+        let frame = screen.visibleFrame
+        return NSPoint(
+            x: frame.maxX - window.frame.width - 26,
+            y: max(frame.minY + 30, window.frame.minY)
+        )
+    }
+
+    private func moveBackFromMini(
+        to target: NSPoint,
+        animated: Bool,
+        completion: (@Sendable () -> Void)? = nil
+    ) {
+        guard let window else { return }
         sessionHUD.hide()
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                window.animator().setFrameOrigin(target)
+            } completionHandler: {
+                DispatchQueue.main.async {
+                    completion?()
+                }
+            }
+        } else {
+            window.setFrameOrigin(target)
+            completion?()
+        }
     }
 
     private func isLegacyStartupParkedOrigin(_ origin: CGPoint) -> Bool {
@@ -524,11 +734,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             && model.preferences.windowOrigin != .zero
     }
 
-    private func persistCurrentWindowOrigin(allowDragging: Bool = false) {
+    private func persistCurrentWindowOrigin(
+        allowDragging: Bool = false,
+        allowRestoring: Bool = false,
+        allowRoaming: Bool = false,
+        allowTransition: Bool = false
+    ) {
         guard isStarted,
               let window,
               (allowDragging || !isDragging),
-              !isRoaming else { return }
+              (allowRestoring || !isRestoringPosition),
+              (allowRoaming || !isRoaming),
+              (allowTransition || !isMiniTransitioning) else { return }
         model.preferences.windowOrigin = window.frame.origin
     }
 
@@ -537,9 +754,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
               !model.preferences.isMiniMode,
               !model.preferences.doNotDisturb,
               !isDragging,
+              !isRoaming,
               let window,
               !model.petState.isTransient,
-              model.petState == .idle || model.petState == .typing else { return }
+              model.petState == .idle else { return }
         let now = Date.now
         guard now >= nextRoamDate else { return }
         roamFence.refresh(from: model.preferences.roamAreaFileURL)
@@ -566,17 +784,40 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }
         nextRoamDate = now.addingTimeInterval(TimeInterval.random(in: 10...20))
         isRoaming = true
+        roamAnimationGeneration &+= 1
+        let generation = roamAnimationGeneration
+        setPetVisualState(.roam)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 1.6
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrameOrigin(newOrigin)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self, self.isRoaming,
+                      self.roamAnimationGeneration == generation else { return }
                 self.isRoaming = false
+                if self.model.petState == .idle {
+                    self.setPetVisualState(.idle)
+                }
                 self.persistCurrentWindowOrigin()
             }
         }
+    }
+
+    private func cancelRoamAnimation() {
+        guard isRoaming else { return }
+        isRoaming = false
+        roamAnimationGeneration &+= 1
+        if let window {
+            // A non-animating write replaces the presentation position and
+            // prevents the completion handler from snapping back to the old
+            // roam target after a hook has already changed the state.
+            window.setFrame(window.frame, display: true, animate: false)
+        }
+        if model.petState == .idle {
+            setPetVisualState(.idle)
+        }
+        persistCurrentWindowOrigin(allowDragging: true)
     }
 
     /// Continuously resizes the pet window from the reduced 120-point base.
@@ -600,12 +841,21 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.2
                 window.animator().setFrame(target, display: true)
+            } completionHandler: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.persistCurrentWindowOrigin(allowDragging: true)
+                }
             }
         } else {
             window.setFrame(target, display: true)
         }
         if model.preferences.isMiniMode {
-            moveToMiniEdge(animated: animate)
+            moveToMiniEdge(animated: animate) { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.persistCurrentWindowOrigin(allowDragging: true)
+                }
+            }
         } else if isStarted && !isDragging {
             model.preferences.windowOrigin = target.origin
         }
@@ -679,6 +929,30 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     public func windowDidMove(_ notification: Notification) {
         guard isStarted else { return }
+        if isRestoringPosition {
+            guard let window else { return }
+            let current = window.frame.origin
+            // AppKit can deliver a delayed notification for either the frame
+            // that was already restored or the panel's original parked frame.
+            // Ignore the former and immediately re-apply the latter. A real
+            // user move is any other coordinate and is persisted below.
+            if let restored = restoredWindowOrigin, current == restored {
+                return
+            }
+            if let startup = startupWindowOrigin, current == startup,
+               let restored = restoredWindowOrigin {
+                window.setFrameOrigin(restored)
+                return
+            }
+            isRestoringPosition = false
+            persistCurrentWindowOrigin(
+                allowRestoring: true,
+                allowTransition: true
+            )
+            refreshQuotaRing()
+            refreshSessionHUD()
+            return
+        }
         guard !isDragging else { return }
         refreshQuotaRing()
         refreshSessionHUD()
@@ -686,7 +960,12 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
-        persistCurrentWindowOrigin(allowDragging: true)
+        persistCurrentWindowOrigin(
+            allowDragging: true,
+            allowRestoring: true,
+            allowRoaming: true,
+            allowTransition: true
+        )
     }
 
     private func refreshQuotaRing() {

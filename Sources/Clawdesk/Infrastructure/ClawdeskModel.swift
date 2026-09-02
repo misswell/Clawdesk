@@ -36,6 +36,12 @@ public final class ClawdeskModel: ObservableObject {
     var maximumPendingPermissionCount = 32
     var permissionReplyTimeout: Duration = .seconds(300)
     private var completionTask: Task<Void, Never>?
+    /// Claude's Stop hook is a candidate completion when a final assistant
+    /// message and background work arrive together. Keep that candidate
+    /// quiet for a short window so a continuation hook can cancel it.
+    private var pendingClaudeStopTasks: [String: Task<Void, Never>] = [:]
+    private var sessionGenerations: [String: Int] = [:]
+    private let claudeStopDebounceSeconds: Double = 2
     private var kimiSuspectTasks: [String: Task<Void, Never>] = [:]
     private var kimiGateOrder: [String: [String]] = [:]
     var lastPointerActivity = Date.now
@@ -197,6 +203,9 @@ public final class ClawdeskModel: ObservableObject {
         permissionExpiryTasks.removeAll()
         permissionOrder.removeAll()
         completionTask?.cancel()
+        pendingClaudeStopTasks.values.forEach { $0.cancel() }
+        pendingClaudeStopTasks.removeAll()
+        sessionGenerations.removeAll()
         sleepTransitionTask?.cancel()
         sleepTransitionTask = nil
         for task in kimiSuspectTasks.values { task.cancel() }
@@ -308,6 +317,22 @@ public final class ClawdeskModel: ObservableObject {
 
     public func accept(_ event: AgentEvent) {
         apply(event)
+    }
+
+    /// Shows the upstream cursor-circle reaction. The detector lives in the
+    /// view, but the lifecycle belongs here so any real agent event can
+    /// interrupt it and the normal session state is restored afterwards.
+    public func triggerDizzy() {
+        guard !preferences.doNotDisturb,
+              !preferences.isMiniMode,
+              petState == .idle else { return }
+        completionTask?.cancel()
+        petState = .dizzy
+        scheduleReturn(
+            to: fallbackState,
+            after: preferences.theme.timings.autoReturn["dizzy"]
+                ?? preferences.theme.timings.dizzyDuration
+        )
     }
 
     public func acceptQuota(_ report: QuotaReport) {
@@ -475,14 +500,14 @@ public final class ClawdeskModel: ObservableObject {
         _ = tickForSleep()
     }
 
-    private func apply(_ event: AgentEvent) {
-        let normalizedEvent = event.eventName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "_", with: "")
-            .replacingOccurrences(of: "-", with: "")
+    private func apply(_ event: AgentEvent, bypassCompletionGate: Bool = false) {
+        let normalizedEvent = EventStateMapper.normalizedEventName(event.eventName)
         let metadataOnly = event.metadataOnly || normalizedEvent == "quotaupdate"
         if !metadataOnly {
+            sessionGenerations[event.sessionID, default: 0] &+= 1
+            // Any forward progress invalidates a pending candidate Stop. A
+            // later Stop gets a fresh generation and may arm a new debounce.
+            cancelPendingClaudeStop(for: event.sessionID)
             resetSleepSequence()
             if startupRecoveryActive { endStartupRecovery() }
         }
@@ -531,20 +556,83 @@ public final class ClawdeskModel: ObservableObject {
             return
         }
 
+        if !bypassCompletionGate,
+           shouldDebounceClaudeStop(event) {
+            petState = transition.state
+            scheduleClaudeStopCompletion(for: event)
+            return
+        }
+
         petState = transition.state
         if transition.state == .attention {
             onCompletion?()
             remoteNotifier.send(RemoteNotification(title: "Task complete", body: event.eventName, sessionTitle: event.title))
-            scheduleReturn(to: fallbackState, after: 4)
+            scheduleReturn(to: fallbackState, after: themeAutoReturn(for: .attention, fallback: 4))
         } else if transition.state == .error || transition.state == .notification {
             if transition.state == .error {
                 remoteNotifier.send(RemoteNotification(title: "Agent error", body: event.eventName, sessionTitle: event.title))
                 onError?(event.title ?? event.eventName)
             }
-            scheduleReturn(to: fallbackState, after: 6)
+            scheduleReturn(to: fallbackState, after: themeAutoReturn(for: transition.state, fallback: 6))
         } else {
             completionTask?.cancel()
         }
+    }
+
+    private func shouldDebounceClaudeStop(_ event: AgentEvent) -> Bool {
+        guard EventStateMapper.normalizedEventName(event.agentID) == "claudecode",
+              EventStateMapper.normalizedEventName(event.eventName) == "stop" else {
+            return false
+        }
+        let hasFinalAssistantText = !(event.assistantLastOutput ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+        let hasBackgroundWork = (event.backgroundTasksCount ?? 0) > 0
+            || (event.backgroundSubagentCount ?? 0) > 0
+        let hardLiveWork = (event.sessionCronsCount ?? 0) > 0
+            || event.stopHookActive
+            || (hasBackgroundWork && !hasFinalAssistantText)
+        guard !hardLiveWork else { return false }
+        return event.headless || (hasBackgroundWork && hasFinalAssistantText)
+    }
+
+    private func cancelPendingClaudeStop(for sessionID: String) {
+        pendingClaudeStopTasks.removeValue(forKey: sessionID)?.cancel()
+    }
+
+    private func scheduleClaudeStopCompletion(for event: AgentEvent) {
+        let sessionID = event.sessionID
+        let generation = sessionGenerations[sessionID] ?? 0
+        var completionEvent = event
+        completionEvent.backgroundTasksCount = 0
+        completionEvent.backgroundSubagentCount = 0
+        completionEvent.sessionCronsCount = 0
+        completionEvent.stopHookActive = false
+        completionEvent.assistantLastOutput = nil
+        completionEvent.assistantLastOutputTruncated = false
+        completionEvent.headless = false
+        completionEvent.stateHint = nil
+        pendingClaudeStopTasks[sessionID] = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(self?.claudeStopDebounceSeconds ?? 2))
+            } catch {
+                return
+            }
+            guard let self,
+                  !Task.isCancelled,
+                  self.sessionGenerations[sessionID] == generation else { return }
+            self.pendingClaudeStopTasks[sessionID] = nil
+            // This is the completion gate's internal replay. It must bypass
+            // the candidate check or the same Stop would schedule itself
+            // forever.
+            self.apply(completionEvent, bypassCompletionGate: true)
+        }
+    }
+
+    private func themeAutoReturn(for state: PetState, fallback: TimeInterval) -> TimeInterval {
+        preferences.theme.timings.autoReturn[state.rawValue]
+            ?? preferences.theme.timings.autoReturn[state == .typing ? "working" : state.rawValue]
+            ?? fallback
     }
 
     private func scheduleReturn(to state: PetState, after seconds: Double) {
@@ -553,7 +641,8 @@ public final class ClawdeskModel: ObservableObject {
             try? await Task.sleep(for: .seconds(seconds))
             guard let self, !Task.isCancelled else { return }
             if self.petState == .attention || self.petState == .error || self.petState == .notification
-                || self.petState == .waking || self.petState == .wakingFromDoze || self.petState.isSleepSequence {
+                || self.petState == .dizzy || self.petState == .waking
+                || self.petState == .wakingFromDoze || self.petState.isSleepSequence {
                 self.petState = self.preferences.isMiniMode ? .miniIdle : state
             }
         }
@@ -662,7 +751,7 @@ public final class ClawdeskModel: ObservableObject {
 
     private func publishSnapshot(state: PetState, sessions: [SessionSnapshot]) {
         let payload: [[String: Any]] = sessions.map { session in
-            [
+            var object: [String: Any] = [
                 "id": session.id,
                 "agentID": session.agentID,
                 "title": session.title,
@@ -671,8 +760,12 @@ public final class ClawdeskModel: ObservableObject {
                 "subagentCount": session.subagentCount,
                 "lastEvent": session.lastEvent,
                 "recentEvents": session.recentEvents,
-            "lastActivity": session.lastActivity.timeIntervalSince1970
             ]
+            object["lastActivity"] = session.lastActivity.timeIntervalSince1970
+            if let contextUsage = session.contextUsage {
+                object["contextUsage"] = contextUsage.wireObject
+            }
+            return object
         }
         let quota = quotaReports.map(\.wireObject)
         eventServer.updateSnapshot(["state": state.rawValue, "sessions": payload, "quota": quota, "updatedAt": Date.now.timeIntervalSince1970])

@@ -132,4 +132,47 @@ final class AppPreferencesTests: XCTestCase {
         let cleared = AppPreferences(defaults: defaults, homeDirectory: FileManager.default.temporaryDirectory)
         XCTAssertNil(cleared.preMiniWindowOrigin)
     }
+
+    func testWindowOriginIsWrittenToRecoveryFileImmediately() throws {
+        let suite = "clawdesk-position-file-\(UUID().uuidString)"
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk-position-file-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let prefs = AppPreferences(defaults: defaults, homeDirectory: root)
+        let origin = CGPoint(x: 913, y: 277)
+        prefs.windowOrigin = origin
+
+        let positionFile = root
+            .appendingPathComponent("Library/Application Support/Clawdesk/window-position.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: positionFile.path))
+
+        let reloaded = AppPreferences(defaults: defaults, homeDirectory: root)
+        XCTAssertEqual(reloaded.windowOrigin, origin)
+    }
+
+    func testLegacyZeroWindowDefaultsAreMigratedButCurrentZeroIsRetained() {
+        let suite = "clawdesk-position-legacy-zero-\(UUID().uuidString)"
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdesk-position-legacy-zero-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(0, forKey: "windowX")
+        defaults.set(0, forKey: "windowY")
+        defaults.set(0, forKey: "preMiniX")
+        defaults.set(0, forKey: "preMiniY")
+
+        let migrated = AppPreferences(defaults: defaults, homeDirectory: root)
+        XCTAssertNil(migrated.windowOrigin)
+        XCTAssertNil(migrated.preMiniWindowOrigin)
+
+        migrated.windowOrigin = .zero
+        let current = AppPreferences(defaults: defaults, homeDirectory: root)
+        XCTAssertEqual(current.windowOrigin, .zero)
+    }
 }

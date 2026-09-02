@@ -84,6 +84,62 @@ final class LocalEventServerTests: XCTestCase {
         XCTAssertFalse(recorder.value()?.payload.values.contains("private") == true)
     }
 
+    func testQueryEventWinsOverBodyStateHint() async throws {
+        let server = LocalEventServer(preferredPort: 37_880)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=Stop&agent=claude-code&session_id=stop-hint",
+            body: #"{"state":"working","subagent_id":"child-1","subagent_type":"agent","preserve_state":true}"#
+        )
+
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        let event = try XCTUnwrap(recorder.value())
+        XCTAssertEqual(event.eventName, "Stop")
+        XCTAssertEqual(event.stateHint, .typing)
+        XCTAssertEqual(event.subagentID, "child-1")
+        XCTAssertEqual(event.subagentType, "agent")
+        XCTAssertTrue(event.preserveState)
+    }
+
+    func testClaudeStopParsesCompletionGateFields() async throws {
+        let server = LocalEventServer(preferredPort: 37_881)
+        let recorder = EventRecorder()
+        let received = DispatchSemaphore(value: 0)
+        server.onMessage = { message in
+            guard case let .event(event) = message else { return }
+            recorder.record(event)
+            received.signal()
+        }
+        server.start()
+        defer { server.stop() }
+        _ = try await waitForServer(server)
+
+        let response = try curl(
+            port: server.port,
+            path: "/state?event=Stop&agent=claude-code&session_id=stop-fields",
+            body: #"{"background_tasks_count":1,"session_crons_count":0,"stop_hook_active":false,"assistant_last_output":"done","assistant_last_output_truncated":true,"headless":true}"#
+        )
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(received.wait(timeout: .now() + 2), .success)
+        let event = try XCTUnwrap(recorder.value())
+        XCTAssertEqual(event.backgroundTasksCount, 1)
+        XCTAssertEqual(event.assistantLastOutput, "done")
+        XCTAssertTrue(event.assistantLastOutputTruncated)
+        XCTAssertTrue(event.headless)
+    }
+
     func testRemoteIngressIsProfileBoundAndRejectsOtherRoutes() async throws {
         let server = LocalEventServer(preferredPort: 37_870)
         let nonce = String(repeating: "a", count: 32)
