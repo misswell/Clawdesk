@@ -299,7 +299,10 @@ public enum BloubStates {
         return pose
     }
 
-    public static let catalog: [BloubState: BloubStateDefinition] = [
+    // Keep the catalogue in small literals. Swift 6's type checker can spend
+    // minutes solving one large dictionary expression when every value also
+    // contains an animation closure.
+    private static let catalogPart1: [BloubState: BloubStateDefinition] = [
         .idle: BloubStateDefinition(
             id: .idle,
             duration: 2.4,
@@ -441,6 +444,9 @@ public enum BloubStates {
             return pose
         },
 
+    ]
+
+    private static let catalogPart2: [BloubState: BloubStateDefinition] = [
         .notify: BloubStateDefinition(
             id: .notify,
             duration: 2.2,
@@ -737,6 +743,9 @@ public enum BloubStates {
             return pose
         },
 
+    ]
+
+    private static let catalogPart3: [BloubState: BloubStateDefinition] = [
         .egg: BloubStateDefinition(
             id: .egg,
             duration: 1.8,
@@ -911,6 +920,9 @@ public enum BloubStates {
             return pose
         },
 
+    ]
+
+    private static let catalogPart4: [BloubState: BloubStateDefinition] = [
         .comet: BloubStateDefinition(
             id: .comet,
             duration: 2.4,
@@ -980,6 +992,9 @@ public enum BloubStates {
             return pose
         },
 
+    ]
+
+    private static let catalogPart5: [BloubState: BloubStateDefinition] = [
         .miniIdle: BloubStateDefinition(
             id: .miniIdle,
             duration: 2.4,
@@ -1145,4 +1160,13 @@ public enum BloubStates {
             return pose
         }
     ]
+
+    public static let catalog: [BloubState: BloubStateDefinition] = {
+        var catalog = catalogPart1
+        catalog.merge(catalogPart2) { _, replacement in replacement }
+        catalog.merge(catalogPart3) { _, replacement in replacement }
+        catalog.merge(catalogPart4) { _, replacement in replacement }
+        catalog.merge(catalogPart5) { _, replacement in replacement }
+        return catalog
+    }()
 }
