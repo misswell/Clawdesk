@@ -527,14 +527,14 @@ public enum BloubStates {
             settlesAt: nil
         ) { t in
             let phase = BloubStates.loopTime(t, period: 3.0)
-            let mouth = sin(phase * .pi / 3)
+            let mouth: CGFloat = sin(phase * .pi / 3)
             var pose = BloubPose()
             pose.body = BloubBody(
                 profile: .circle(1),
                 center: CGPoint(x: 0, y: abs(mouth) * 0.025),
                 scale: CGSize(width: 1 + abs(mouth) * 0.015, height: 1 - abs(mouth) * 0.03)
             )
-            pose.gaze = BloubGaze(yaw: -4, pitch: 9 + mouth * 6, roll: 0)
+            pose.gaze = BloubGaze(yaw: -4, pitch: 9 + Double(mouth) * 6, roll: 0)
             pose.eyes = .mirrored(0.19, 0.28, 0, 0.9 - abs(mouth) * 0.55)
             return pose
         },
@@ -642,7 +642,7 @@ public enum BloubStates {
                 center: CGPoint(x: 0, y: (1 - progress) * 0.02),
                 scale: CGSize(width: 1 + progress * 0.01, height: 0.985 + progress * 0.015)
             )
-            pose.gaze = BloubGaze(yaw: 0, pitch: 8 - progress * 8, roll: 0)
+            pose.gaze = BloubGaze(yaw: 0, pitch: 8 - Double(progress) * 8, roll: 0)
             pose.eyes = .mirrored(0.19, 0.35, 0, 0.2 + progress * 0.8)
             return pose
         },
@@ -657,7 +657,8 @@ public enum BloubStates {
             settlesAt: nil
         ) { t in
             let phase = BloubStates.loopTime(t, period: 2.8)
-            let wave = sin(phase * .pi * 2 / 2.8)
+            let wave: CGFloat = sin(phase * .pi * 2 / 2.8)
+            let waveDouble = Double(wave)
             let rotation = wave * 0.16
             var pose = BloubPose()
             pose.body = BloubBody(
@@ -666,7 +667,11 @@ public enum BloubStates {
                 center: CGPoint(x: wave * 0.035, y: abs(wave) * 0.025),
                 scale: CGSize(width: 1 + abs(wave) * 0.035, height: 1 - abs(wave) * 0.025)
             )
-            pose.gaze = BloubGaze(yaw: 22 + wave * 10, pitch: 20 - wave * 8, roll: -12 + wave * 4)
+            pose.gaze = BloubGaze(
+                yaw: 22 + waveDouble * 10,
+                pitch: 20 - waveDouble * 8,
+                roll: -12 + waveDouble * 4
+            )
             pose.split = 13.37
             pose.eyes = .pair(0.177, 0.411)
             pose.arcs = BloubDecor.swoosh.enumerated().map { index, seed in
@@ -692,7 +697,8 @@ public enum BloubStates {
             settlesAt: nil
         ) { t in
             let phase = BloubStates.loopTime(t, period: 2.2)
-            let bob = sin(phase * .pi * 2 / 2.2)
+            let bob: CGFloat = sin(phase * .pi * 2 / 2.2)
+            let bobDouble = Double(bob)
             var pose = BloubPose()
             pose.body = BloubBody(
                 profile: BloubProfileFixture.egg,
@@ -700,7 +706,11 @@ public enum BloubStates {
                 center: CGPoint(x: bob * 0.025, y: 0.04 + abs(bob) * 0.025),
                 scale: CGSize(width: 0.96 + abs(bob) * 0.035, height: 1 - abs(bob) * 0.02)
             )
-            pose.gaze = BloubGaze(yaw: 20 + bob * 12, pitch: 24 - bob * 8, roll: -17 + bob * 5)
+            pose.gaze = BloubGaze(
+                yaw: 20 + bobDouble * 12,
+                pitch: 24 - bobDouble * 8,
+                roll: -17 + bobDouble * 5
+            )
             pose.split = 11.07
             pose.eyes = .pair(0.164, 0.385)
             pose.dots = [
@@ -852,9 +862,11 @@ public enum BloubStates {
             var pose = BloubPose()
             pose.body = body
             // The eyes race around the sphere ~3x faster than the silhouette.
+            let travelDouble = Double(travel)
+            let backDouble = Double(back)
             pose.gaze = BloubGaze(
-                yaw: BloubMotion.restGaze.yaw + sin(travel * 6.5) * 65 * (1 - back),
-                pitch: CGFloat(-4) + back * CGFloat(32),
+                yaw: BloubMotion.restGaze.yaw + sin(travelDouble * 6.5) * 65 * (1 - backDouble),
+                pitch: -4 + backDouble * 32,
                 roll: -13
             )
             pose.eyes = .pair(0.18, 0.34 + back * 0.07)
@@ -964,8 +976,9 @@ public enum BloubStates {
             baseFace: false,
             settlesAt: nil
         ) { t in
-            let angle = BloubStates.loopTime(t, period: 3) * .pi * 2 / 3
-            let wobble = sin(angle)
+            let angle: CGFloat = BloubStates.loopTime(t, period: 3) * .pi * 2 / 3
+            let angleDouble = Double(angle)
+            let wobble: CGFloat = CGFloat(sin(angleDouble))
             var pose = BloubPose()
             // A small elliptical sway keeps the body grounded while the
             // rings and eyes communicate the original dizzy reaction.
@@ -976,9 +989,9 @@ public enum BloubStates {
                 scale: CGSize(width: 1 + wobble * 0.012, height: 1 - wobble * 0.012)
             )
             pose.gaze = BloubGaze(
-                yaw: sin(angle * 2) * 24,
-                pitch: cos(angle * 2) * 10,
-                roll: sin(angle) * 8
+                yaw: sin(angleDouble * 2) * 24,
+                pitch: cos(angleDouble * 2) * 10,
+                roll: sin(angleDouble) * 8
             )
             pose.eyes = .pair(0.18, 0.34)
             pose.arcs = BloubDecor.rings.prefix(3).enumerated().map { index, seed in
@@ -1016,14 +1029,14 @@ public enum BloubStates {
             baseFace: false,
             settlesAt: 0.9
         ) { t in
-            let wave = sin(BloubStates.loopTime(t, period: 0.9) * .pi * 2)
+            let wave: CGFloat = sin(BloubStates.loopTime(t, period: 0.9) * .pi * 2)
             var pose = BloubPose()
             pose.body = BloubBody(
                 profile: .circle(1),
                 rotation: wave * 0.035,
                 center: CGPoint(x: wave * 0.025, y: abs(wave) * 0.025)
             )
-            pose.gaze = BloubGaze(yaw: -12, pitch: -4, roll: wave * 3)
+            pose.gaze = BloubGaze(yaw: -12, pitch: -4, roll: Double(wave) * 3)
             pose.eyes = .pair(0.22, 0.42)
             return pose
         },
@@ -1119,7 +1132,11 @@ public enum BloubStates {
                 center: CGPoint(x: 0, y: (1 - progress) * 0.35),
                 scale: CGSize(width: 0.92 + progress * 0.08, height: 0.88 + progress * 0.12)
             )
-            pose.gaze = BloubGaze(yaw: -8 + progress * 8, pitch: -8 + progress * 4, roll: 0)
+            pose.gaze = BloubGaze(
+                yaw: -8 + Double(progress) * 8,
+                pitch: -8 + Double(progress) * 4,
+                roll: 0
+            )
             return pose
         },
 
