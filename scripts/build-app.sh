@@ -56,6 +56,7 @@ else
 fi
 
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_PATH/Contents/Info.plist"
+cp "$PROJECT_DIR/Resources/Clawdesk.icns" "$APP_PATH/Contents/Resources/Clawdesk.icns"
 chmod +x "$APP_PATH/Contents/MacOS/Clawdesk" \
     "$APP_PATH/Contents/MacOS/ClawdeskStatusline" \
     "$APP_PATH/Contents/MacOS/ClawdeskUpdater"

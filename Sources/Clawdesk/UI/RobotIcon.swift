@@ -1,10 +1,9 @@
 import AppKit
 import CoreGraphics
 
-/// The Clawdesk pet icon, drawn programmatically so the status item and Dock
-/// share the pet's own visual language: one rounded head and two capsule eyes
-/// (the same stadium shape the bloub engine renders). The Dock version also
-/// carries the original antenna; the menu-bar version stays a compact face.
+/// The Clawdesk pet icon. The menu-bar face stays a lightweight template image;
+/// the Dock uses the bundled multi-resolution icon made from the pet's own
+/// silhouette, with a CoreGraphics fallback for package/test runs.
 enum RobotIcon {
     /// Menu bar template image matching the pet's neutral face: a filled
     /// circular body with two capsule-shaped eye holes. The transparent eyes
@@ -48,28 +47,29 @@ enum RobotIcon {
         return image
     }
 
-    /// Dock / application icon: the pet's own palette on a rounded backdrop.
+    /// Dock / application icon: the pet's own palette and silhouette.
     static func applicationImage() -> NSImage {
+        if let iconURL = Bundle.main.url(forResource: "Clawdesk", withExtension: "icns"),
+           let bundledIcon = NSImage(contentsOf: iconURL) {
+            bundledIcon.accessibilityDescription = "Clawdesk"
+            return bundledIcon
+        }
+
+        return fallbackApplicationImage()
+    }
+
+    /// Package tests and development launches do not have the built app's
+    /// Contents/Resources directory. Keep a deterministic fallback that has
+    /// the same pet face instead of resurrecting the old antenna icon.
+    private static func fallbackApplicationImage() -> NSImage {
         let size = NSSize(width: 512, height: 512)
         let image = NSImage(size: size, flipped: false) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            let backdrop = CGRect(x: 56, y: 56, width: 400, height: 400)
-            let backdropPath = CGPath(
-                roundedRect: backdrop,
-                cornerWidth: 92,
-                cornerHeight: 92,
-                transform: nil
-            )
-            context.addPath(backdropPath)
-            context.setFillColor(NSColor(calibratedWhite: 0.96, alpha: 1).cgColor)
-            context.fillPath()
-
-            drawRobotHead(
+            drawPetFace(
                 in: context,
-                bounds: backdrop.insetBy(dx: 74, dy: 74),
-                headColor: NSColor(calibratedRed: 0.07, green: 0.07, blue: 0.08, alpha: 1).cgColor,
-                eyeColor: NSColor.white.cgColor,
-                antennaColor: NSColor(calibratedRed: 0.98, green: 0.62, blue: 0.18, alpha: 1).cgColor
+                bounds: rect,
+                bodyColor: NSColor(calibratedRed: 0.095, green: 0.095, blue: 0.12, alpha: 1).cgColor,
+                eyeColor: NSColor.white.cgColor
             )
             return true
         }
@@ -77,68 +77,35 @@ enum RobotIcon {
         return image
     }
 
-    /// One robot head, centred in `bounds`: antenna on top, rounded-square
-    /// head, two capsule eyes — the bloub eye shape, so the icon reads as
-    /// the pet itself in miniature.
-    private static func drawRobotHead(
+    /// One near-circular pet face centred in `bounds`, with the same capsule
+    /// eyes used by the bloub renderer. The eyes sit high and to the right,
+    /// matching the reference idle pose used for the app icon.
+    private static func drawPetFace(
         in context: CGContext,
         bounds: CGRect,
-        headColor: CGColor,
-        eyeColor: CGColor,
-        antennaColor: CGColor
+        bodyColor: CGColor,
+        eyeColor: CGColor
     ) {
         let unit = min(bounds.width, bounds.height)
-        let centerX = bounds.midX
-        let headHeight = unit * 0.62
-        let headWidth = unit * 0.78
-        let headBottom = bounds.midY - headHeight / 2 + unit * 0.03
-        let head = CGRect(
-            x: centerX - headWidth / 2,
-            y: headBottom,
-            width: headWidth,
-            height: headHeight
+        let faceDiameter = unit * 0.68
+        let face = CGRect(
+            x: bounds.midX - faceDiameter / 2,
+            y: bounds.midY - faceDiameter / 2,
+            width: faceDiameter,
+            height: faceDiameter
         )
-        let headRadius = headHeight * 0.30
+        context.setFillColor(bodyColor)
+        context.fillEllipse(in: face)
 
-        // Antenna: stem plus a lit dot.
-        let stemWidth = unit * 0.045
-        let stemTop = headBottom + headHeight - headRadius * 0.4
-        let stemHeight = unit * 0.14
-        context.setFillColor(antennaColor)
-        context.fill(CGRect(
-            x: centerX - stemWidth / 2,
-            y: stemTop,
-            width: stemWidth,
-            height: stemHeight
-        ))
-        let antennaDotRadius = unit * 0.062
-        let antennaDot = CGRect(
-            x: centerX - antennaDotRadius,
-            y: stemTop + stemHeight - antennaDotRadius * 0.2,
-            width: antennaDotRadius * 2,
-            height: antennaDotRadius * 2
-        )
-        context.fillEllipse(in: antennaDot)
-
-        // Head.
-        context.addPath(CGPath(
-            roundedRect: head,
-            cornerWidth: headRadius,
-            cornerHeight: headRadius,
-            transform: nil
-        ))
-        context.setFillColor(headColor)
-        context.fillPath()
-
-        // Two capsule eyes, the bloub stadium shape.
-        let eyeWidth = unit * 0.105
-        let eyeHeight = unit * 0.185
-        let eyeOffset = unit * 0.185
-        for side in [-1.0, 1.0] {
-            let eyeCenterX = centerX + CGFloat(side) * eyeOffset
-            let eyeCenterY = headBottom + headHeight * 0.56
+        let eyeWidth = faceDiameter * 0.13
+        let eyeHeight = faceDiameter * 0.29
+        let eyeCenters: [(x: CGFloat, y: CGFloat)] = [
+            (bounds.midX + faceDiameter * 0.11, bounds.midY + faceDiameter * 0.16),
+            (bounds.midX + faceDiameter * 0.29, bounds.midY + faceDiameter * 0.22)
+        ]
+        for eyeCenter in eyeCenters {
             let capsule = BloubPaths.capsule(width: eyeWidth, height: eyeHeight)
-            let transform = CGAffineTransform(translationX: eyeCenterX, y: eyeCenterY)
+            let transform = CGAffineTransform(translationX: eyeCenter.x, y: eyeCenter.y)
             context.addPath(capsule.transformed(transform))
             context.setFillColor(eyeColor)
             context.fillPath()
