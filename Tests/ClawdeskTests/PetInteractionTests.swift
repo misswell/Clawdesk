@@ -33,8 +33,55 @@ final class PetInteractionTests: XCTestCase {
         XCTAssertEqual(clock.advance(to: 10.35), 0.25, accuracy: 0.0001)
     }
 
-    func testIdleAnimationCyclePlaysOnceAfterQuietPeriodAndSkipsSelectedRestingFile() {
+    func testIdleCycleFallsBackToBloubScenesWhenThemeHasNoIdleFiles() {
         let activity = Date(timeIntervalSince1970: 10_000)
+        var cycle = IdleAnimationCycle()
+
+        // Before the quiet period elapses nothing plays.
+        XCTAssertEqual(
+            cycle.chooseScene(
+                now: activity.addingTimeInterval(5),
+                activity: activity,
+                animations: [],
+                selectedIdleFile: nil,
+                randomIndex: { _ in 0 }
+            ),
+            .none
+        )
+
+        // A theme without idle files gets a bloub-native scene, weighted so
+        // the wink dominates and the dizzy spell stays the rare treat.
+        var scenes: [BloubIdleScene] = []
+        for tick in 0..<200 {
+            cycle.reset(for: activity.addingTimeInterval(TimeInterval(tick * 60)))
+            if case .bloub(let scene) = cycle.chooseScene(
+                now: activity.addingTimeInterval(TimeInterval(tick * 60 + 21)),
+                activity: activity.addingTimeInterval(TimeInterval(tick * 60)),
+                animations: [],
+                selectedIdleFile: nil,
+                randomIndex: { _ in 0 }
+            ) {
+                scenes.append(scene)
+            }
+        }
+        XCTAssertFalse(scenes.isEmpty)
+        XCTAssertTrue(scenes.allSatisfy { $0 == .wink || $0 == .dizzy })
+
+        // With a deterministic index, the mapping is stable: 0 -> wink.
+        cycle.reset(for: activity)
+        XCTAssertEqual(
+            cycle.chooseScene(
+                now: activity.addingTimeInterval(21),
+                activity: activity,
+                animations: [],
+                selectedIdleFile: nil,
+                randomIndex: { _ in 0 }
+            ),
+            .bloub(.wink)
+        )
+    }
+
+    func testIdleAnimationCyclePlaysOnceAfterQuietPeriodAndSkipsSelectedRestingFile() {        let activity = Date(timeIntervalSince1970: 10_000)
         let animations = [
             ThemeIdleAnimation(file: "selected.gif", duration: 1),
             ThemeIdleAnimation(file: "look.gif", duration: 6.5)

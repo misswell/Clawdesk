@@ -659,29 +659,39 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             cancelIdleAnimation(resetCycle: true)
         }
         let selected = model.preferences.selectedIdleVisual(for: model.preferences.theme)
-        guard idleAnimationTask == nil,
-              let animation = idleAnimationCycle.choose(
-                  now: .now,
-                  activity: activity,
-                  animations: model.preferences.theme.idleAnimations,
-                  selectedIdleFile: selected,
-                  quietPeriod: model.preferences.theme.timings.mouseIdleTimeout,
-                  randomIndex: { Int.random(in: 0..<$0) }
-              ) else { return }
-
-        petView.idleVisualFile = animation.file
-        let duration = animation.duration
-        idleAnimationTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(max(250, Int(duration * 1_000))))
-            guard let self, !Task.isCancelled else { return }
-            guard self.model.petState == .idle,
-                  !self.model.preferences.isMiniMode,
-                  self.model.lastPointerActivity == activity else {
+        guard idleAnimationTask == nil else { return }
+        let choice = idleAnimationCycle.chooseScene(
+            now: .now,
+            activity: activity,
+            animations: model.preferences.theme.idleAnimations,
+            selectedIdleFile: selected,
+            quietPeriod: model.preferences.theme.timings.mouseIdleTimeout,
+            randomIndex: { Int.random(in: 0..<$0) }
+        )
+        switch choice {
+        case .none:
+            return
+        case .theme(let animation):
+            petView.idleVisualFile = animation.file
+            let duration = animation.duration
+            idleAnimationTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(max(250, Int(duration * 1_000))))
+                guard let self, !Task.isCancelled else { return }
+                guard self.model.petState == .idle,
+                      !self.model.preferences.isMiniMode,
+                      self.model.lastPointerActivity == activity else {
+                    self.idleAnimationTask = nil
+                    return
+                }
+                self.petView.idleVisualFile = self.model.preferences.selectedIdleVisual(for: self.model.preferences.theme)
                 self.idleAnimationTask = nil
-                return
             }
-            self.petView.idleVisualFile = self.model.preferences.selectedIdleVisual(for: self.model.preferences.theme)
-            self.idleAnimationTask = nil
+        case .bloub(.wink):
+            // Bloub-native stand-ins for themed idle animations (upstream
+            // idle easter eggs). showReaction owns the return to idle.
+            showReaction(.reactDouble, duration: 0.9)
+        case .bloub(.dizzy):
+            model.triggerDizzy()
         }
     }
 
