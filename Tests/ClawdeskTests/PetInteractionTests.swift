@@ -617,4 +617,42 @@ final class PetInteractionTests: XCTestCase {
             && abs(color.greenComponent - expectedColor.greenComponent) < 0.03
             && abs(color.blueComponent - expectedColor.blueComponent) < 0.03
     }
+
+    func testDockEdgeDetectionRefusesDockOccupiedMiniEdges() {
+        // A left Dock reserves a strip left of the visible frame.
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let leftDockVisible = CGRect(x: 120, y: 0, width: 1392, height: 952)
+        let occupied = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen,
+            visibleFrame: leftDockVisible
+        )
+        XCTAssertTrue(occupied.left)
+        XCTAssertFalse(occupied.right)
+
+        // A bottom Dock (or no Dock) leaves both vertical edges free.
+        let bottomDockVisible = CGRect(x: 0, y: 0, width: 1512, height: 930)
+        let free = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen,
+            visibleFrame: bottomDockVisible
+        )
+        XCTAssertFalse(free.left)
+        XCTAssertFalse(free.right)
+
+        // A right Dock occupies only the right edge.
+        let rightDockVisible = CGRect(x: 0, y: 0, width: 1392, height: 952)
+        let rightOnly = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen,
+            visibleFrame: rightDockVisible
+        )
+        XCTAssertFalse(rightOnly.left)
+        XCTAssertTrue(rightOnly.right)
+
+        // An auto-hiding Dock reserves nothing.
+        let autoHidden = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen,
+            visibleFrame: screen
+        )
+        XCTAssertFalse(autoHidden.left)
+        XCTAssertFalse(autoHidden.right)
+    }
 }

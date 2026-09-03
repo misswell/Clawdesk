@@ -31,6 +31,21 @@ public struct PetDragAnchor: Equatable, Sendable {
 /// screen convention instead (y positive = cursor BELOW the pet), matching
 /// the `Aim` struct the upstream rule consumes.
 public enum PetPointerMapper {
+    /// Whether a fixed Dock (or any reserved strip) occupies the screen's
+    /// left/right edge, derived from the screen frame vs. its visible
+    /// (work-area) frame. A mini-mode pet docked on an occupied edge would
+    /// sit under the Dock, where the Dock eats every click — so those edges
+    /// must refuse docking.
+    public static func dockOccupiesEdges(
+        screenFrame: CGRect,
+        visibleFrame: CGRect,
+        threshold: CGFloat = 20
+    ) -> (left: Bool, right: Bool) {
+        let left = visibleFrame.minX - screenFrame.minX > threshold
+        let right = screenFrame.maxX - visibleFrame.maxX > threshold
+        return (left, right)
+    }
+
     /// Normalized gaze offset: x right-positive, y down-positive, -1...1.
     public static func gazeOffset(
         petCenter: CGPoint,

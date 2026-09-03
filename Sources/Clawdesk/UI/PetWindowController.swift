@@ -523,13 +523,21 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var shouldEnterMiniMode: Bool {
         guard let window, let screen = screenForWindow(window) else { return false }
         // Upstream snaps on BOTH edges within a 30 px tolerance and remembers
-        // which side docked so a restart re-docks to the same edge.
+        // which side docked so a restart re-docks to the same edge. An edge
+        // occupied by a fixed Dock is refused: the pet would sit under the
+        // Dock where the Dock eats every click.
         let frame = screen.visibleFrame
+        let dock = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen.frame,
+            visibleFrame: frame
+        )
         if window.frame.maxX >= frame.maxX - 30 {
+            guard !dock.right else { return false }
             model.preferences.miniEdgeLeft = false
             return true
         }
         if window.frame.minX <= frame.minX + 30 {
+            guard !dock.left else { return false }
             model.preferences.miniEdgeLeft = true
             return true
         }
@@ -763,9 +771,19 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func miniDockOrigin(for window: NSWindow) -> NSPoint {
         guard let screen = screenForWindow(window) else { return window.frame.origin }
         let frame = screen.visibleFrame
+        // A persisted edge that a fixed Dock has since occupied flips to the
+        // free side, so a restored pet never wakes up under the Dock.
+        let dock = PetPointerMapper.dockOccupiesEdges(
+            screenFrame: screen.frame,
+            visibleFrame: frame
+        )
+        var edgeLeft = model.preferences.miniEdgeLeft
+        if edgeLeft && dock.left { edgeLeft = false }
+        if !edgeLeft && dock.right { edgeLeft = true }
+        model.preferences.miniEdgeLeft = edgeLeft
         // Upstream docks by theme offsetRatio (48% visible); the mirrored
-        // left edge shows the same sliver on the other side.
-        if model.preferences.miniEdgeLeft {
+        // edge shows the same sliver on the other side.
+        if edgeLeft {
             return NSPoint(
                 x: frame.minX - window.frame.width * 0.52,
                 y: max(frame.minY + 16, window.frame.minY)
