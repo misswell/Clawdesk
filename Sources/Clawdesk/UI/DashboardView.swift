@@ -120,6 +120,16 @@ public struct DashboardView: View {
                             }
                             .buttonStyle(.borderless)
                             .font(.caption2)
+                            if session.folder != nil {
+                                // Upstream's per-session "open folder" action.
+                                Button(prefs.text("Open Folder")) {
+                                    if let folder = session.folder {
+                                        NSWorkspace.shared.openFile(folder)
+                                    }
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.caption2)
+                            }
                         }
                         .font(.caption2)
                         .foregroundStyle(.secondary)

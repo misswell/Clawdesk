@@ -163,20 +163,24 @@ public final class RemoteNotifier {
 
     public func send(_ notification: RemoteNotification) {
         guard settings.enabled else { return }
+        // Everything leaving the desktop is redacted first (upstream applies
+        // secret-redact to every remote payload).
+        let title = SecretRedactor.redact(notification.title)
+        let body = SecretRedactor.redact(notification.body)
         if let slackWebhookURL = settings.slackWebhookURL, let url = URL(string: slackWebhookURL) {
             post(url: url, object: [
-                "text": "\(notification.title)\n\(notification.body)"
+                "text": "\(title)\n\(body)"
             ])
         }
         if let token = settings.telegramBotToken,
            let chatID = settings.telegramChatID,
            let url = URL(string: "https://api.telegram.org/bot\(token)/sendMessage") {
-            post(url: url, object: ["chat_id": chatID, "text": "*\(notification.title)*\n\(notification.body)", "parse_mode": "Markdown"])
+            post(url: url, object: ["chat_id": chatID, "text": "*\(title)*\n\(body)", "parse_mode": "Markdown"])
         }
         if let webhook = settings.feishuWebhookURL, let url = URL(string: webhook) {
             post(url: url, object: [
                 "msg_type": "text",
-                "content": ["text": "\(notification.title)\n\(notification.body)"]
+                "content": ["text": "\(title)\n\(body)"]
             ])
         }
     }
@@ -261,13 +265,21 @@ public final class RemoteNotifier {
         }
     }
 
+    /// The remote approval card never carries the raw command or full tool
+    /// input: upstream's rule is that commands and queries do not leave the
+    /// desktop bubble. Only the redacted title, the action, and a bounded
+    /// path/URL fallback summary travel.
     internal static func telegramApprovalPayload(for request: PermissionRequest) -> [String: Any] {
-        let command = request.command.map { "\nCommand: \(bounded($0, maxLength: 900))" } ?? ""
-        let input = request.input.map { "\nInput: \(bounded($0, maxLength: 900))" } ?? ""
-        let text = "Clawdesk permission request\n\(bounded(request.title, maxLength: 900))\(command)\(input)"
+        var text = "Clawdesk permission request\n\(SecretRedactor.redact(request.title))"
+        if let action = request.action?.trimmingCharacters(in: .whitespacesAndNewlines), !action.isEmpty {
+            text += "\nAction: \(action)"
+        }
+        if let detail = fallbackDetail(from: request.input) {
+            text += "\nTarget: \(detail)"
+        }
         return [
             "chat_id": "",
-            "text": bounded(text, maxLength: 3500),
+            "text": bounded(SecretRedactor.redact(text), maxLength: 3500),
             "reply_markup": [
                 "inline_keyboard": [[
                     ["text": "Allow", "callback_data": "clawdesk:\(request.id):allow"],
@@ -275,6 +287,19 @@ public final class RemoteNotifier {
                 ]]
             ]
         ]
+    }
+
+    /// Upstream's remote-approval fallback detail: a file path, home-relative
+    /// path, or URL pulled out of the tool input. `command`/`query`-shaped
+    /// input is deliberately never forwarded.
+    nonisolated internal static func fallbackDetail(from input: String?) -> String? {
+        guard let input, !input.isEmpty else { return nil }
+        let pattern = "(?:(?:/[\\w.\\-]+)+|~(?:/[\\w.\\-]+)+|https?://[^\\s\"'<>]+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(input.startIndex..., in: input)
+        guard let match = regex.firstMatch(in: input, options: [], range: range),
+              let range = Range(match.range, in: input) else { return nil }
+        return String(input[range])
     }
 
     private func post(url: URL, object: [String: Any]) {
@@ -356,6 +381,11 @@ public final class RemoteNotifier {
         if let updateID = (update["update_id"] as? NSNumber)?.int64Value {
             telegramUpdateOffset = max(telegramUpdateOffset, updateID + 1)
         }
+        // Fail closed like upstream: the tap must come from the configured
+        // approver AND originate in the configured chat, so a card forwarded
+        // (or screenshotted) into another chat can never resolve anything.
+        let expectedChatID = settings.telegramChatID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let callback = update["callback_query"] as? [String: Any],
               let callbackID = callback["id"] as? String,
               let data = callback["data"] as? String,
@@ -364,6 +394,11 @@ public final class RemoteNotifier {
               let from = callback["from"] as? [String: Any],
               let fromID = (from["id"] as? NSNumber)?.stringValue,
               fromID == allowedUserID,
+              let message = callback["message"] as? [String: Any],
+              let chat = message["chat"] as? [String: Any],
+              let chatID = (chat["id"] as? NSNumber)?.stringValue,
+              let expectedChatID, !expectedChatID.isEmpty,
+              chatID == expectedChatID,
               let handler = approvalHandlers.removeValue(forKey: parsed.requestID) else {
             return
         }

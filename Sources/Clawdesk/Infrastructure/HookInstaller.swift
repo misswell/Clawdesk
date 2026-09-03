@@ -423,7 +423,14 @@ public final class HookInstaller {
             for hook in flattenHookEntries(entry) {
                 let command = hook["command"] as? String ?? ""
                 let url = hook["url"] as? String ?? ""
-                if command.contains(Self.marker) || url.contains("/permission") && url.contains("127.0.0.1") {
+                if command.contains(Self.marker) { return true }
+                // A bare localhost /permission URL is NOT ownership: a user's
+                // own local permission hook would be claimed (and later
+                // rewritten) by mistake. Only Clawdesk's own marker-bearing
+                // permission URL counts, like upstream's exact-URL + marker
+                // rule.
+                if url.contains("/permission"), url.contains("127.0.0.1"),
+                   url.contains(Self.marker) || url.contains("clawdesk") {
                     return true
                 }
             }

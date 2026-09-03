@@ -83,4 +83,73 @@ final class ClawdeskModelPermissionLifetimeTests: XCTestCase {
         XCTAssertTrue(model.pendingPermissions.isEmpty)
         model.stop()
     }
+
+    func testLifecycleEventSweepsPendingPermissionForSameSession() {
+        let model = makeModel()
+        let recorder = PermissionDecisionRecorder()
+        submit(id: "sweep", to: model, recorder: recorder)
+        XCTAssertEqual(model.pendingPermissions.map(\.id), ["sweep"])
+
+        // The user answered in the terminal: PostToolUse for the same
+        // session+agent resolves the bubble with a no-decision.
+        model.accept(AgentEvent(
+            sessionID: "session-sweep",
+            agentID: "codex",
+            eventName: "PostToolUse",
+            toolName: "Bash"
+        ))
+
+        XCTAssertTrue(model.pendingPermissions.isEmpty)
+        XCTAssertEqual(recorder.decision(for: "sweep"), .defer, "a sweep is a no-decision, never a forged allow/deny")
+        model.stop()
+    }
+
+    func testPassthroughToolsAutoAllowWithoutBubble() {
+        let model = makeModel()
+        let recorder = PermissionDecisionRecorder()
+        let request = PermissionRequest(
+            id: "task-create",
+            sessionID: "session-task",
+            agentID: "claude-code",
+            title: "TaskCreate",
+            input: "{}"
+        )
+        let event = AgentEvent(
+            sessionID: "session-task",
+            agentID: "claude-code",
+            eventName: "PermissionRequest",
+            toolName: "TaskCreate",
+            permission: request
+        )
+        model.receive(.permission(event, PermissionReply { decision in
+            recorder.record(decision, for: "task-create")
+        }))
+
+        XCTAssertTrue(model.pendingPermissions.isEmpty, "metadata tools never show a bubble")
+        XCTAssertEqual(recorder.decision(for: "task-create"), .allow)
+        model.stop()
+    }
+
+    func testPermissionEventDoesNotCreateGhostSessionRow() {
+        let model = makeModel()
+        let recorder = PermissionDecisionRecorder()
+        let request = PermissionRequest(
+            id: "ghost",
+            sessionID: "unknown-session",
+            agentID: "claude-code",
+            title: "Allow Bash?"
+        )
+        let event = AgentEvent(
+            sessionID: "unknown-session",
+            agentID: "claude-code",
+            eventName: "PermissionRequest",
+            permission: request
+        )
+        model.receive(.permission(event, PermissionReply { _ in }))
+        XCTAssertTrue(model.sessions.isEmpty, "transient permission requests never create session rows")
+        XCTAssertEqual(model.petState, .notification, "the pending-permission overlay pins the aggregate")
+        model.resolvePermission(id: "ghost", decision: .allow)
+        XCTAssertEqual(model.petState, .idle, "resolution restores the aggregate")
+        model.stop()
+    }
 }

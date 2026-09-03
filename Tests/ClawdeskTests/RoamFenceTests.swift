@@ -44,8 +44,9 @@ final class RoamFenceTests: XCTestCase {
             random: { $0.lowerBound }
         )
         XCTAssertNotNil(target)
-        XCTAssertEqual(target?.x, 8)
-        XCTAssertEqual(target?.y, 8)
+        // Upstream keeps a 15% margin band from the work-area edges.
+        XCTAssertEqual(target?.x, 150)
+        XCTAssertEqual(target?.y, 105)
     }
 
     func testPlannerConfinesTargetToFence() {

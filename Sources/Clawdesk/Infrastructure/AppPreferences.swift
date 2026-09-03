@@ -56,6 +56,12 @@ public final class AppPreferences: ObservableObject {
 
     @Published public var selectedThemeID: String { didSet { persist() } }
     @Published public var isMiniMode: Bool { didSet { persist() } }
+    /// Upstream's manual pet visibility layer (`petHidden`): Hide Pet removes
+    /// the window from screen until Show Pet is chosen.
+    @Published public var petHidden: Bool { didSet { persist() } }
+    /// Which edge the pet docked against in mini mode (upstream persists the
+    /// edge so a restart re-docks to the same side).
+    @Published public var miniEdgeLeft: Bool { didSet { persist() } }
     @Published public var doNotDisturb: Bool { didSet { persist() } }
     @Published public var soundEnabled: Bool { didSet { persist() } }
     @Published public var lowPowerAnimations: Bool { didSet { persist() } }
@@ -108,6 +114,8 @@ public final class AppPreferences: ObservableObject {
         positionRecoveryURL = homeDirectory.appendingPathComponent("Library/Application Support/Clawdesk/window-position.json")
         selectedThemeID = defaults.string(forKey: "theme") ?? "pinch"
         isMiniMode = defaults.bool(forKey: "miniMode")
+        petHidden = defaults.bool(forKey: "petHidden")
+        miniEdgeLeft = defaults.bool(forKey: "miniEdgeLeft")
         doNotDisturb = defaults.bool(forKey: "doNotDisturb")
         soundEnabled = defaults.object(forKey: "soundEnabled") as? Bool ?? true
         lowPowerAnimations = defaults.object(forKey: "lowPowerAnimations") as? Bool ?? true
@@ -292,6 +300,8 @@ public final class AppPreferences: ObservableObject {
         guard !isLoading else { return }
         defaults.set(selectedThemeID, forKey: "theme")
         defaults.set(isMiniMode, forKey: "miniMode")
+        defaults.set(petHidden, forKey: "petHidden")
+        defaults.set(miniEdgeLeft, forKey: "miniEdgeLeft")
         defaults.set(doNotDisturb, forKey: "doNotDisturb")
         defaults.set(soundEnabled, forKey: "soundEnabled")
         defaults.set(lowPowerAnimations, forKey: "lowPowerAnimations")

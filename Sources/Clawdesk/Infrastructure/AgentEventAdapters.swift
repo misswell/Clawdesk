@@ -73,7 +73,8 @@ public protocol AgentEventAdapter {
     func permissionResponse(
         for decision: PermissionDecision,
         agentID: String,
-        eventName: String
+        eventName: String,
+        toolInput: String?
     ) -> AgentPermissionHTTPResponse
 
     func permissionFallbackResponse(
@@ -86,7 +87,8 @@ public extension AgentEventAdapter {
     func permissionResponse(
         for decision: PermissionDecision,
         agentID: String,
-        eventName: String
+        eventName: String,
+        toolInput: String? = nil
     ) -> AgentPermissionHTTPResponse {
         standardPermissionResponse(for: decision)
     }
@@ -181,18 +183,46 @@ public struct DefaultAgentEventAdapter: AgentEventAdapter {
     public func permissionResponse(
         for decision: PermissionDecision,
         agentID: String,
-        eventName: String
+        eventName: String,
+        toolInput: String? = nil
     ) -> AgentPermissionHTTPResponse {
-        guard isZCodePermission(agentID: agentID, eventName: eventName) else {
+        if isZCodePermission(agentID: agentID, eventName: eventName) {
+            guard decision != .defer else { return .noContent }
+            return standardJSONResponse([
+                "hookSpecificOutput": [
+                    "hookEventName": "PermissionRequest",
+                    "decision": ["behavior": decision == .allow ? "allow" : "deny"]
+                ]
+            ])
+        }
+        // Claude Code and CodeBuddy parse the hookSpecificOutput envelope;
+        // anything else is ignored and the request falls back to the native
+        // prompt. A no-decision keeps that native flow (204 like upstream).
+        guard Self.usesHookSpecificOutput(agentID: agentID) else {
             return standardPermissionResponse(for: decision)
         }
         guard decision != .defer else { return .noContent }
+        var decisionObject: [String: Any] = ["behavior": decision == .allow ? "allow" : "deny"]
+        if decision == .deny {
+            decisionObject["message"] = "Denied from Clawdesk"
+        } else if let toolInput,
+                  let data = toolInput.data(using: .utf8),
+                  let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            // Claude requires the exact tool input echoed back on plan-mode
+            // allows; for ordinary tools the identical input is a no-op.
+            decisionObject["updatedInput"] = parsed
+        }
         return standardJSONResponse([
             "hookSpecificOutput": [
                 "hookEventName": "PermissionRequest",
-                "decision": ["behavior": decision == .allow ? "allow" : "deny"]
+                "decision": decisionObject
             ]
         ])
+    }
+
+    static func usesHookSpecificOutput(agentID: String) -> Bool {
+        let normalized = EventStateMapper.normalizedEventName(agentID)
+        return ["claudecode", "claude", "codebuddy"].contains(normalized)
     }
 
     public func permissionFallbackResponse(

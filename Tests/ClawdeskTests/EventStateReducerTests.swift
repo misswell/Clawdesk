@@ -64,17 +64,72 @@ final class EventStateReducerTests: XCTestCase {
         )
     }
 
-    func testSessionsAggregateByPriorityAndDisappearOnSessionEnd() {
+    func testPermissionRequestIsTransientAndNeverCreatesASession() {
         let store = SessionStore()
         _ = store.apply(AgentEvent(sessionID: "thinking", eventName: "UserPromptSubmit"))
-        let active = store.apply(AgentEvent(sessionID: "permission", eventName: "PermissionRequest"))
-        XCTAssertEqual(active.state, .notification)
-        XCTAssertEqual(active.sessions.count, 2)
+        // Upstream: a PermissionRequest must not create a session row for an
+        // unknown session, nor overwrite the live session's lifecycle state.
+        // It only surfaces through the transition's permission lane.
+        let active = store.apply(AgentEvent(
+            sessionID: "unknown-permission",
+            eventName: "PermissionRequest",
+            permission: PermissionRequest(sessionID: "unknown-permission", agentID: "claude-code", title: "Allow Bash?")
+        ))
+        XCTAssertEqual(active.state, .thinking)
+        XCTAssertEqual(active.sessions.count, 1)
+        XCTAssertEqual(active.permission?.title, "Allow Bash?")
 
-        let afterEnd = store.apply(AgentEvent(sessionID: "permission", eventName: "SessionEnd"))
-        XCTAssertEqual(afterEnd.completedSessionID, "permission")
+        // A request scoped to a live session leaves that session's state and
+        // recent-event history untouched as well.
+        let scoped = store.apply(AgentEvent(sessionID: "thinking", eventName: "PermissionRequest"))
+        XCTAssertEqual(scoped.state, .thinking)
+        let session = store.sessions.first { $0.id == "thinking" }
+        XCTAssertEqual(session?.lastEvent, "UserPromptSubmit")
+
+        // A plain Notification hook is NOT transient: it creates a real row.
+        let notification = store.apply(AgentEvent(sessionID: "notify", eventName: "Notification"))
+        XCTAssertEqual(notification.state, .notification)
+        XCTAssertEqual(notification.sessions.count, 2)
+
+        let afterEnd = store.apply(AgentEvent(sessionID: "notify", eventName: "SessionEnd"))
+        XCTAssertEqual(afterEnd.completedSessionID, "notify")
         XCTAssertEqual(afterEnd.state, .thinking)
         XCTAssertEqual(afterEnd.sessions.count, 1)
+    }
+
+    func testDuplicateClaudeStopDoesNotMarkCompletionTwice() {
+        let store = SessionStore()
+        let first = store.apply(AgentEvent(sessionID: "cc", agentID: "claude-code", eventName: "Stop"))
+        XCTAssertFalse(first.isDuplicateCompletion)
+        let duplicate = store.apply(AgentEvent(sessionID: "cc", agentID: "claude-code", eventName: "Stop"))
+        XCTAssertTrue(duplicate.isDuplicateCompletion, "a repeated Stop with no activity in between is a duplicate delivery")
+        // Forward progress re-arms the celebration.
+        _ = store.apply(AgentEvent(sessionID: "cc", agentID: "claude-code", eventName: "UserPromptSubmit"))
+        let rearmed = store.apply(AgentEvent(sessionID: "cc", agentID: "claude-code", eventName: "Stop"))
+        XCTAssertFalse(rearmed.isDuplicateCompletion)
+    }
+
+    func testHeadlessSessionsAreExcludedFromTheDominantState() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(sessionID: "cc", agentID: "claude-code", eventName: "Stop"))
+        XCTAssertEqual(store.currentAggregateState(), .attention)
+        let headless = store.apply(AgentEvent(
+            sessionID: "headless",
+            agentID: "claude-code",
+            eventName: "UserPromptSubmit",
+            headless: true
+        ))
+        XCTAssertEqual(headless.state, .attention, "headless work never raises the aggregate")
+        XCTAssertEqual(store.currentAggregateState(), .attention)
+    }
+
+    func testSessionMenuSortsByStatePriorityThenRecency() {
+        let store = SessionStore()
+        let early = Date(timeIntervalSince1970: 1_000)
+        _ = store.apply(AgentEvent(sessionID: "attention", agentID: "claude-code", eventName: "Stop", timestamp: early))
+        _ = store.apply(AgentEvent(sessionID: "error", agentID: "claude-code", eventName: "ApiError", timestamp: early))
+        // An older error outranks a newer completion.
+        XCTAssertEqual(store.sessions.first?.id, "error")
     }
 
     func testMultiAgentWorkUsesBuildingAndSubagentTier() {

@@ -110,4 +110,33 @@ final class RemoteNotifierTests: XCTestCase {
         XCTAssertEqual(buttons[0]["callback_data"] as? String, "clawdesk:request-1:allow")
         XCTAssertEqual(buttons[1]["callback_data"] as? String, "clawdesk:request-1:deny")
     }
+
+    func testApprovalPayloadNeverCarriesCommandsOrSecrets() {
+        let request = PermissionRequest(
+            id: "request-2",
+            sessionID: "session-2",
+            agentID: "claude-code",
+            title: "Run deployment",
+            action: "Bash",
+            command: "curl -H \"Authorization: Bearer sk-abcdefghijklmnopqrst\" https://example.com",
+            input: "/tmp/build/out.log sk-proj-abcdefghijklmnopqrst"
+        )
+
+        let payload = RemoteNotifier.telegramApprovalPayload(for: request)
+        let text = payload["text"] as? String ?? ""
+        // Upstream rule: commands and raw tool input never leave the desktop.
+        XCTAssertFalse(text.contains("curl"))
+        XCTAssertFalse(text.contains("sk-proj-"), "provider tokens must be stripped even from fallback text")
+        XCTAssertTrue(text.contains("Action: Bash"))
+        // A path-shaped target survives as the bounded fallback summary.
+        XCTAssertTrue(text.contains("/tmp/build/out.log"))
+    }
+
+    func testFallbackDetailExtractsOnlyPathLikeTargets() {
+        XCTAssertEqual(RemoteNotifier.fallbackDetail(from: "writing /Users/me/notes.txt now"), "/Users/me/notes.txt")
+        XCTAssertEqual(RemoteNotifier.fallbackDetail(from: "~/docs/report.md"), "~/docs/report.md")
+        XCTAssertEqual(RemoteNotifier.fallbackDetail(from: "see https://example.com/x"), "https://example.com/x")
+        XCTAssertNil(RemoteNotifier.fallbackDetail(from: "echo hello world"))
+        XCTAssertNil(RemoteNotifier.fallbackDetail(from: nil))
+    }
 }

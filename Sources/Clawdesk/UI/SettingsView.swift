@@ -754,6 +754,12 @@ private struct SoftwareUpdateSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(updater.state.isBusy)
+                        // Upstream's pending-version pipeline: "Later"
+                        // postpones this release; background checks skip it.
+                        Button(model.preferences.text("Later")) {
+                            updater.dismissPendingUpdate()
+                        }
+                        .disabled(updater.state.isBusy)
                     }
                     Spacer()
                 }

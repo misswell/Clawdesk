@@ -146,6 +146,7 @@ public final class PetCanvasView: NSView {
     public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnded: (() -> Void)?
     public var onClick: (() -> Void)?
+    public var onCommandClick: (() -> Void)?
     public var onDoubleTap: (() -> Void)?
     public var onFlail: (() -> Void)?
     public var onDizzy: (() -> Void)?
@@ -576,7 +577,8 @@ public final class PetCanvasView: NSView {
         window?.makeFirstResponder(self)
         let now = Date.now
         clickTimes.append(now)
-        clickTimes.removeAll { now.timeIntervalSince($0) > 0.9 }
+        // Upstream's click accumulator window is 400 ms.
+        clickTimes.removeAll { now.timeIntervalSince($0) > 0.4 }
         if clickTimes.count >= 4 {
             clickTimes.removeAll()
             onFlail?()
@@ -602,7 +604,10 @@ public final class PetCanvasView: NSView {
 
     public override func mouseUp(with event: NSEvent) {
         onDragEnded?()
-        if !didDragSinceMouseDown, event.clickCount == 1 {
+        if !didDragSinceMouseDown, event.modifierFlags.contains(.command) {
+            // Upstream: Cmd-click (mac) opens the dashboard.
+            onCommandClick?()
+        } else if !didDragSinceMouseDown, event.clickCount == 1 {
             onClick?()
         }
         mouseDownScreenPoint = nil

@@ -356,13 +356,20 @@ final class FeishuApprovalTransport {
     }
 
     static func approvalCard(for request: PermissionRequest) -> [String: Any] {
-        let detail = [
+        // Same egress rule as Telegram: redacted title + action + a
+        // path/URL fallback only. Commands and raw tool input never leave
+        // the desktop.
+        var lines = [
             "Clawdesk permission request",
-            bounded(request.title, maxLength: 900),
-            request.command.map { "Command: \(bounded($0, maxLength: 900))" },
-            request.input.map { "Input: \(bounded($0, maxLength: 900))" }
-        ].compactMap { $0 }.joined(separator: "\n")
-        return card(title: "Permission request", detail: detail, decision: nil, requestID: request.id)
+            bounded(SecretRedactor.redact(request.title), maxLength: 900)
+        ]
+        if let action = request.action?.trimmingCharacters(in: .whitespacesAndNewlines), !action.isEmpty {
+            lines.append("Action: \(bounded(action, maxLength: 120))")
+        }
+        if let detail = RemoteNotifier.fallbackDetail(from: request.input) {
+            lines.append("Target: \(bounded(detail, maxLength: 300))")
+        }
+        return card(title: "Permission request", detail: lines.joined(separator: "\n"), decision: nil, requestID: request.id)
     }
 
     private static func statusCard(for request: PermissionRequest, decision: PermissionDecision) -> [String: Any] {
@@ -374,7 +381,7 @@ final class FeishuApprovalTransport {
         }
         return card(
             title: "Permission request · \(label)",
-            detail: bounded(request.title, maxLength: 1_200),
+            detail: bounded(SecretRedactor.redact(request.title), maxLength: 1_200),
             decision: decision,
             requestID: request.id
         )

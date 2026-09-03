@@ -1,5 +1,50 @@
 # Upstream sync changelog
 
+## 2026-09-03 — parity batches P1–P3 (same-day follow-up to the audit)
+
+- **P1 wire fidelity**: Claude Code/CodeBuddy permission decisions now reply
+  in the `hookSpecificOutput` envelope (allow echoes `updatedInput` so
+  ExitPlanMode works; deny carries a message; no-decision stays 204);
+  PostToolUse/Stop/SessionEnd/UserPromptSubmit sweep pending bubbles with a
+  no-decision ("answered in terminal"); PASSTHROUGH_TOOLS
+  (TaskCreate/TaskUpdate/TaskGet/TaskList/TaskStop/TaskOutput) auto-allow;
+  `addRules` suggestions merge into one entry; a `~/.claude` directory
+  watcher triggers a health check ~1 s after an external overwrite
+  (`ClaudeSettingsWatcher`); sessionless hook posts coalesce onto
+  `<agent>:default` instead of orphan UUIDs; ownership detection no longer
+  claims arbitrary localhost `/permission` URLs.
+- **P2 pet window**: Hide/Show Pet layer (persisted, ⌃⇧P, context + status
+  menus, HUD/quota follow); drag clamped to the attached-display union plus
+  startup off-screen fallback; mini mode snaps on both edges with exit
+  anti-resnap and click-to-exit; 400 ms click accumulator; Cmd-click opens
+  the dashboard; upstream roam cadence/speed/margins (8 s/4 s, 80 px/s, 15%,
+  100 px min hop, permission-bubble hold, drag cancel).
+- **P3 companions**: menu-bar completion/error flash; `test_result` hook
+  reaction; updater "Later" pipeline (persisted dismissals, reconcile prune,
+  background-check suppression); dashboard per-session Open Folder.
+- Verification: 310 tests green, `scripts/build-app.sh` succeeds.
+
+## 2026-09-03 — clawd-on-desk parity audit (latest main `e5855877`) + P0 fixes
+
+- Audited ~600 upstream behaviors across five domains against latest main
+  (51 commits beyond the v0.16.0 baseline). Full matrix in
+  `docs/PARITY_AUDIT_2026-09-03.md`.
+- P0 correctness/security batch landed: transient permission/question events
+  no longer create or overwrite session rows (upstream lifecycle rule), the
+  pending-permission overlay pins the aggregate and resolution restores it;
+  stale cleanup mirrors upstream (10 min idle delete, 5 min silent working
+  demotion, 20 min Codex/OpenCode floor); duplicate Claude Stop deliveries no
+  longer re-celebrate; headless sessions stay out of the dominant state and
+  resolve permission requests with a no-decision; `assistant_last_output` is
+  control-char-scrubbed and capped at 2400; the session menu comparator now
+  sorts by state priority then recency (dead-code fix).
+- Remote egress hardening: new `SecretRedactor` (port of upstream
+  `secret-redact.js`) applied to every Telegram/Feishu/Slack payload, and the
+  approval cards follow upstream's rule that commands and raw tool input
+  never leave the desktop (redacted title + action + path/URL fallback
+  only). Telegram approval taps now fail closed on both approver ID and
+  chat ID.
+
 ## 2026-08-30 — clawd-on-desk v0.16.0 parity audit
 
 - Advanced the tracked agent baseline from `a7283581` to `c8c153cc` (51

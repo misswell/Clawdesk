@@ -95,36 +95,58 @@ final class AgentProcessTests: XCTestCase {
         XCTAssertNil(store2.pruneStale())
     }
 
-    func testSilentActiveSessionsStayWorkingUntilExplicitCompletion() {
-        for (agentID, sessionID) in [("claude-code", "claude-live"), ("codex", "codex-live")] {
-            let store = SessionStore()
-            let started = Date(timeIntervalSince1970: 1_000)
-            _ = store.apply(AgentEvent(
-                sessionID: sessionID,
-                agentID: agentID,
-                eventName: "UserPromptSubmit",
-                timestamp: started
-            ))
+    func testSilentActiveSessionsDemoteOnUpstreamStaleFloors() {
+        // Upstream's stale-cleanup contract: a silent working-tier session
+        // demotes to idle after 5 minutes (Claude) / 20 minutes (Codex), so a
+        // dead CLI cannot leave the pet "working" forever. Below the floor it
+        // stays working.
+        let started = Date(timeIntervalSince1970: 1_000)
 
-            // A long model/tool segment may legitimately produce no hook for
-            // longer than the ordinary idle cleanup window. It must not make
-            // the pet look idle before the agent reports completion.
-            XCTAssertNil(store.pruneStale(
-                now: started.addingTimeInterval(2 * 60 * 60),
-                olderThan: 15 * 60,
-                codexActiveTimeout: 20 * 60
-            ), agentID)
-            XCTAssertEqual(store.sessions.first?.state, .thinking, agentID)
+        let claudeStore = SessionStore()
+        _ = claudeStore.apply(AgentEvent(
+            sessionID: "claude-live",
+            agentID: "claude-code",
+            eventName: "UserPromptSubmit",
+            timestamp: started
+        ))
+        XCTAssertNil(claudeStore.pruneStale(
+            now: started.addingTimeInterval(5 * 60 - 1),
+            olderThan: 10 * 60,
+            workingTimeout: 5 * 60,
+            codexActiveTimeout: 20 * 60
+        ))
+        let claudeDemoted = claudeStore.pruneStale(
+            now: started.addingTimeInterval(5 * 60),
+            olderThan: 10 * 60,
+            workingTimeout: 5 * 60,
+            codexActiveTimeout: 20 * 60
+        )
+        XCTAssertEqual(claudeDemoted?.sessions.first { $0.id == "claude-live" }?.state, .idle)
 
-            let ended = store.apply(AgentEvent(
-                sessionID: sessionID,
-                agentID: agentID,
-                eventName: "SessionEnd",
-                timestamp: started.addingTimeInterval(2 * 60 * 60)
-            ))
-            XCTAssertTrue(ended.sessions.isEmpty, agentID)
-            XCTAssertEqual(ended.state, .idle, agentID)
-        }
+        let codexStore = SessionStore()
+        _ = codexStore.apply(AgentEvent(
+            sessionID: "codex-live",
+            agentID: "codex",
+            eventName: "UserPromptSubmit",
+            timestamp: started
+        ))
+        // Codex holds its working tier for its own 20-minute floor.
+        XCTAssertNil(codexStore.pruneStale(
+            now: started.addingTimeInterval(6 * 60),
+            olderThan: 10 * 60,
+            workingTimeout: 5 * 60,
+            codexActiveTimeout: 20 * 60
+        ))
+        XCTAssertEqual(codexStore.sessions.first?.state, .thinking)
+
+        let ended = codexStore.apply(AgentEvent(
+            sessionID: "codex-live",
+            agentID: "codex",
+            eventName: "SessionEnd",
+            timestamp: started.addingTimeInterval(2 * 60 * 60)
+        ))
+        XCTAssertTrue(ended.sessions.isEmpty)
+        XCTAssertEqual(ended.state, .idle)
     }
 
     // MARK: - startup recovery state machine

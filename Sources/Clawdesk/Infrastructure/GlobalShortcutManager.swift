@@ -31,13 +31,17 @@ public final class GlobalShortcutManager {
     private func handle(_ event: NSEvent) {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard modifiers.contains([.control, .shift]) else { return }
-        let decision: PermissionDecision?
         switch event.keyCode {
-        case 16: decision = .allow // Y
-        case 45: decision = .deny // N
-        default: decision = nil
+        case 16: // ⌃⇧Y — allow the newest pending permission
+            guard let request = model.pendingPermissions.first else { return }
+            model.resolvePermission(id: request.id, decision: .allow)
+        case 45: // ⌃⇧N — deny the newest pending permission
+            guard let request = model.pendingPermissions.first else { return }
+            model.resolvePermission(id: request.id, decision: .deny)
+        case 35: // ⌃⇧P — upstream's togglePet action
+            model.preferences.petHidden.toggle()
+        default:
+            break
         }
-        guard let decision, let request = model.pendingPermissions.first else { return }
-        model.resolvePermission(id: request.id, decision: decision)
     }
 }

@@ -133,4 +133,60 @@ final class AgentEventAdapterTests: XCTestCase {
             204
         )
     }
+
+    func testClaudePermissionReplyUsesHookSpecificOutputContract() throws {
+        let adapter = DefaultAgentEventAdapter(environment: [:])
+
+        // Allow echoes the exact tool input (required for ExitPlanMode).
+        let allow = adapter.permissionResponse(
+            for: .allow,
+            agentID: "claude-code",
+            eventName: "PermissionRequest",
+            toolInput: #"{"plan":"ship it"}"#
+        )
+        XCTAssertEqual(allow.statusCode, 200)
+        let allowObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: allow.body) as? [String: Any])
+        let allowOutput = try XCTUnwrap(allowObject["hookSpecificOutput"] as? [String: Any])
+        XCTAssertEqual(allowOutput["hookEventName"] as? String, "PermissionRequest")
+        let allowDecision = try XCTUnwrap(allowOutput["decision"] as? [String: Any])
+        XCTAssertEqual(allowDecision["behavior"] as? String, "allow")
+        XCTAssertEqual(allowDecision["updatedInput"] as? [String: String], ["plan": "ship it"])
+
+        // Deny carries an explanatory message.
+        let deny = adapter.permissionResponse(
+            for: .deny,
+            agentID: "claude-code",
+            eventName: "PermissionRequest",
+            toolInput: nil
+        )
+        let denyObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: deny.body) as? [String: Any])
+        let denyDecision = try XCTUnwrap((denyObject["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any])
+        XCTAssertEqual(denyDecision["behavior"] as? String, "deny")
+        XCTAssertNotNil(denyDecision["message"])
+
+        // A no-decision keeps Claude's native flow (204), and plain-string
+        // tool input never becomes a malformed updatedInput.
+        XCTAssertEqual(
+            adapter.permissionResponse(for: .defer, agentID: "claude-code", eventName: "PermissionRequest").statusCode,
+            204
+        )
+        let allowStringInput = adapter.permissionResponse(
+            for: .allow,
+            agentID: "claude-code",
+            eventName: "PermissionRequest",
+            toolInput: "not json"
+        )
+        let allowStringObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: allowStringInput.body) as? [String: Any])
+        let allowStringDecision = try XCTUnwrap((allowStringObject["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any])
+        XCTAssertNil(allowStringDecision["updatedInput"])
+
+        // CodeBuddy shares the family; other agents keep the generic reply.
+        XCTAssertEqual(
+            adapter.permissionResponse(for: .allow, agentID: "codebuddy", eventName: "PermissionRequest").statusCode,
+            200
+        )
+        let codex = adapter.permissionResponse(for: .allow, agentID: "codex", eventName: "PermissionRequest")
+        let codexObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: codex.body) as? [String: Any])
+        XCTAssertNil(codexObject["hookSpecificOutput"], "only the Claude family speaks hookSpecificOutput")
+    }
 }

@@ -107,17 +107,44 @@ private struct SubagentTracker {
 public final class SessionStore {
     private var sessionsByID: [String: SessionSnapshot] = [:]
     private var subagentTrackersBySessionID: [String: SubagentTracker] = [:]
+    /// Sessions whose accepted Claude Stop already played the completion
+    /// celebration. A second Stop with no user activity in between is a
+    /// duplicate hook delivery, not a new completion, and must not celebrate
+    /// (or notify remotely) twice.
+    private var celebratedStopSessionIDs: Set<String> = []
 
     public init() {}
 
+    /// Dashboard/HUD ordering mirrors upstream's session menu comparator:
+    /// dominant-state priority first, recency second.
     public var sessions: [SessionSnapshot] {
         sessionsByID.values.sorted { lhs, rhs in
-            if lhs.state == rhs.state { return lhs.lastActivity > rhs.lastActivity }
-            return lhs.lastActivity > rhs.lastActivity
+            let left = Self.priority(of: lhs.state)
+            let right = Self.priority(of: rhs.state)
+            if left == right { return lhs.lastActivity > rhs.lastActivity }
+            return left > right
         }
     }
 
-    public func apply(_ event: AgentEvent) -> StateTransition {
+    /// The aggregate visual state over every live session, identical to the
+    /// one used for transitions.
+    public func currentAggregateState() -> PetState {
+        aggregateState()
+    }
+
+    public func apply(_ event: AgentEvent, isCompletionReplay: Bool = false) -> StateTransition {
+        // Permission and question requests are transient: upstream never lets
+        // them create a session row or overwrite a live session's lifecycle
+        // state. They surface through the bubble/remote-approval lane and the
+        // model's pending-permission overlay instead.
+        if isTransientRequestEvent(event.eventName) {
+            return StateTransition(
+                state: aggregateState(),
+                sessions: sessions,
+                permission: event.permission
+            )
+        }
+
         let existing = sessionsByID[event.sessionID]
         let normalizedSubagentID = normalizeSubagentID(event.subagentID)
         let isSubagentStart = isSubagentStart(event.eventName)
@@ -127,6 +154,14 @@ public final class SessionStore {
         let isParentEnd = isSessionEnd && !isScopedSubagentEnd
         let liveCountBefore = sessionsByID.count
         let liveCountAfter = liveCountBefore + (existing == nil ? 1 : 0)
+
+        // Any accepted forward progress re-arms the completion celebration for
+        // this session; only a Stop with nothing in between is a duplicate.
+        // A Stop itself must not clear the marker it is about to be checked
+        // against, which is why Claude Stops are excluded here.
+        if !isCompletionReplay, !isClaudeMainStop(event) {
+            celebratedStopSessionIDs.remove(event.sessionID)
+        }
 
         var tracker = tracker(for: event.sessionID, existing: existing)
         let hadSubagent = tracker.count > 0
@@ -228,8 +263,17 @@ public final class SessionStore {
         // A real parent Stop is the lifecycle boundary that clears all child
         // evidence. Held/debounced Stops stay in the tracker until a later
         // accepted Stop or a concrete child stop arrives.
+        var duplicateCompletion = false
         if isClaudeMainStop(event) && !holdingClaudeStop && !debouncingClaudeStop {
             tracker = SubagentTracker()
+            // Upstream inspects the completion tail so a duplicated Stop hook
+            // delivery never replays the celebration. The first accepted Stop
+            // arms the marker; forward progress (handled above) disarms it.
+            if celebratedStopSessionIDs.contains(event.sessionID) {
+                duplicateCompletion = true
+            } else {
+                celebratedStopSessionIDs.insert(event.sessionID)
+            }
         }
 
         // While a child is alive, ordinary parent work events cannot downgrade
@@ -260,7 +304,8 @@ public final class SessionStore {
             lastActivity: event.timestamp,
             terminalPID: event.terminalPID ?? existing?.terminalPID,
             recentEvents: recent,
-            contextUsage: event.contextUsage ?? existing?.contextUsage
+            contextUsage: event.contextUsage ?? existing?.contextUsage,
+            headless: event.headless
         )
         sessionsByID[event.sessionID] = snapshot
         if tracker.count > 0 || hadSubagent || isSubagentStart || isSubagentStop || isScopedSubagentEnd {
@@ -279,6 +324,7 @@ public final class SessionStore {
         return StateTransition(
             state: aggregateState(),
             sessions: sessions,
+            isDuplicateCompletion: duplicateCompletion,
             permission: event.permission
         )
     }
@@ -312,33 +358,28 @@ public final class SessionStore {
         return StateTransition(state: aggregateState(), sessions: sessions)
     }
 
-    /// Remove sessions that stopped reporting. Hook-based agents normally send
-    /// SessionEnd, but process crashes and force-quits do not. Idle sessions
-    /// still use the stale window; active sessions remain event-driven so a
-    /// long model call or tool cannot be mistaken for completion.
-    /// Prunes sessions idle for `interval`, plus — when a liveness checker is
-    /// supplied — sessions pinned to a terminal process that no longer exists:
-    /// a closed terminal means the session is an orphan, and waiting out the
-    /// stale window would keep a dead session's state on the pet.
+    /// Remove or demote sessions that stopped reporting, mirroring upstream's
+    /// stale-cleanup contract:
+    /// - idle sessions are deleted after `interval` (upstream 10 minutes);
+    /// - silent working-tier sessions are demoted to idle after
+    ///   `workingTimeout` (upstream 5 minutes) so a dead CLI cannot leave the
+    ///   pet "working" forever — Codex and OpenCode get the longer
+    ///   `codexActiveTimeout` floor (upstream 20 minutes, 0 disables);
+    /// - sessions pinned to a terminal process that no longer exists are
+    ///   deleted immediately.
     public func pruneStale(
         now: Date = .now,
-        olderThan interval: TimeInterval = 15 * 60,
+        olderThan interval: TimeInterval = 10 * 60,
+        workingTimeout: TimeInterval = 5 * 60,
         codexActiveTimeout: TimeInterval = 20 * 60,
         isProcessAlive: ((Int32) -> Bool)? = nil
     ) -> StateTransition? {
-        // Lifecycle hooks are the source of truth for active work. A model
-        // call or a long-running tool can legitimately be silent for longer
-        // than any UX timeout, so age must never turn an active session idle
-        // or delete it. The optional process check below still retires an
-        // active session immediately when its known owner has exited. Keep
-        // codexActiveTimeout in the API for source compatibility with older
-        // callers; it is intentionally no longer used as a false completion
-        // signal.
-        _ = codexActiveTimeout
         let activeStates: Set<PetState> = [
             .thinking, .typing, .building, .juggling, .sweeping, .carrying
         ]
+        let demotableStates: Set<PetState> = [.thinking, .typing, .building, .juggling]
         var staleIDs: [String] = []
+        var demotedIDs: [String] = []
         for (id, session) in sessionsByID {
             if let pid = session.terminalPID, let alive = isProcessAlive,
                pid > 0, !alive(Int32(clamping: pid)) {
@@ -346,13 +387,33 @@ public final class SessionStore {
                 continue
             }
             if activeStates.contains(session.state) {
+                guard demotableStates.contains(session.state) else { continue }
+                // A model call or a long-running tool can legitimately be
+                // silent for a while, so the demotion floor is deliberately
+                // longer than any ordinary turn — and never applies to
+                // Codex/OpenCode below their own floor (0 disables).
+                let floor: TimeInterval
+                let normalizedAgent = session.agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if normalizedAgent.contains("codex") || normalizedAgent.contains("opencode") {
+                    guard codexActiveTimeout > 0 else { continue }
+                    floor = codexActiveTimeout
+                } else {
+                    floor = workingTimeout
+                }
+                if now.timeIntervalSince(session.lastActivity) >= floor {
+                    demotedIDs.append(id)
+                }
                 continue
             }
             let age = now.timeIntervalSince(session.lastActivity)
             if age >= interval { staleIDs.append(id) }
         }
-        guard !staleIDs.isEmpty else { return nil }
+        guard !staleIDs.isEmpty || !demotedIDs.isEmpty else { return nil }
         for id in staleIDs { sessionsByID.removeValue(forKey: id) }
+        for id in demotedIDs {
+            sessionsByID[id]?.state = .idle
+            celebratedStopSessionIDs.remove(id)
+        }
         return StateTransition(state: aggregateState(), sessions: sessions)
     }
 
@@ -388,34 +449,50 @@ public final class SessionStore {
     }
 
     private func aggregateState() -> PetState {
-        guard !sessionsByID.isEmpty else { return .idle }
-        let priority: [PetState: Int] = [
-            // Keep the aggregate order identical to clawd-on-desk's
-            // STATE_PRIORITY. In particular, an error must remain visible
-            // above a simultaneous permission notification, while sweeping
-            // and completion remain above ordinary work.
-            .error: 80,
-            .notification: 70,
-            .sweeping: 60,
-            .attention: 50,
-            .carrying: 40,
-            .juggling: 40,
-            .building: 40,
-            .typing: 30,
-            .thinking: 20,
-            .roam: 10,
-            .dozing: 0,
-            .idle: 10
-        ]
-        func score(_ session: SessionSnapshot) -> Int {
-            return priority[session.state] ?? 0
-        }
-        return sessionsByID.values.max { lhs, rhs in
-            let left = score(lhs)
-            let right = score(rhs)
+        // Upstream's dominant-state resolver skips headless sessions: their
+        // quiet-window completions must not pin the pet's visible state.
+        let visible = sessionsByID.values.filter { !$0.headless }
+        guard !visible.isEmpty else { return .idle }
+        return visible.max { lhs, rhs in
+            let left = Self.priority(of: lhs.state)
+            let right = Self.priority(of: rhs.state)
             if left == right { return lhs.lastActivity < rhs.lastActivity }
             return left < right
         }?.state ?? .idle
+    }
+
+    /// Upstream STATE_PRIORITY, on the native state vocabulary.
+    static func priority(of state: PetState) -> Int {
+        switch state {
+        case .error: return 80
+        case .notification: return 70
+        case .sweeping: return 60
+        case .attention: return 50
+        case .carrying, .juggling, .building: return 40
+        case .typing: return 30
+        case .thinking: return 20
+        case .roam, .idle: return 10
+        default: return 0
+        }
+    }
+
+    /// Permission/elicitation/question requests are transient: upstream never
+    /// lets them create a session row or overwrite a live session's state.
+    /// A plain `notification` (Claude's Notification hook) is a real state and
+    /// is deliberately excluded.
+    private func isTransientRequestEvent(_ name: String) -> Bool {
+        let normalized = EventStateMapper.normalizedEventName(name)
+        if ["permissionrequest", "permission", "codexuserinputrequest",
+            "userinputrequest", "requestuserinput", "elicitation"].contains(normalized) {
+            return true
+        }
+        // Suffixed vendor spellings (`approvalRequired`, `toolPermissionRequest`).
+        return (normalized.contains("permission") || normalized.contains("approval")
+                || normalized.contains("elicitation"))
+            && EventStateMapper.state(
+                for: AgentEvent(sessionID: "-", agentID: "-", eventName: name),
+                liveSessionCount: 1
+            ) == .notification
     }
 
     private func isSessionEnd(_ name: String) -> Bool {

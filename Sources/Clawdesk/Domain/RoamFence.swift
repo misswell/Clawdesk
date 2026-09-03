@@ -69,7 +69,16 @@ public struct RoamArea: Equatable, Sendable {
 /// Picks a whole-window target inside the work area, optionally confined to a
 /// fence rectangle. Returns nil when no valid position exists (the window is
 /// larger than the area on either axis), in which case roaming holds.
+///
+/// Semantics mirror upstream `roam.js`: the target keeps a 15% margin band
+/// from the work-area edges, must be at least 100 px (euclidean) away from
+/// the current origin, and after 8 random attempts the farthest of the four
+/// area corners wins so long treks stay likely.
 public enum RoamPlanner {
+    public static let edgeMarginFraction: CGFloat = 0.15
+    public static let minimumHopDistance: CGFloat = 100
+    public static let maxAttempts = 8
+
     public static func nextTarget(
         currentOrigin: CGPoint,
         windowSize: CGSize,
@@ -77,7 +86,11 @@ public enum RoamPlanner {
         fence: RoamArea?,
         random: (ClosedRange<CGFloat>) -> CGFloat
     ) -> CGPoint? {
-        var rect = workArea.insetBy(dx: 8, dy: 8)
+        var rect = workArea.insetBy(
+            dx: workArea.width * edgeMarginFraction,
+            dy: workArea.height * edgeMarginFraction
+        )
+        if rect.width <= 0 || rect.height <= 0 { rect = workArea }
         if let fence, fence.enabled {
             let x0 = workArea.minX + workArea.width * CGFloat(fence.left ?? 0)
             let x1 = workArea.minX + workArea.width * CGFloat(fence.right ?? 1)
@@ -88,7 +101,29 @@ public enum RoamPlanner {
         let maxX = rect.maxX - windowSize.width
         let maxY = rect.maxY - windowSize.height
         guard maxX >= rect.minX, maxY >= rect.minY else { return nil }
-        _ = currentOrigin
-        return CGPoint(x: random(rect.minX...maxX), y: random(rect.minY...maxY))
+        let candidates = (0..<maxAttempts).map { _ in
+            CGPoint(x: random(rect.minX...maxX), y: random(rect.minY...maxY))
+        }
+        let valid = candidates.filter { origin in
+            let dx = origin.x - currentOrigin.x
+            let dy = origin.y - currentOrigin.y
+            return (dx * dx + dy * dy) >= minimumHopDistance * minimumHopDistance
+        }
+        if let picked = valid.randomElement() { return picked }
+        // Upstream's fallback: the farthest area corner from the current
+        // origin keeps the walk meaningful when the fence is small.
+        let corners = [
+            CGPoint(x: rect.minX, y: rect.minY),
+            CGPoint(x: maxX, y: rect.minY),
+            CGPoint(x: rect.minX, y: maxY),
+            CGPoint(x: maxX, y: maxY)
+        ]
+        return corners.max { lhs, rhs in
+            distance(lhs, currentOrigin) < distance(rhs, currentOrigin)
+        }
+    }
+
+    private static func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+        hypot(a.x - b.x, a.y - b.y)
     }
 }

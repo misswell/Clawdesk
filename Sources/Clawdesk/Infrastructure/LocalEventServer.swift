@@ -366,7 +366,8 @@ public final class LocalEventServer: @unchecked Sendable {
                 let response = self.eventAdapter.permissionResponse(
                     for: decision,
                     agentID: permission.agentID,
-                    eventName: event.eventName
+                    eventName: event.eventName,
+                    toolInput: permission.input
                 )
                 self.send(response, on: connection)
             }
@@ -383,6 +384,19 @@ public final class LocalEventServer: @unchecked Sendable {
             }
             onMessage?(.event(event))
         }
+    }
+
+    /// Upstream normalizes `assistant_last_output` before storage: control
+    /// characters become spaces and the text is capped at 2400 characters.
+    static func scrubbedAssistantOutput(_ value: String) -> String {
+        let control = CharacterSet.controlCharacters
+        var cleaned = String.UnicodeScalarView()
+        for scalar in value.unicodeScalars {
+            cleaned.append(control.contains(scalar) ? " " : scalar)
+        }
+        let text = String(cleaned)
+        guard text.count > 2400 else { return text }
+        return String(text.prefix(2400))
     }
 
     private func makeEvent(from object: [String: Any], query: [String: String], forcePermission: Bool, fallbackEvent: String?) -> AgentEvent {
@@ -420,13 +434,19 @@ public final class LocalEventServer: @unchecked Sendable {
             return nil
         }
 
-        let rawSessionID = string(["session_id", "sessionId", "session", "id"]) ?? query["session_id"] ?? query["sessionId"] ?? UUID().uuidString
         let queryAgent = [query["agent_id"], query["agent"]]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty }
         let rawAgentID = queryAgent ?? string(["agent_id", "agentId", "source", "agent"]) ?? "custom"
         let agentID = AgentRegistry.canonicalID(for: rawAgentID)
         let normalizedAgentID = agentID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Sessionless posts coalesce onto a per-agent default key like
+        // upstream (`codex:default`, …) instead of minting an orphan UUID
+        // per event.
+        let rawSessionID = string(["session_id", "sessionId", "session", "id"])
+            ?? query["session_id"]
+            ?? query["sessionId"]
+            ?? "\(normalizedAgentID):default"
         let namespacedSessionID = normalizedAgentID == "traecode" && !rawSessionID.hasPrefix("traecode:")
             ? "traecode:\(rawSessionID)"
             : rawSessionID
@@ -529,7 +549,7 @@ public final class LocalEventServer: @unchecked Sendable {
             assistantLastOutput: string([
                 "assistant_last_output", "assistantLastOutput",
                 "last_assistant_output", "lastAssistantOutput"
-            ]),
+            ]).map(Self.scrubbedAssistantOutput),
             assistantLastOutputTruncated: bool([
                 "assistant_last_output_truncated", "assistantLastOutputTruncated",
                 "last_assistant_output_truncated", "lastAssistantOutputTruncated"
@@ -674,24 +694,59 @@ public final class LocalEventServer: @unchecked Sendable {
             ?? object["permissionSuggestions"]
             ?? object["suggestions"]
         guard let list = raw as? [Any] else { return [] }
-        return list.prefix(6).compactMap { item -> PermissionSuggestion? in
+        var regular: [PermissionSuggestion] = []
+        var addRules: [String] = []
+        for item in list.prefix(12) {
             if let dictionary = item as? [String: Any] {
+                // Upstream merges every `addRules` entry into one "always
+                // allow" suggestion instead of rendering N raw entries.
+                if (dictionary["type"] as? String)?.lowercased() == "addrules" {
+                    if let rules = dictionary["rules"] as? [Any] {
+                        addRules.append(contentsOf: rules.compactMap(Self.ruleLabel))
+                    } else if let merged = Self.ruleLabel(dictionary) {
+                        addRules.append(merged)
+                    }
+                    continue
+                }
                 guard let label = stringValueIn(dictionary, keys: ["label", "title", "text", "name"]),
-                      !label.isEmpty else { return nil }
+                      !label.isEmpty else { continue }
                 let decision = suggestionDecision(from: dictionary)
-                return PermissionSuggestion(
-                    id: stringValueIn(dictionary, keys: ["id", "suggestion_id"]) ?? UUID().uuidString,
-                    label: String(label.prefix(80)),
-                    decision: decision
+                regular.append(
+                    PermissionSuggestion(
+                        id: stringValueIn(dictionary, keys: ["id", "suggestion_id"]) ?? UUID().uuidString,
+                        label: String(label.prefix(80)),
+                        decision: decision
+                    )
                 )
+                continue
             }
-            guard let label = item as? String, !label.isEmpty else { return nil }
+            guard let label = item as? String, !label.isEmpty else { continue }
             let normalized = label.lowercased()
             let decision: PermissionDecision = ["no", "deny", "denied", "reject", "拒绝"].contains(normalized)
                 ? .deny
                 : .allow
-            return PermissionSuggestion(label: String(label.prefix(80)), decision: decision)
+            regular.append(PermissionSuggestion(label: String(label.prefix(80)), decision: decision))
         }
+        if !addRules.isEmpty {
+            let label = "Always allow " + addRules.map { "`\($0)`" }.joined(separator: ", ")
+            regular.append(PermissionSuggestion(label: String(label.prefix(160)), decision: .allow))
+        }
+        return Array(regular.prefix(6))
+    }
+
+    private static func ruleLabel(_ rule: Any) -> String? {
+        if let text = rule as? String, !text.isEmpty { return text }
+        guard let dictionary = rule as? [String: Any] else { return nil }
+        let tool = dictionary["toolName"] as? String
+            ?? (dictionary["tool_name"] as? String)
+            ?? ""
+        let content = dictionary["ruleContent"] as? String
+            ?? (dictionary["rule_content"] as? String)
+            ?? ""
+        if tool.isEmpty && content.isEmpty { return nil }
+        if content.isEmpty { return tool }
+        if tool.isEmpty { return content }
+        return "\(tool): \(content)"
     }
 
     private func stringValueIn(_ dictionary: [String: Any], keys: [String]) -> String? {

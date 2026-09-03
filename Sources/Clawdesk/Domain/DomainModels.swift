@@ -415,6 +415,9 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
     public var terminalPID: Int?
     public var recentEvents: [String]
     public var contextUsage: ContextUsage?
+    /// Headless sessions drive completion debouncing but are excluded from
+    /// the pet's dominant visible state and the HUD, like upstream.
+    public var headless: Bool
 
     public init(
         id: String,
@@ -427,7 +430,8 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
         lastActivity: Date = .now,
         terminalPID: Int? = nil,
         recentEvents: [String] = [],
-        contextUsage: ContextUsage? = nil
+        contextUsage: ContextUsage? = nil,
+        headless: Bool = false
     ) {
         self.id = id
         self.agentID = agentID
@@ -440,6 +444,7 @@ public struct SessionSnapshot: Equatable, Sendable, Identifiable {
         self.terminalPID = terminalPID
         self.recentEvents = recentEvents
         self.contextUsage = contextUsage
+        self.headless = headless
     }
 }
 
@@ -448,16 +453,21 @@ public struct StateTransition: Equatable, Sendable {
     public let sessions: [SessionSnapshot]
     public let completedSessionID: String?
     public let permission: PermissionRequest?
+    /// True when this Stop is a duplicate delivery for an already-celebrated
+    /// completion. Callers must not replay the celebration or notify again.
+    public let isDuplicateCompletion: Bool
 
     public init(
         state: PetState,
         sessions: [SessionSnapshot],
         completedSessionID: String? = nil,
+        isDuplicateCompletion: Bool = false,
         permission: PermissionRequest? = nil
     ) {
         self.state = state
         self.sessions = sessions
         self.completedSessionID = completedSessionID
+        self.isDuplicateCompletion = isDuplicateCompletion
         self.permission = permission
     }
 }

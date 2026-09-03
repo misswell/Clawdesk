@@ -239,21 +239,30 @@ final class ClawdeskSoftwareUpdater: ObservableObject {
 
     @Published private(set) var state: ClawdeskUpdateState = .idle
     let currentVersion: String
+    /// Upstream's pending-version pipeline: versions the user postponed with
+    /// "Later" never re-prompt on their own (a manual check still offers
+    /// them), and the dismissal list is pruned to releases that no longer
+    /// exist upstream.
+    @Published private(set) var dismissedVersions: Set<String> = []
 
     private let session: URLSession
     private let applicationURL: URL
     private let failureMarkerURL: URL
+    private let defaults: UserDefaults
 
     init(
         currentVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0.1.0",
         session: URLSession = .shared,
         applicationURL: URL = Bundle.main.bundleURL,
-        failureMarkerURL: URL = ClawdeskUpdatePaths.failureMarkerURL
+        failureMarkerURL: URL = ClawdeskUpdatePaths.failureMarkerURL,
+        defaults: UserDefaults = .standard
     ) {
         self.currentVersion = currentVersion
         self.session = session
         self.applicationURL = applicationURL
         self.failureMarkerURL = failureMarkerURL
+        self.defaults = defaults
+        dismissedVersions = Set(defaults.stringArray(forKey: "dismissedUpdateVersions") ?? [])
 
         if let previousFailure = Self.consumeFailureMarker(at: failureMarkerURL) {
             state = .failed(ClawdeskUpdateFailure(previousFailure: previousFailure))
@@ -265,10 +274,53 @@ final class ClawdeskSoftwareUpdater: ObservableObject {
         state = .checking
         do {
             let release = try await fetchLatestRelease()
-            state = release.isNewer(than: currentVersion) ? .available(release) : .upToDate
+            if release.isNewer(than: currentVersion) {
+                state = .available(release)
+            } else {
+                pruneDismissals()
+                state = .upToDate
+            }
         } catch {
             state = .failed(ClawdeskUpdateFailure(error))
         }
+    }
+
+    /// "Later": remember this release so background checks skip it. A manual
+    /// check still offers it explicitly.
+    func dismissPendingUpdate() {
+        guard case .available(let release) = state else { return }
+        dismissedVersions.insert(release.version.description)
+        defaults.set(Array(dismissedVersions).sorted(), forKey: "dismissedUpdateVersions")
+        state = .upToDate
+    }
+
+    var pendingUpdateIsDismissed: Bool {
+        guard case .available(let release) = state else { return false }
+        return dismissedVersions.contains(release.version.description)
+    }
+
+    /// Test hooks following the repo's injectable-seam pattern: state is
+    /// otherwise reachable only through the network path.
+    func markAvailableForTesting(_ release: ClawdeskRelease) {
+        state = .available(release)
+    }
+
+    func pruneDismissalsForTesting() {
+        pruneDismissals()
+    }
+
+    /// Upstream reconcile: drop dismissed entries that are no longer newer
+    /// than the running version, so the list stays bounded and a rolled-out
+    /// version stops haunting the store.
+    private func pruneDismissals() {
+        let current = ClawdeskVersion(currentVersion)
+        let stale = dismissedVersions.filter { version in
+            guard let candidate = ClawdeskVersion(version), let current else { return true }
+            return candidate <= current
+        }
+        guard !stale.isEmpty else { return }
+        dismissedVersions = dismissedVersions.subtracting(stale)
+        defaults.set(Array(dismissedVersions).sorted(), forKey: "dismissedUpdateVersions")
     }
 
     func downloadAndInstall() async {

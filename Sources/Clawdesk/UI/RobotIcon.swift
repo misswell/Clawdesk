@@ -8,7 +8,8 @@ enum RobotIcon {
     /// Menu bar template image matching the pet's neutral face: a filled
     /// circular body with two capsule-shaped eye holes. The transparent eyes
     /// reveal the menu bar behind the template image in either system theme.
-    static func menuBarImage() -> NSImage {
+    /// `alert` paints the eyes solid for the completion-flash blink.
+    static func menuBarImage(alert: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             let diameter = min(rect.width, rect.height) * 0.76
@@ -30,7 +31,7 @@ enum RobotIcon {
             let eyeHeight = diameter * 0.31
             let eyeOffset = diameter * 0.19
             context.saveGState()
-            context.setBlendMode(.clear)
+            context.setBlendMode(alert ? .normal : .clear)
             for side in [-1.0, 1.0] {
                 let eyeCenterX = rect.midX + CGFloat(side) * eyeOffset
                 let eyeCenterY = rect.midY

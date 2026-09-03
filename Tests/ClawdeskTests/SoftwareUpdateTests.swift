@@ -48,3 +48,57 @@ final class SoftwareUpdateTests: XCTestCase {
         XCTAssertThrowsError(try ClawdeskRelease.decodeGitHubResponse(data))
     }
 }
+
+@MainActor
+final class UpdateDismissalTests: XCTestCase {
+    private func makeUpdater(defaults: UserDefaults) -> ClawdeskSoftwareUpdater {
+        ClawdeskSoftwareUpdater(
+            currentVersion: "0.1.0",
+            session: URLSession.shared,
+            applicationURL: URL(fileURLWithPath: "/tmp/Clawdesk.app"),
+            defaults: defaults
+        )
+    }
+
+    func testDismissedVersionIsReportedAndPrunedAfterCatchUp() {
+        let suite = "clawdesk-update-dismissal-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let updater = makeUpdater(defaults: defaults)
+
+        XCTAssertFalse(updater.pendingUpdateIsDismissed)
+
+        // Simulate postponing a pending release by injecting the state the
+        // check would produce, then dismissing it.
+        updater.markAvailableForTesting(ClawdeskRelease(
+            version: ClawdeskVersion("0.2.0")!,
+            releaseNotes: "",
+            archiveURL: URL(string: "https://example.com/x.zip")!,
+            sha256: String(repeating: "a", count: 64)
+        ))
+        updater.dismissPendingUpdate()
+        XCTAssertTrue(updater.dismissedVersions.contains("0.2.0"))
+        XCTAssertEqual(updater.state, .upToDate)
+
+        // Re-checking flags the release again, but the dismissal is visible
+        // to prompt paths so background checks stay quiet.
+        updater.markAvailableForTesting(ClawdeskRelease(
+            version: ClawdeskVersion("0.2.0")!,
+            releaseNotes: "",
+            archiveURL: URL(string: "https://example.com/x.zip")!,
+            sha256: String(repeating: "a", count: 64)
+        ))
+        XCTAssertTrue(updater.pendingUpdateIsDismissed)
+
+        // Once the running version catches up, the stale dismissal is pruned.
+        let caughtUp = ClawdeskSoftwareUpdater(
+            currentVersion: "0.2.0",
+            session: URLSession.shared,
+            applicationURL: URL(fileURLWithPath: "/tmp/Clawdesk.app"),
+            defaults: defaults
+        )
+        caughtUp.pruneDismissalsForTesting()
+        XCTAssertFalse(caughtUp.dismissedVersions.contains("0.2.0"))
+        defaults.removePersistentDomain(forName: suite)
+    }
+}

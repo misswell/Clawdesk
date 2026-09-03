@@ -29,12 +29,34 @@ public final class ClawdeskModel: ObservableObject {
     public var onPermission: ((PermissionRequest) -> Void)?
     public var onCompletion: (() -> Void)?
     public var onError: ((String) -> Void)?
+    /// Upstream's decorative test-result reaction: hooks report a pass/fail
+    /// `test_result` field and the pet plays a short reaction.
+    public var onTestReaction: ((Bool) -> Void)?
 
     private var replies: [String: PermissionReply] = [:]
     private var permissionExpiryTasks: [String: Task<Void, Never>] = [:]
     private var permissionOrder: [String] = []
     var maximumPendingPermissionCount = 32
     var permissionReplyTimeout: Duration = .seconds(300)
+    /// Pure-metadata tools auto-allowed without a bubble (upstream
+    /// PASSTHROUGH_TOOLS — zero side effects).
+    static let passthroughTools: Set<String> = [
+        "TaskCreate", "TaskUpdate", "TaskGet", "TaskList", "TaskStop", "TaskOutput"
+    ]
+    /// Lifecycle events that prove the user answered a pending permission in
+    /// the terminal (upstream's `findPendingPermissionForStateEvent` sweep).
+    static let lifecycleSweepEvents: Set<String> = [
+        "posttooluse", "stop", "sessionend", "userpromptsubmit"
+    ]
+
+    private func sweepStalePermissions(matching event: AgentEvent) {
+        let stale = pendingPermissions.filter {
+            $0.sessionID == event.sessionID && $0.agentID == event.agentID
+        }
+        for request in stale {
+            resolvePermission(id: request.id, decision: .defer)
+        }
+    }
     private var completionTask: Task<Void, Never>?
     /// Claude's Stop hook is a candidate completion when a final assistant
     /// message and background work arrive together. Keep that candidate
@@ -96,6 +118,9 @@ public final class ClawdeskModel: ObservableObject {
     private var lastPointerLocation: CGPoint?
     private var preferenceCancellables = Set<AnyCancellable>()
     private var healthTimer: Timer?
+    lazy var claudeSettingsWatcher = ClaudeSettingsWatcher(homeDirectory: hookInstaller.homeDirectory) { [weak self] in
+        Task { @MainActor [weak self] in self?.runHealthCheck() }
+    }
     private var startupSyncTask: Task<Void, Never>?
     private var sleepTransitionTask: Task<Void, Never>?
     private var isStarted = false
@@ -183,6 +208,10 @@ public final class ClawdeskModel: ObservableObject {
         healthTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.runHealthCheck() }
         }
+        // Directory-level watch on ~/.claude: an external overwrite of
+        // settings.json is repaired within ~1 s instead of the next timer
+        // tick (upstream claude-settings-watcher).
+        claudeSettingsWatcher.start()
         startupSyncTask?.cancel()
         startupSyncTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
@@ -219,6 +248,7 @@ public final class ClawdeskModel: ObservableObject {
         codexLogMonitor.stop()
         healthTimer?.invalidate()
         healthTimer = nil
+        claudeSettingsWatcher.stop()
         startupSyncTask?.cancel()
         startupSyncTask = nil
         remoteNotifier.stop()
@@ -273,6 +303,19 @@ public final class ClawdeskModel: ObservableObject {
             )
             retainPermissionReply(reply, for: request.id)
             apply(event)
+            // Pure-metadata tools have zero side effects; upstream auto-allows
+            // them without ever showing a bubble.
+            if let toolName = event.toolName, Self.passthroughTools.contains(toolName) {
+                resolvePermission(id: request.id, decision: .allow)
+                return
+            }
+            if event.headless {
+                // Headless sessions have no desktop owner to answer; upstream
+                // auto-denies so the turn fails cleanly instead of falling
+                // back to a native prompt nobody will ever see.
+                resolvePermission(id: request.id, decision: .deny)
+                return
+            }
             if preferences.doNotDisturb {
                 resolvePermission(id: request.id, decision: .defer)
                 return
@@ -311,6 +354,11 @@ public final class ClawdeskModel: ObservableObject {
                 if !pendingPermissions.contains(where: { $0.id == request.id }) {
                     pendingPermissions.append(request)
                 }
+                // Upstream pins the aggregate on `permissionLocked` while any
+                // request is pending; transient permission events no longer
+                // touch session rows, so the overlay lives here. Resolution
+                // recomputes the aggregate instead of scheduling a return.
+                if !preferences.isMiniMode { petState = .notification }
                 onPermission?(request)
             } else if !remoteStarted {
                 resolvePermission(id: request.id, decision: .defer)
@@ -372,7 +420,11 @@ public final class ClawdeskModel: ObservableObject {
         replies.removeValue(forKey: id)?.resolve(decision)
         pendingPermissions.removeAll { $0.id == id }
         if petState == .notification {
-            petState = sessions.first?.state ?? .idle
+            // Restore the aggregate the transient permission never touched:
+            // upstream's clearPermissionNotification semantics.
+            if pendingPermissions.isEmpty {
+                petState = sessionStore.currentAggregateState()
+            }
         }
     }
 
@@ -546,11 +598,24 @@ public final class ClawdeskModel: ObservableObject {
         if event.permissionGated {
             closeKimiGate(for: event)
         }
-        let transition = sessionStore.apply(event)
+        // Upstream resolves pending approvals from later lifecycle events:
+        // when PostToolUse/Stop/SessionEnd/UserPromptSubmit fires for the
+        // same session, the user answered in the terminal and the bubble is
+        // stale. The sweep is a no-decision, never a forged allow/deny.
+        if Self.lifecycleSweepEvents.contains(EventStateMapper.normalizedEventName(event.eventName)) {
+            sweepStalePermissions(matching: event)
+        }
+        let transition = sessionStore.apply(event, isCompletionReplay: bypassCompletionGate)
         sessions = transition.sessions
         publishSnapshot(state: transition.state, sessions: transition.sessions)
         eventLog.insert("\(event.agentID) · \(event.eventName)", at: 0)
         if eventLog.count > 80 { eventLog.removeLast(eventLog.count - 80) }
+        if let testResult = event.payload["test_result"], !testResult.isEmpty {
+            let failed = ["fail", "failed", "false", "0", "error"].contains(
+                testResult.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            )
+            onTestReaction?(!failed)
+        }
 
         if event.permissionSuspect {
             armKimiSuspectCue(for: event)
@@ -570,9 +635,15 @@ public final class ClawdeskModel: ObservableObject {
 
         petState = transition.state
         if transition.state == .attention {
-            onCompletion?()
-            remoteNotifier.send(RemoteNotification(title: "Task complete", body: event.eventName, sessionTitle: event.title))
-            scheduleReturn(to: fallbackState, after: themeAutoReturn(for: .attention, fallback: 4))
+            if transition.isDuplicateCompletion {
+                // A duplicated Stop hook delivery: keep the visual but never
+                // celebrate or notify twice.
+                scheduleReturn(to: fallbackState, after: themeAutoReturn(for: .attention, fallback: 4))
+            } else {
+                onCompletion?()
+                remoteNotifier.send(RemoteNotification(title: "Task complete", body: event.eventName, sessionTitle: event.title))
+                scheduleReturn(to: fallbackState, after: themeAutoReturn(for: .attention, fallback: 4))
+            }
         } else if transition.state == .error || transition.state == .notification {
             if transition.state == .error {
                 remoteNotifier.send(RemoteNotification(title: "Agent error", body: event.eventName, sessionTitle: event.title))

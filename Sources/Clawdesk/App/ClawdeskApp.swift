@@ -16,6 +16,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
     private var statusMenuRebuildTask: Task<Void, Never>?
     private var updateCheckTask: Task<Void, Never>?
+    private var statusItemFlashTask: Task<Void, Never>?
 
     public static func main() {
         let application = NSApplication.shared
@@ -47,9 +48,15 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         }
         model.onCompletion = { [weak self] in
             self?.playSound(logical: "complete", systemFallback: "Glass")
+            self?.flashStatusItem()
         }
         model.onError = { [weak self] _ in
             self?.playSound(logical: "error", systemFallback: "Sosumi")
+            self?.flashStatusItem()
+        }
+        model.onTestReaction = { [weak self] passed in
+            guard let self, !self.model.preferences.doNotDisturb else { return }
+            self.petWindow.showTestReaction(passed: passed)
         }
 
         installStatusItem()
@@ -91,6 +98,24 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         statusItem.menu = makeStatusMenu()
     }
 
+    /// Upstream's completion flash: blink the menu-bar icon a few times so a
+    /// finished (or failed) turn stays visible even when the pet is hidden.
+    private func flashStatusItem() {
+        guard let button = statusItem?.button else { return }
+        statusItemFlashTask?.cancel()
+        let normal = RobotIcon.menuBarImage()
+        let highlighted = RobotIcon.menuBarImage(alert: true)
+        statusItemFlashTask = Task { @MainActor [weak button] in
+            for _ in 0..<3 {
+                button?.image = highlighted
+                try? await Task.sleep(for: .milliseconds(220))
+                button?.image = normal
+                try? await Task.sleep(for: .milliseconds(220))
+            }
+            button?.image = normal
+        }
+    }
+
     private func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
         addMenuItem(to: menu, title: model.preferences.text("Open Dashboard"), action: #selector(showDashboard))
@@ -101,6 +126,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
         menu.addItem(sessions)
         menu.addItem(.separator())
         addMenuItem(to: menu, title: model.preferences.text("Mini Mode"), action: #selector(toggleMini))
+        addMenuItem(to: menu, title: model.preferences.text(model.preferences.petHidden ? "Show Pet" : "Hide Pet"), action: #selector(togglePetHidden))
         addMenuItem(to: menu, title: model.preferences.text("Do Not Disturb"), action: #selector(toggleDND))
         addMenuItem(to: menu, title: model.preferences.text("Sound effects"), action: #selector(toggleSound))
         menu.addItem(.separator())
@@ -155,6 +181,7 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     @objc private func showSettings() { settingsWindow.show() }
     @objc private func showDashboard() { dashboardWindow.show() }
     @objc private func toggleMini() { model.preferences.isMiniMode.toggle() }
+    @objc private func togglePetHidden() { model.preferences.petHidden.toggle() }
     @objc private func toggleDND() { model.preferences.doNotDisturb.toggle() }
     @objc private func toggleSound() { model.preferences.soundEnabled.toggle() }
     @objc private func terminate() { NSApp.terminate(nil) }
@@ -170,6 +197,10 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
     }
 
     private func presentUpdatePrompt(_ release: ClawdeskRelease) {
+        let updater = model.softwareUpdater
+        // A release the user already postponed only re-prompts through an
+        // explicit "Check for Updates…" (upstream dismissed-version rule).
+        guard !updater.pendingUpdateIsDismissed else { return }
         let alert = NSAlert()
         alert.messageText = model.preferences.text("Update available")
         alert.informativeText = "Clawdesk \(release.version) is available."
@@ -179,6 +210,8 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 await self?.model.softwareUpdater.downloadAndInstall()
             }
+        } else {
+            updater.dismissPendingUpdate()
         }
     }
 
@@ -192,7 +225,8 @@ public final class ClawdeskApp: NSObject, NSApplicationDelegate {
             while let self, !Task.isCancelled {
                 guard self.model.preferences.autoCheckForUpdates else { return }
                 await self.model.softwareUpdater.checkForUpdates()
-                if let release = self.model.softwareUpdater.state.availableRelease {
+                if let release = self.model.softwareUpdater.state.availableRelease,
+                   !self.model.softwareUpdater.pendingUpdateIsDismissed {
                     self.presentUpdatePrompt(release)
                 }
                 try? await Task.sleep(for: .seconds(6 * 60 * 60))

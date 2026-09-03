@@ -78,7 +78,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         petView.onDragBegan = { [weak self] point in self?.beginDrag(at: point) }
         petView.onDrag = { [weak self] point in self?.drag(to: point) }
         petView.onDragEnded = { [weak self] in self?.endDrag() }
-        petView.onClick = { [weak self] in self?.revealSessionHUD() }
+        petView.onClick = { [weak self] in self?.handlePetClick() }
+        petView.onCommandClick = { [weak self] in self?.onDashboard?() }
         petView.onDoubleTap = { [weak self] in self?.showReaction(.reactDouble, duration: 1.3) }
         petView.onFlail = { [weak self] in self?.showReaction(.reactFlail, duration: 1.4) }
         petView.onDizzy = { [weak self] in self?.model.triggerDizzy() }
@@ -120,6 +121,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         }.store(in: &cancellables)
         model.preferences.$isMiniMode.sink { [weak self] enabled in
             self?.setMiniMode(enabled, animate: true)
+        }.store(in: &cancellables)
+        model.preferences.$petHidden.sink { [weak self] _ in
+            self?.applyPetVisibility()
         }.store(in: &cancellables)
         model.preferences.$doNotDisturb.sink { [weak self] _ in
             self?.updateStateAssetOverride()
@@ -174,7 +178,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard !isStarted else { return }
         isStarted = true
         restorePosition()
-        window?.orderFrontRegardless()
+        // Respect a persisted Hide Pet choice; otherwise bring the panel up.
+        applyPetVisibility()
         // The quota store may have restored the last account report before
         // this controller was created; draw that balance immediately instead
         // of waiting for the next hook/statusline event.
@@ -233,6 +238,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             if self.model.lastPointerActivity != previousActivity {
                 self.cancelIdleAnimation(resetCycle: true)
                 if self.isRoaming { self.cancelRoamAnimation() }
+                // Upstream: the first walk after mouse silence waits 8 s.
+                self.nextRoamDate = Date.now.addingTimeInterval(8)
             }
             guard self.petView.petState == .idle
                 || self.petView.petState == .miniIdle
@@ -456,6 +463,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func beginDrag(at screenPoint: CGPoint) {
         guard let window else { return }
+        // Upstream's drag-lock cancels an in-flight roam; otherwise the roam
+        // animator fights the drag for the window frame.
+        cancelRoamAnimation()
         cancelIdleAnimation(resetCycle: true)
         sessionHUD.hide()
         isDragging = true
@@ -466,7 +476,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func drag(to screenPoint: CGPoint) {
         guard let window, let dragAnchor else { return }
-        window.setFrameOrigin(dragAnchor.windowOrigin(for: screenPoint))
+        window.setFrameOrigin(clampedToAttachedScreens(dragAnchor.windowOrigin(for: screenPoint), windowSize: window.frame.size))
         // Do not wait for mouse-up: a crash, quit, or mode change during a
         // drag must still leave the latest position recoverable.
         persistCurrentWindowOrigin(allowDragging: true)
@@ -476,20 +486,54 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard isDragging else { return }
         isDragging = false
         dragAnchor = nil
+        guard let window else { return }
+        // Upstream's final drag clamp: the resting origin always stays inside
+        // the attached-displays union.
+        let clamped = clampedToAttachedScreens(window.frame.origin, windowSize: window.frame.size)
+        if clamped != window.frame.origin {
+            window.setFrameOrigin(clamped)
+        }
         if shouldEnterMiniMode {
-            model.preferences.preMiniWindowOrigin = window?.frame.origin
-                ?? model.preferences.windowOrigin
+            model.preferences.preMiniWindowOrigin = window.frame.origin
             model.preferences.isMiniMode = true
         } else {
-            model.preferences.windowOrigin = window?.frame.origin
+            model.preferences.windowOrigin = window.frame.origin
             setPetVisualState(model.petState)
         }
         refreshQuotaRing()
     }
 
+    /// Upstream `looseClampPetToDisplays`: the pet must remain reachable on
+    /// the union of the attached screens, even when dragging across displays.
+    private func clampedToAttachedScreens(_ origin: NSPoint, windowSize: CGSize) -> NSPoint {
+        let union = NSScreen.screens.reduce(NSRect.null) { $0.union($1.visibleFrame) }
+        guard union.width > 0, union.height > 0 else { return origin }
+        let x = min(max(origin.x, union.minX), max(union.minX, union.maxX - windowSize.width))
+        let y = min(max(origin.y, union.minY), max(union.minY, union.maxY - windowSize.height))
+        return NSPoint(x: x, y: y)
+    }
+
+    /// Upstream's startup gate: a saved origin that no longer intersects any
+    /// attached screen (unplugged monitor) falls back to the default spot.
+    private func originIsVisibleOnAttachedScreens(_ origin: NSPoint, windowSize: CGSize) -> Bool {
+        let frame = NSRect(origin: origin, size: windowSize)
+        return NSScreen.screens.contains { $0.visibleFrame.intersects(frame) }
+    }
+
     private var shouldEnterMiniMode: Bool {
         guard let window, let screen = screenForWindow(window) else { return false }
-        return window.frame.maxX >= screen.visibleFrame.maxX - 8
+        // Upstream snaps on BOTH edges within a 30 px tolerance and remembers
+        // which side docked so a restart re-docks to the same edge.
+        let frame = screen.visibleFrame
+        if window.frame.maxX >= frame.maxX - 30 {
+            model.preferences.miniEdgeLeft = false
+            return true
+        }
+        if window.frame.minX <= frame.minX + 30 {
+            model.preferences.miniEdgeLeft = true
+            return true
+        }
+        return false
     }
 
     /// Clawdesk Behavior: a genuinely new session earns a one-shot wink (the
@@ -540,12 +584,49 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         sessionHUD.reveal(petWindowFrame: frame)
     }
 
+    /// Upstream: the first click reveals the HUD; in mini mode a click exits
+    /// mini mode instead.
+    private func handlePetClick() {
+        if model.preferences.isMiniMode {
+            model.preferences.isMiniMode = false
+            return
+        }
+        revealSessionHUD()
+    }
+
+    /// Upstream's manual pet visibility layer: Hide Pet keeps the runtime and
+    /// hooks fully working while removing every on-screen surface; Show Pet
+    /// brings the window back exactly where it was.
+    func applyPetVisibility() {
+        guard let window else { return }
+        if model.preferences.petHidden {
+            sessionHUD.hide()
+            window.orderOut(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
+        refreshQuotaRing()
+        refreshSessionHUD()
+    }
+
+    @objc private func togglePetHidden() {
+        model.preferences.petHidden.toggle()
+    }
+
+    /// Upstream's decorative test-result reaction. The bloub vocabulary has
+    /// no pass/fail artwork, so a pass winks and a failure plays the flail.
+    func showTestReaction(passed: Bool) {
+        guard !model.preferences.petHidden, !isDragging else { return }
+        showReaction(passed ? .reactDouble : .reactFlail, duration: 1.3)
+    }
+
     private func refreshSessionHUD() {
         guard let frame = window?.frame else { return }
         sessionHUD.update(
             petWindowFrame: frame,
             enabled: model.preferences.sessionHUDEnabled
                 && !model.preferences.isMiniMode
+                && !model.preferences.petHidden
                 && !isDragging
         )
     }
@@ -618,7 +699,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         // race where AppKit reports the panel's initial lower-left frame.
         startupWindowOrigin = window.frame.origin
         let target: NSPoint
-        if let saved = model.preferences.windowOrigin {
+        if let saved = model.preferences.windowOrigin,
+           originIsVisibleOnAttachedScreens(saved, windowSize: window.frame.size) {
             target = saved
         } else if model.preferences.isMiniMode {
             target = miniDockOrigin(for: window)
@@ -681,6 +763,14 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func miniDockOrigin(for window: NSWindow) -> NSPoint {
         guard let screen = screenForWindow(window) else { return window.frame.origin }
         let frame = screen.visibleFrame
+        // Upstream docks by theme offsetRatio (48% visible); the mirrored
+        // left edge shows the same sliver on the other side.
+        if model.preferences.miniEdgeLeft {
+            return NSPoint(
+                x: frame.minX - window.frame.width * 0.52,
+                y: max(frame.minY + 16, window.frame.minY)
+            )
+        }
         return NSPoint(
             x: frame.maxX - window.frame.width * 0.48,
             y: max(frame.minY + 16, window.frame.minY)
@@ -688,22 +778,34 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func miniExitOrigin(for window: NSWindow) -> NSPoint {
+        var target: NSPoint
         if let parked = model.preferences.preMiniWindowOrigin,
            !isLegacyStartupParkedOrigin(parked) {
-            return parked
-        }
-        if let saved = model.preferences.windowOrigin {
+            target = parked
+        } else if let saved = model.preferences.windowOrigin {
             // A pre-0.1.27 startup callback could save the initial (0, 0)
             // frame as the parked position. Keep the last real position rather
             // than reviving that lower-left value.
-            return saved
+            target = saved
+        } else {
+            let frame = screenForWindow(window)?.visibleFrame
+                ?? NSRect(origin: window.frame.origin, size: window.frame.size)
+            target = NSPoint(
+                x: frame.maxX - window.frame.width - 26,
+                y: max(frame.minY + 30, window.frame.minY)
+            )
         }
-        guard let screen = screenForWindow(window) else { return window.frame.origin }
-        let frame = screen.visibleFrame
-        return NSPoint(
-            x: frame.maxX - window.frame.width - 26,
-            y: max(frame.minY + 30, window.frame.minY)
-        )
+        // Upstream's exit anti-resnap: shift the resting position 100 px
+        // inside the snap zone so the very next drag does not re-dock.
+        if let screen = screenForWindow(window) {
+            let frame = screen.visibleFrame
+            if target.x + window.frame.width >= frame.maxX - 30 {
+                target.x = frame.maxX - window.frame.width - 100
+            } else if target.x <= frame.minX + 30 {
+                target.x = frame.minX + 100
+            }
+        }
+        return target
     }
 
     private func moveBackFromMini(
@@ -749,12 +851,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         model.preferences.windowOrigin = window.frame.origin
     }
 
+    /// Upstream roam cadence: the first walk starts after 8 s of quiet, later
+    /// walks every 4 s; walks move at 80 px/s (minimum 1 s), and a visible
+    /// permission bubble holds roaming — the pet must not wander from its
+    /// waiting spot.
     private func checkRoam() {
         guard model.preferences.freeRoamEnabled,
               !model.preferences.isMiniMode,
               !model.preferences.doNotDisturb,
               !isDragging,
               !isRoaming,
+              model.pendingPermissions.isEmpty,
               let window,
               !model.petState.isTransient,
               model.petState == .idle else { return }
@@ -762,7 +869,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         guard now >= nextRoamDate else { return }
         roamFence.refresh(from: model.preferences.roamAreaFileURL)
         guard roamFence.confirmed else {
-            nextRoamDate = now.addingTimeInterval(5)
+            nextRoamDate = now.addingTimeInterval(4)
             return
         }
         guard let screen = screenForWindow(window) else { return }
@@ -778,18 +885,23 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         let newOrigin = NSPoint(x: target.x, y: target.y)
-        guard abs(newOrigin.x - window.frame.origin.x) + abs(newOrigin.y - window.frame.origin.y) > 8 else {
-            nextRoamDate = now.addingTimeInterval(8)
+        let distance = hypot(
+            newOrigin.x - window.frame.origin.x,
+            newOrigin.y - window.frame.origin.y
+        )
+        guard distance >= RoamPlanner.minimumHopDistance else {
+            nextRoamDate = now.addingTimeInterval(4)
             return
         }
-        nextRoamDate = now.addingTimeInterval(TimeInterval.random(in: 10...20))
+        nextRoamDate = now.addingTimeInterval(4)
         isRoaming = true
         roamAnimationGeneration &+= 1
         let generation = roamAnimationGeneration
         setPetVisualState(.roam)
+        let duration = max(1.0, distance / 80)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 1.6
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().setFrameOrigin(newOrigin)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in
@@ -877,6 +989,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(.separator())
         let mini = addMenuItem(to: menu, title: model.preferences.text(model.preferences.isMiniMode ? "Exit Mini Mode" : "Mini Mode"), action: #selector(toggleMini))
         mini.state = model.preferences.isMiniMode ? .on : .off
+        let hidden = addMenuItem(to: menu, title: model.preferences.text(model.preferences.petHidden ? "Show Pet" : "Hide Pet"), action: #selector(togglePetHidden))
+        hidden.state = model.preferences.petHidden ? .on : .off
         let dnd = addMenuItem(to: menu, title: model.preferences.text(model.preferences.doNotDisturb ? "Wake Clawdesk" : "Do Not Disturb"), action: #selector(toggleDND))
         dnd.state = model.preferences.doNotDisturb ? .on : .off
         let sound = addMenuItem(to: menu, title: model.preferences.text("Sound effects"), action: #selector(toggleSound))
@@ -969,7 +1083,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refreshQuotaRing() {
-        guard let window, !model.preferences.isMiniMode else {
+        guard let window,
+              !model.preferences.isMiniMode,
+              !model.preferences.petHidden else {
             quotaRing.hide()
             return
         }
