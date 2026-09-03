@@ -1,5 +1,23 @@
 # Upstream sync changelog
 
+## 2026-09-03 — parity batch 2 (turn machine, doctor, session actions)
+
+- **Codex official-hook turn machine** ported into the session store
+  (`server-codex-official-turns.js`): turns open on UserPromptSubmit, tool
+  events mark activity (FIFO table capped at 200), a Stop resolves
+  attention only with tool activity or final assistant output — a quiet
+  turn ends idle — `stop_hook_active` drops the completion side effects,
+  and subagent-role Stops resolve headless/idle.
+- **Doctor breadth**: the upstream eight-check sweep minus Windows-only
+  probes — per-agent integrations plus system checks (preferences, local
+  server, permission policy, Feishu approval config, theme health, Remote
+  SSH ingress/isolation) and a copyable markdown report with home paths
+  redacted, surfaced in Settings → Doctor.
+- **Session actions**: dashboard rename (persisted aliases, empty restores
+  the automatic title) and hide (dismiss recomputes the aggregate), plus
+  the upstream hotkey rule that ⌃⇧Y/⌃⇧N target the NEWEST visible card.
+- 319 tests green; app rebuilt and redeployed.
+
 ## 2026-09-03 — parity batches P1–P3 (same-day follow-up to the audit)
 
 - **P1 wire fidelity**: Claude Code/CodeBuddy permission decisions now reply

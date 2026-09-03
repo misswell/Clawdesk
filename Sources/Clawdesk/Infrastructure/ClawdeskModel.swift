@@ -24,6 +24,7 @@ public final class ClawdeskModel: ObservableObject {
     @Published public private(set) var quotaReports: [QuotaReport] = []
     @Published public private(set) var agentInstallStatus: [String: String] = [:]
     @Published public private(set) var doctorReports: [AgentDiagnostic] = []
+    @Published public private(set) var systemDoctorReports: [SystemDiagnostic] = []
     @Published public private(set) var serverPort: UInt16
 
     public var onPermission: ((PermissionRequest) -> Void)?
@@ -429,8 +430,37 @@ public final class ClawdeskModel: ObservableObject {
     }
 
     public func resolveLatestPermission(decision: PermissionDecision) {
-        guard let request = pendingPermissions.first else { return }
+        // Upstream hotkeys target the NEWEST visible card, not the oldest.
+        guard let request = pendingPermissions.last else { return }
         resolvePermission(id: request.id, decision: decision)
+    }
+
+    /// Dashboard rename (upstream session aliases). An empty string clears.
+    public func setSessionAlias(_ raw: String, for sessionID: String) {
+        let alias = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        if alias.isEmpty {
+            preferences.sessionAliases.removeValue(forKey: sessionID)
+        } else {
+            preferences.sessionAliases[sessionID] = alias
+        }
+        applySessionAlias(sessionID)
+    }
+
+    /// Re-applies a stored alias to the live snapshot (also called after
+    /// every event so a renamed session keeps its name).
+    private func applySessionAlias(_ sessionID: String) {
+        guard let alias = preferences.sessionAliases[sessionID],
+              let transition = sessionStore.setSessionTitle(alias, for: sessionID) else { return }
+        sessions = transition.sessions
+        publishSnapshot(state: petState, sessions: transition.sessions)
+    }
+
+    /// Dashboard hide (upstream dismissSession): drops the row and lets the
+    /// aggregate recompute. Runtime-level, like upstream.
+    public func dismissSession(_ sessionID: String) {
+        guard let transition = sessionStore.dismiss(sessionID: sessionID) else { return }
+        sessions = transition.sessions
+        publishSnapshot(state: transition.state, sessions: transition.sessions)
     }
 
     private func retainPermissionReply(_ reply: PermissionReply, for id: String) {
@@ -491,6 +521,34 @@ public final class ClawdeskModel: ObservableObject {
 
     public func refreshDoctor() {
         doctorReports = doctor.diagnose()
+        systemDoctorReports = doctor.diagnoseSystem(systemCheckInputs())
+    }
+
+    /// Snapshot of the runtime facts the system checks evaluate.
+    private func systemCheckInputs() -> SystemCheckInputs {
+        SystemCheckInputs(
+            serverResponding: eventServer.isRunning,
+            serverPort: eventServer.port,
+            preferencesReadable: UserDefaults.standard.dictionaryRepresentation().count > 0,
+            themeID: preferences.selectedThemeID,
+            themeStateCount: preferences.theme.stateFiles.count
+                + preferences.theme.stateBindings.count,
+            permissionBubblesEnabled: preferences.showPermissionBubbles,
+            permissionAutomationOff: preferences.permissionAutomation == .off,
+            remoteChannels: remoteNotifier.settings,
+            remoteSSHProfileCount: remoteSSHManager.profiles.count,
+            remoteSSHIngressActive: remoteSSHManager.profiles.isEmpty
+                ? false : remoteSSHManager.hasActiveIngress
+        )
+    }
+
+    /// Upstream doctor-report: a redacted, copyable markdown summary.
+    public func diagnosticReport() -> String {
+        doctor.diagnosticReport(
+            agentDiagnostics: doctorReports,
+            systemDiagnostics: systemDoctorReports,
+            appVersion: softwareUpdater.currentVersion
+        )
     }
 
     public func fixAgent(_ agentID: String) {
@@ -608,6 +666,9 @@ public final class ClawdeskModel: ObservableObject {
         let transition = sessionStore.apply(event, isCompletionReplay: bypassCompletionGate)
         sessions = transition.sessions
         publishSnapshot(state: transition.state, sessions: transition.sessions)
+        if preferences.sessionAliases[event.sessionID] != nil {
+            applySessionAlias(event.sessionID)
+        }
         eventLog.insert("\(event.agentID) · \(event.eventName)", at: 0)
         if eventLog.count > 80 { eventLog.removeLast(eventLog.count - 80) }
         if let testResult = event.payload["test_result"], !testResult.isEmpty {

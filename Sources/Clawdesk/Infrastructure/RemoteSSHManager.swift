@@ -119,6 +119,8 @@ public final class RemoteSSHManager: ObservableObject {
     @Published public private(set) var profiles: [RemoteSSHProfile]
     @Published public private(set) var statuses: [String: RemoteSSHStatus] = [:]
     @Published public private(set) var messages: [String: String] = [:]
+    /// Doctor check: at least one profile-bound reverse tunnel is alive.
+    public var hasActiveIngress: Bool { !tunnels.isEmpty }
 
     private let fileManager: FileManager
     private var tunnels: [String: Process] = [:]

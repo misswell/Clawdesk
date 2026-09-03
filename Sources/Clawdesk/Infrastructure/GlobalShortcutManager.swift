@@ -33,11 +33,9 @@ public final class GlobalShortcutManager {
         guard modifiers.contains([.control, .shift]) else { return }
         switch event.keyCode {
         case 16: // ⌃⇧Y — allow the newest pending permission
-            guard let request = model.pendingPermissions.first else { return }
-            model.resolvePermission(id: request.id, decision: .allow)
+            model.resolveLatestPermission(decision: .allow)
         case 45: // ⌃⇧N — deny the newest pending permission
-            guard let request = model.pendingPermissions.first else { return }
-            model.resolvePermission(id: request.id, decision: .deny)
+            model.resolveLatestPermission(decision: .deny)
         case 35: // ⌃⇧P — upstream's togglePet action
             model.preferences.petHidden.toggle()
         default:

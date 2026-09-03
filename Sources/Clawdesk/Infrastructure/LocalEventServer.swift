@@ -54,6 +54,10 @@ public final class LocalEventServer: @unchecked Sendable {
 
     public private(set) var port: UInt16
     public var onMessage: MessageHandler?
+    /// Doctor check: the main listener exists (start() called, not stopped).
+    public var isRunning: Bool {
+        queue.sync { listener != nil }
+    }
 
     private let queue = DispatchQueue(label: "com.clawdesk.local-event-server", qos: .utility)
     private let snapshotLock = NSLock()

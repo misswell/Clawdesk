@@ -672,9 +672,34 @@ private struct DoctorSettingsView: View {
                 Text(model.preferences.text("Doctor"))
                     .font(.title2.weight(.semibold))
                 Spacer()
+                Button(model.preferences.text("Copy report")) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(model.diagnosticReport(), forType: .string)
+                }
+                .buttonStyle(.bordered)
                 Button(model.preferences.text("Run checks")) { model.refreshDoctor() }
                     .buttonStyle(.borderedProminent)
             }
+            if !model.systemDoctorReports.isEmpty {
+                Text(model.preferences.text("System checks"))
+                    .font(.headline)
+                List(model.systemDoctorReports, id: \.id) { check in
+                    HStack(spacing: 10) {
+                        Image(systemName: systemIcon(for: check.state))
+                            .foregroundStyle(systemColor(for: check.state))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(check.displayName).font(.headline)
+                            Text(check.message).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(systemLabel(for: check.state))
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+            Text(model.preferences.text("Agent integrations"))
+                .font(.headline)
             if model.doctorReports.isEmpty {
                 Text("Run checks to inspect local agent integrations.")
                     .foregroundStyle(.secondary)
@@ -700,6 +725,33 @@ private struct DoctorSettingsView: View {
             }
         }
         .padding(8)
+    }
+
+    private func systemIcon(for state: SystemDiagnostic.State) -> String {
+        switch state {
+        case .ok: return "checkmark.circle"
+        case .warn: return "exclamationmark.triangle"
+        case .fail: return "xmark.circle"
+        case .notApplicable: return "minus.circle"
+        }
+    }
+
+    private func systemColor(for state: SystemDiagnostic.State) -> Color {
+        switch state {
+        case .ok: return .green
+        case .warn: return .orange
+        case .fail: return .red
+        case .notApplicable: return .secondary
+        }
+    }
+
+    private func systemLabel(for state: SystemDiagnostic.State) -> String {
+        switch state {
+        case .ok: return "OK"
+        case .warn: return "WARN"
+        case .fail: return "FAIL"
+        case .notApplicable: return "N/A"
+        }
     }
 
     private func icon(for state: AgentDiagnostic.State) -> String {

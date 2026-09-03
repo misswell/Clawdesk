@@ -93,6 +93,9 @@ public final class AppPreferences: ObservableObject {
     /// mini round-trip does not lose where the user left it.
     @Published public var preMiniWindowOrigin: CGPoint? { didSet { persist() } }
     @Published public var idleVisualByTheme: [String: String] { didSet { persist() } }
+    /// Dashboard session renames (upstream session aliases), keyed by
+    /// session id and capped per entry.
+    @Published public var sessionAliases: [String: String] { didSet { persist() } }
     /// Bloub customizer choices (body shape, colour, resting expression).
     @Published public var bloubAppearance: BloubAppearance { didSet { persist() } }
     @Published public private(set) var customThemes: [ThemeDefinition]
@@ -153,6 +156,7 @@ public final class AppPreferences: ObservableObject {
                 .map(AgentRegistry.canonicalID)
         )
         idleVisualByTheme = defaults.dictionary(forKey: "idleVisualByTheme") as? [String: String] ?? [:]
+        sessionAliases = defaults.dictionary(forKey: "sessionAliases") as? [String: String] ?? [:]
         if let data = defaults.data(forKey: "bloubAppearance"),
            let decoded = try? JSONDecoder().decode(BloubAppearance.self, from: data) {
             bloubAppearance = decoded
@@ -329,6 +333,7 @@ public final class AppPreferences: ObservableObject {
         if let data = try? JSONEncoder().encode(bloubAppearance) {
             defaults.set(data, forKey: "bloubAppearance")
         }
+        defaults.set(sessionAliases, forKey: "sessionAliases")
         if let windowOrigin {
             defaults.set(windowOrigin.x, forKey: "windowX")
             defaults.set(windowOrigin.y, forKey: "windowY")

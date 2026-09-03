@@ -132,6 +132,109 @@ final class EventStateReducerTests: XCTestCase {
         XCTAssertEqual(store.sessions.first?.id, "error")
     }
 
+    // MARK: - Codex official-hook turn machine
+
+    private func codexEvent(
+        _ eventName: String,
+        sessionID: String = "cx",
+        turnID: String? = "t1",
+        role: String? = nil,
+        stopHookActive: Bool = false,
+        assistantOutput: String? = nil
+    ) -> AgentEvent {
+        var payload = ["hook_source": "codex-official"]
+        if let turnID { payload["turn_id"] = turnID }
+        if let role { payload["codex_session_role"] = role }
+        return AgentEvent(
+            sessionID: sessionID,
+            agentID: "codex",
+            eventName: eventName,
+            stopHookActive: stopHookActive,
+            assistantLastOutput: assistantOutput,
+            payload: payload
+        )
+    }
+
+    func testCodexQuietTurnEndsIdleWithoutCelebration() {
+        let store = SessionStore()
+        _ = store.apply(codexEvent("UserPromptSubmit"))
+        _ = store.apply(codexEvent("PreToolUse", turnID: nil))
+        // No tool use inside the turn and no assistant output: the Stop is a
+        // quiet turn end, not a completion.
+        let stopped = store.apply(codexEvent("Stop"))
+        XCTAssertEqual(stopped.sessions.first { $0.id == "cx" }?.state, .idle)
+    }
+
+    func testCodexToolBearingTurnCelebratesOnStop() {
+        let store = SessionStore()
+        _ = store.apply(codexEvent("UserPromptSubmit"))
+        _ = store.apply(codexEvent("PreToolUse"))
+        let stopped = store.apply(codexEvent("Stop"))
+        XCTAssertEqual(stopped.sessions.first { $0.id == "cx" }?.state, .attention)
+        XCTAssertFalse(stopped.isDuplicateCompletion)
+        // The turn is consumed; a second Stop for the same turn is quiet.
+        let replay = store.apply(codexEvent("Stop"))
+        XCTAssertEqual(replay.sessions.first { $0.id == "cx" }?.state, .idle)
+    }
+
+    func testCodexStopHookActiveContinuesWithoutCelebrating() {
+        let store = SessionStore()
+        _ = store.apply(codexEvent("UserPromptSubmit"))
+        _ = store.apply(codexEvent("PreToolUse"))
+        let held = store.apply(codexEvent("Stop", stopHookActive: true))
+        XCTAssertTrue(held.isDuplicateCompletion, "stop_hook_active drops the completion side effects")
+        // Upstream consumes the turn on stop_hook_active: the follow-up Stop
+        // is quiet unless it carries the final assistant output.
+        let quiet = store.apply(codexEvent("Stop"))
+        XCTAssertEqual(quiet.sessions.first { $0.id == "cx" }?.state, .idle)
+        let finished = store.apply(codexEvent("Stop", assistantOutput: "Continued and done."))
+        XCTAssertEqual(finished.sessions.first { $0.id == "cx" }?.state, .attention)
+    }
+
+    func testCodexSubagentStopIsHeadlessIdle() {
+        let store = SessionStore()
+        _ = store.apply(codexEvent("UserPromptSubmit"))
+        _ = store.apply(codexEvent("PreToolUse"))
+        let stopped = store.apply(codexEvent("Stop", role: "subagent"))
+        let session = stopped.sessions.first { $0.id == "cx" }
+        XCTAssertEqual(session?.state, .idle)
+        XCTAssertEqual(session?.headless, true)
+    }
+
+    func testCodexAssistantOutputAloneCountsAsCompletion() {
+        let store = SessionStore()
+        _ = store.apply(codexEvent("UserPromptSubmit"))
+        let stopped = store.apply(codexEvent("Stop", assistantOutput: "All done."))
+        XCTAssertEqual(stopped.sessions.first { $0.id == "cx" }?.state, .attention)
+    }
+
+    // MARK: - dashboard session actions
+
+    func testSessionRenameKeepsLifecycleFields() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(sessionID: "s", agentID: "claude-code", eventName: "UserPromptSubmit", title: "Original"))
+        let before = store.sessions.first { $0.id == "s" }
+
+        let renamed = store.setSessionTitle("My build", for: "s")
+        XCTAssertNotNil(renamed)
+        let session = renamed?.sessions.first { $0.id == "s" }
+        XCTAssertEqual(session?.title, "My build")
+        XCTAssertEqual(session?.lastActivity, before?.lastActivity, "a rename never bumps the lifecycle timestamp")
+        XCTAssertEqual(renamed?.sessions.first { $0.id == "s" }?.state, before?.state)
+    }
+
+    func testDismissRemovesRowAndRecomputesAggregate() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(sessionID: "a", agentID: "claude-code", eventName: "UserPromptSubmit"))
+        _ = store.apply(AgentEvent(sessionID: "b", agentID: "claude-code", eventName: "Stop"))
+        XCTAssertEqual(store.currentAggregateState(), .attention)
+
+        let dismissed = store.dismiss(sessionID: "b")
+        XCTAssertEqual(dismissed?.sessions.map(\.id), ["a"])
+        XCTAssertEqual(dismissed?.state, .thinking)
+        XCTAssertNil(store.dismiss(sessionID: "b"), "dismissing an unknown session is a no-op")
+    }
+
     func testMultiAgentWorkUsesBuildingAndSubagentTier() {
         let store = SessionStore()
         _ = store.apply(AgentEvent(sessionID: "one", eventName: "PreToolUse"))

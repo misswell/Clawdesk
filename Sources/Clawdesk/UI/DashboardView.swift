@@ -3,6 +3,8 @@ import SwiftUI
 public struct DashboardView: View {
     @ObservedObject private var model: ClawdeskModel
     @ObservedObject private var prefs: AppPreferences
+    @State private var renameTarget: SessionSnapshot?
+    @State private var aliasText: String = ""
 
     public init(model: ClawdeskModel) {
         self.model = model
@@ -104,6 +106,19 @@ public struct DashboardView: View {
                             Text(session.state.displayName)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(color(for: session.state))
+                            Menu {
+                                Button(prefs.text("Rename…")) {
+                                    renameTarget = session
+                                    aliasText = prefs.sessionAliases[session.id] ?? ""
+                                }
+                                Button(prefs.text("Hide session")) {
+                                    model.dismissSession(session.id)
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
                         }
                         Text(session.folder ?? session.agentID)
                             .font(.caption.monospaced())
@@ -140,6 +155,24 @@ public struct DashboardView: View {
         }
         .padding(16)
         .frame(minWidth: 390, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .alert(
+            prefs.text("Rename session"),
+            isPresented: Binding(
+                get: { renameTarget != nil },
+                set: { if !$0 { renameTarget = nil } }
+            )
+        ) {
+            TextField(prefs.text("Session name"), text: $aliasText)
+            Button(prefs.text("Save")) {
+                if let target = renameTarget {
+                    model.setSessionAlias(aliasText, for: target.id)
+                }
+                renameTarget = nil
+            }
+            Button(prefs.text("Cancel"), role: .cancel) { renameTarget = nil }
+        } message: {
+            Text("An empty name restores the automatic title.")
+        }
     }
 
     private var eventPane: some View {

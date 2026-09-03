@@ -104,9 +104,20 @@ private struct SubagentTracker {
     }
 }
 
+/// One Codex official-hook turn (`server-codex-official-turns.js`): opens on
+/// UserPromptSubmit, marks tool activity, and lets a Stop resolve to a real
+/// completion only when something actually happened during the turn.
+private struct CodexTurnState {
+    var hadToolUse = false
+}
+
 public final class SessionStore {
     private var sessionsByID: [String: SessionSnapshot] = [:]
     private var subagentTrackersBySessionID: [String: SubagentTracker] = [:]
+    /// Codex official-hook turn table, keyed `session|turn`, FIFO-capped at
+    /// 200 like upstream.
+    private var codexOfficialTurns: [String: CodexTurnState] = [:]
+    private var codexTurnOrder: [String] = []
     /// Sessions whose accepted Claude Stop already played the completion
     /// celebration. A second Stop with no user activity in between is a
     /// duplicate hook delivery, not a new completion, and must not celebrate
@@ -132,6 +143,26 @@ public final class SessionStore {
         aggregateState()
     }
 
+    /// Dashboard rename (upstream session aliases): applies without touching
+    /// the lifecycle timestamp.
+    @discardableResult
+    public func setSessionTitle(_ title: String, for sessionID: String) -> StateTransition? {
+        guard var session = sessionsByID[sessionID], session.title != title else { return nil }
+        session.title = title
+        sessionsByID[sessionID] = session
+        return StateTransition(state: aggregateState(), sessions: sessions)
+    }
+
+    /// Dashboard hide (upstream `dismissSession`): removes the row and its
+    /// tracker so the aggregate recomputes without the hidden session.
+    @discardableResult
+    public func dismiss(sessionID: String) -> StateTransition? {
+        guard sessionsByID.removeValue(forKey: sessionID) != nil else { return nil }
+        subagentTrackersBySessionID.removeValue(forKey: sessionID)
+        celebratedStopSessionIDs.remove(sessionID)
+        return StateTransition(state: aggregateState(), sessions: sessions)
+    }
+
     public func apply(_ event: AgentEvent, isCompletionReplay: Bool = false) -> StateTransition {
         // Permission and question requests are transient: upstream never lets
         // them create a session row or overwrite a live session's lifecycle
@@ -154,6 +185,20 @@ public final class SessionStore {
         let isParentEnd = isSessionEnd && !isScopedSubagentEnd
         let liveCountBefore = sessionsByID.count
         let liveCountAfter = liveCountBefore + (existing == nil ? 1 : 0)
+
+        // Codex official-hook turn machine: a Stop without tool activity or
+        // assistant output is a quiet turn end (idle, no celebration), a
+        // stop_hook_active Stop continues the turn, and a subagent role stays
+        // headless/idle.
+        var codexDropCompletion = false
+        var codexStateOverride: PetState?
+        var codexHeadlessOverride = false
+        if isCodexOfficialHook(event) {
+            let resolution = resolveCodexOfficialTurn(event)
+            codexStateOverride = resolution.state
+            codexDropCompletion = resolution.drop
+            codexHeadlessOverride = resolution.headless
+        }
 
         // Any accepted forward progress re-arms the completion celebration for
         // this session; only a Stop with nothing in between is a duplicate.
@@ -248,6 +293,9 @@ public final class SessionStore {
         } else {
             mapped = EventStateMapper.state(for: mappingEvent, liveSessionCount: max(1, liveCountAfter))
         }
+        if codexHeadlessOverride {
+            mappingEvent.headless = true
+        }
 
         if isParentEnd {
             sessionsByID.removeValue(forKey: event.sessionID)
@@ -285,6 +333,13 @@ public final class SessionStore {
             mapped = .juggling
         }
 
+        if let codexStateOverride {
+            // The turn machine is authoritative for codex-official Stops:
+            // quiet turns end idle, tool-bearing turns celebrate — even when
+            // subagent hold logic would otherwise pin the tier.
+            mapped = codexStateOverride
+        }
+
         var recent = existing?.recentEvents ?? []
         recent.append(event.eventName)
         if recent.count > 12 { recent.removeFirst(recent.count - 12) }
@@ -305,7 +360,7 @@ public final class SessionStore {
             terminalPID: event.terminalPID ?? existing?.terminalPID,
             recentEvents: recent,
             contextUsage: event.contextUsage ?? existing?.contextUsage,
-            headless: event.headless
+            headless: event.headless || codexHeadlessOverride
         )
         sessionsByID[event.sessionID] = snapshot
         if tracker.count > 0 || hadSubagent || isSubagentStart || isSubagentStop || isScopedSubagentEnd {
@@ -324,7 +379,7 @@ public final class SessionStore {
         return StateTransition(
             state: aggregateState(),
             sessions: sessions,
-            isDuplicateCompletion: duplicateCompletion,
+            isDuplicateCompletion: duplicateCompletion || codexDropCompletion,
             permission: event.permission
         )
     }
@@ -517,6 +572,90 @@ public final class SessionStore {
         let agent = EventStateMapper.normalizedEventName(event.agentID)
         let name = EventStateMapper.normalizedEventName(event.eventName)
         return (agent == "claude" || agent == "claudecode") && name == "stop"
+    }
+
+    // MARK: - Codex official-hook turn machine
+
+    private static let maxCodexOfficialTurns = 200
+
+    private func isCodexOfficialHook(_ event: AgentEvent) -> Bool {
+        EventStateMapper.normalizedEventName(event.agentID) == "codex"
+            && event.payload["hook_source"]?.lowercased() == "codex-official"
+    }
+
+    private func resolveCodexOfficialTurn(_ event: AgentEvent)
+        -> (state: PetState?, drop: Bool, headless: Bool) {
+        let normalized = EventStateMapper.normalizedEventName(event.eventName)
+        let isStop = normalized == "stop"
+        let isPrompt = normalized == "userpromptsubmit"
+        let isToolUse = normalized == "pretooluse" || normalized == "posttooluse"
+        guard isStop || isPrompt || isToolUse else { return (nil, false, false) }
+
+        let turnID = normalizeCodexTurnID(event.payload["turn_id"])
+        let turnKey = turnID.map { "\(event.sessionID)|\($0)" }
+        let isSubagent = event.payload["codex_session_role"]?.lowercased() == "subagent"
+
+        // A stop_hook_active Stop continues the turn: the requested visual
+        // stands but the completion must not celebrate (upstream `drop`).
+        if isStop, event.stopHookActive {
+            if let turnKey {
+                codexOfficialTurns.removeValue(forKey: turnKey)
+                codexTurnOrder.removeAll { $0 == turnKey }
+            }
+            return (nil, true, isSubagent)
+        }
+
+        guard let turnKey else {
+            // No turn id: a Stop still resolves directly from the payload.
+            guard isStop else { return (nil, false, isSubagent) }
+            return (codexStopState(hadToolUse: false, event: event), false, isSubagent)
+        }
+
+        if isPrompt {
+            codexOfficialTurns[turnKey] = CodexTurnState()
+            codexTurnOrder.append(turnKey)
+            pruneCodexTurns()
+            return (nil, false, isSubagent)
+        }
+        if isToolUse {
+            var turn = codexOfficialTurns[turnKey] ?? CodexTurnState()
+            turn.hadToolUse = true
+            codexOfficialTurns[turnKey] = turn
+            if !codexTurnOrder.contains(turnKey) { codexTurnOrder.append(turnKey) }
+            pruneCodexTurns()
+            return (nil, false, isSubagent)
+        }
+        // Stop: resolve the turn, then quiet turns fall to idle.
+        let turn = codexOfficialTurns.removeValue(forKey: turnKey)
+        codexTurnOrder.removeAll { $0 == turnKey }
+        if isSubagent { return (.idle, false, true) }
+        return (codexStopState(hadToolUse: turn?.hadToolUse ?? false, event: event), false, false)
+    }
+
+    /// `resolveCodexOfficialStopState`: tool activity or a final assistant
+    /// message makes it a real completion; a silent turn just ends.
+    private func codexStopState(hadToolUse: Bool, event: AgentEvent) -> PetState {
+        if hadToolUse { return .attention }
+        let hasOutput = !(event.assistantLastOutput ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+        return hasOutput ? .attention : .idle
+    }
+
+    private func pruneCodexTurns() {
+        guard codexTurnOrder.count > Self.maxCodexOfficialTurns else { return }
+        let overflow = codexTurnOrder.count - Self.maxCodexOfficialTurns
+        for key in codexTurnOrder.prefix(overflow) {
+            codexOfficialTurns.removeValue(forKey: key)
+        }
+        codexTurnOrder.removeFirst(overflow)
+    }
+
+    private func normalizeCodexTurnID(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 256 else { return nil }
+        return trimmed
     }
 
     private func defaultTitle(for agentID: String) -> String {
