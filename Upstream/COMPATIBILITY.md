@@ -26,6 +26,15 @@ does not (yet).
 
 ## Adapted for the native pet window
 
+- **State emphasis emblems.** The engine poses stay pinned to the bloub
+  fixtures, but at desktop size (and from across a room) the working-family
+  motion is too subtle to read. The renderer draws one additional emblem per
+  state: a rotating activity ring around the body for `working`/`building`,
+  and outlined thought bubbles rising past the head while `thinking`. The
+  emblems size off the canvas (the engine frame speaks pixels), animate on
+  the same clock, and are pinned by the `working`/`thinking` snapshot
+  goldens. This is a deliberate Clawdesk-side presentation layer, not an
+  upstream behavior.
 - **Eyes as holes → clipped capsules.** Upstream punches real holes in the SVG
   body (mask) and backs them with an opaque `paper` underlay so back arcs do
   not leak through. On a transparent desktop there is no page background: the

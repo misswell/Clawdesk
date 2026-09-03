@@ -58,6 +58,7 @@ final class BloubSnapshotTests: XCTestCase {
         let cases: [(String, PetState, TimeInterval, BloubAppearance)] = [
             ("idle", .idle, 1.0, .standard),
             ("thinking", .thinking, 1.1, .standard),
+            ("working", .typing, 1.0, .standard),
             ("alert", .error, 0.8, .standard),
             ("notify", .notification, 0.9, .standard),
             ("sleep", .sleeping, 0.45, .standard),

@@ -714,7 +714,72 @@ public final class PetCanvasView: NSView {
         for arc in frame.arcs {
             strokeArc(context, arc, polylines: arc.front)
         }
+
+        drawStateEmblem(context, canvas: bounds, palette: palette)
+
         context.restoreGState()
+    }
+
+    /// Clawdesk-side presentation emphasis (documented in
+    /// Upstream/COMPATIBILITY.md): the engine poses stay pinned to the bloub
+    /// fixtures, but at desktop size the working/thinking motion language is
+    /// too subtle to read across a room. The renderer adds one emblem per
+    /// working-family state — a rotating activity ring for busy states and
+    /// classic rising thought bubbles while thinking. All sizes derive from
+    /// the canvas, because the engine frame speaks pixels, not unit space.
+    private func drawStateEmblem(_ context: CGContext, canvas: CGRect, palette: BloubPalette) {
+        let unit = min(canvas.width, canvas.height)
+        guard unit > 40 else { return }
+        switch petState {
+        case .typing, .building:
+            // Activity ring: a round-capped arc sweeping around the body.
+            let radius = unit * 0.36
+            let sweep: CGFloat = .pi * 1.45
+            let cycle: CGFloat = 2.2
+            let progress = CGFloat(assetClock.truncatingRemainder(dividingBy: 2.2)) / cycle
+            let halfPi: CGFloat = .pi / 2
+            let head = progress * .pi * 2 - halfPi
+            context.setAlpha(0.85)
+            context.setStrokeColor(palette.notification.cgColor)
+            context.setLineWidth(unit * 0.028)
+            context.setLineCap(.round)
+            context.addArc(
+                center: CGPoint(x: 0, y: 0),
+                radius: radius,
+                startAngle: head,
+                endAngle: head + sweep,
+                clockwise: false
+            )
+            context.strokePath()
+            context.setAlpha(1)
+        case .thinking:
+            // Thought bubbles: three outlined dots rising past the head,
+            // staggered so the column climbs continuously.
+            for index in 0..<3 {
+                let phase = (assetClock * 0.45 + Double(index) * 0.33)
+                    .truncatingRemainder(dividingBy: 1)
+                let rise = CGFloat(phase)
+                let offset = CGFloat(index) * unit * 0.085
+                let centerX = unit * 0.17 + offset
+                let centerY = -unit * 0.30 - rise * unit * 0.14
+                let radius = unit * (0.055 - CGFloat(index) * 0.012)
+                let alpha = CGFloat(sin(rise * .pi))
+                guard alpha > 0.05 else { continue }
+                let dotRect = CGRect(
+                    x: centerX - radius, y: centerY - radius,
+                    width: radius * 2, height: radius * 2
+                )
+                context.setAlpha(alpha * 0.9)
+                context.setFillColor(CGColor(gray: 1, alpha: 1))
+                context.fillEllipse(in: dotRect)
+                context.setStrokeColor(CGColor(gray: 0, alpha: 0.45))
+                context.setLineWidth(unit * 0.008)
+                context.strokeEllipse(in: dotRect)
+                context.setAlpha(1)
+            }
+        default:
+            break
+        }
     }
 
     private func drawDots(_ context: CGContext, _ dots: [BloubDot], palette: BloubPalette) {
