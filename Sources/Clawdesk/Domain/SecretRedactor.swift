@@ -17,7 +17,7 @@ public enum SecretRedactor {
             // Telegram bot token (digits:base64-ish).
             (regex(#"\b\d+:[A-Za-z0-9_-]{20,}\b"#), "<redacted:telegram-token>"),
             // Authorization / Proxy-Authorization header: scheme + credential.
-            (regex(#"\b(?:proxy-)?authorization\b\s*[:=]\s*[^\r\n]*"#, ), "authorization=<redacted>"),
+            (regex(#"\b(?:proxy-)?authorization\b\s*[:=]\s*[^\r\n]*"#), "authorization=<redacted>"),
             // A Slack Incoming Webhook URL is itself the credential.
             (regex(#"\bhttps?://hooks\.slack\.com(?::\d{1,5})?/[^\s<>"']+"#), "<redacted:slack-webhook>"),
             // High-confidence provider token shapes (explicit prefixes only).
