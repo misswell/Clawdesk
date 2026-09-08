@@ -28,16 +28,6 @@ enum WorkSceneRenderer {
         func stroke(_ x: CGFloat, _ y: CGFloat, _ x2: CGFloat, _ y2: CGFloat, _ color: CGColor, _ width: CGFloat = 3) {
             line([CGPoint(x: x, y: y), CGPoint(x: x2, y: y2)], color, width)
         }
-        let bounce = state == .juggling ? beat * 2 : abs(beat) * 1.5
-        // A soft body leans over the tools, with a focused downward gaze.
-        c.saveGState()
-        c.translateBy(x: state == .juggling ? -19 : 0, y: -12 + bounce)
-        box(-43, -43, 86, 83, body, 35)
-        box(-23, -15, 12, 22, cream, 6)
-        box(11, -15, 12, 22, cream, 6)
-        ball(-16, -1, 3, ink); ball(18, -1, 3, ink)
-        c.restoreGState()
-
         switch state {
         case .typing:
             // Keyboard, alternating paws and individual illuminated key presses.

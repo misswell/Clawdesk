@@ -78,6 +78,8 @@ public final class PetCanvasView: NSView {
                 at: 0
             )
             bloubEngine.rewindCustomization(at: 0)
+            workSceneEngine.reset(.idle, at: 0)
+            workSceneEngine.rewindCustomization(at: 0)
             lookActive = false
             pointerKnown = false
             spinDetector.reset()
@@ -157,6 +159,10 @@ public final class PetCanvasView: NSView {
     /// canvas feeds it the shared animation time, and all inputs (state
     /// changes, look targets) enter through timestamped setters.
     private var bloubEngine = BloubEngine(radius: PetCanvasView.bloubRadius)
+    /// Work scenes reuse the settled Bloub body and face. The lifecycle engine
+    /// still tracks the semantic work state, while this companion engine keeps
+    /// the character silhouette consistent as physical props change.
+    private var workSceneEngine = BloubEngine(radius: PetCanvasView.bloubRadius)
     private var lookActive = false
     private var animationClock = PetAnimationClock()
     private var assetClock: TimeInterval { animationClock.time }
@@ -211,6 +217,8 @@ public final class PetCanvasView: NSView {
     private func applyAppearance() {
         bloubEngine.setShape(bloubAppearance.shape.profile, at: assetClock)
         bloubEngine.setExpression(bloubAppearance.expression, at: assetClock)
+        workSceneEngine.setShape(bloubAppearance.shape.profile, at: assetClock)
+        workSceneEngine.setExpression(bloubAppearance.expression, at: assetClock)
     }
 
     /// Pointer tracking is an idle-state affordance: the engine blends the
@@ -282,10 +290,7 @@ public final class PetCanvasView: NSView {
             x: (point.x - bounds.midX) / scale,
             y: (bounds.midY - point.y) / scale
         )
-        if hasWorkScene {
-            return CGRect(x: -78, y: -58, width: 158, height: 143).contains(enginePoint) ? self : nil
-        }
-        let body = bloubEngine.sample(at: assetClock).bodyPath()
+        let body = (hasWorkScene ? workSceneEngine : bloubEngine).sample(at: assetClock).bodyPath()
         return body.contains(enginePoint) ? self : nil
     }
 
@@ -627,7 +632,7 @@ public final class PetCanvasView: NSView {
     // MARK: - bloub frame renderer (engine output -> Core Graphics)
 
     private func drawBloubFrame(in context: CGContext) {
-        let frame = bloubEngine.sample(at: assetClock)
+        let frame = (hasWorkScene ? workSceneEngine : bloubEngine).sample(at: assetClock)
         // A customizer colour overrides the theme palette; "theme" defers to it.
         let bodyColor = bloubAppearance.bodyColor ?? BloubRGB(
             red: theme.palette.body.red,
@@ -647,12 +652,6 @@ public final class PetCanvasView: NSView {
         // verbatim with no per-component sign tracking. (Verified against the
         // live display path: the production context CTM is the identity, so
         // the early flip is the only handedness change on this stack.)
-
-        if hasWorkScene {
-            WorkSceneRenderer.draw(context, state: petState, time: assetClock, body: palette.body.cgColor)
-            context.restoreGState()
-            return
-        }
 
         // Orbit depth: back half of every arc first, so the body occludes it.
         for arc in frame.arcs {
@@ -724,7 +723,11 @@ public final class PetCanvasView: NSView {
             strokeArc(context, arc, polylines: arc.front)
         }
 
-        drawStateEmblem(context, canvas: bounds, palette: palette)
+        if hasWorkScene {
+            WorkSceneRenderer.draw(context, state: petState, time: assetClock, body: palette.body.cgColor)
+        } else {
+            drawStateEmblem(context, canvas: bounds, palette: palette)
+        }
 
         context.restoreGState()
     }
