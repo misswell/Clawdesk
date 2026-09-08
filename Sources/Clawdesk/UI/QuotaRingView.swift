@@ -159,7 +159,7 @@ public final class QuotaRingWindowController {
     public func update(petWindowFrame: NSRect) {
         lastPetWindowFrame = petWindowFrame
         let result = QuotaRingGeometry.coins(from: model.quotaReports, show: model.preferences.showQuotaRing)
-        guard !result.coins.isEmpty else {
+        guard readoutsVisible, !result.coins.isEmpty else {
             panel?.orderOut(nil)
             return
         }
