@@ -83,10 +83,15 @@ public enum QuotaRingGeometry {
         return (coins, overflow)
     }
 
-    public static func clusterSize(coinCount: Int, overflow: Int) -> CGSize {
+    public static func clusterSize(
+        coinCount: Int,
+        overflow: Int,
+        showReadouts: Bool = true
+    ) -> CGSize {
         var height = CGFloat(coinCount) * coinSize + CGFloat(max(0, coinCount - 1)) * coinGap
         if overflow > 0 { height += overflowHeight + 8 }
-        return CGSize(width: coinSize + readoutWidth + 10, height: max(0, height))
+        let width = coinSize + (showReadouts ? readoutWidth + 10 : 0)
+        return CGSize(width: width, height: max(0, height))
     }
 
     public static func coinRect(index: Int, size: CGSize) -> CGRect {

@@ -599,6 +599,9 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             model.preferences.isMiniMode = false
             return
         }
+        if let frame = window?.frame {
+            quotaRing.revealReadouts(petWindowFrame: frame)
+        }
         revealSessionHUD()
     }
 

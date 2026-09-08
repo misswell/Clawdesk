@@ -18,6 +18,13 @@ public final class SessionHUDView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// The panel remains a compact viewport while the full session list lives
+    /// in `rows`. A positive offset moves the content upward to reveal later
+    /// sessions.
+    private var scrollOffset: CGFloat = 0 {
+        didSet { needsDisplay = true }
+    }
+
     public var onSessionSelected: ((SessionSnapshot) -> Void)?
     public var onOverflowSelected: (() -> Void)?
     public var onPinToggled: ((Bool) -> Void)?
@@ -27,6 +34,26 @@ public final class SessionHUDView: NSView {
     private var trackingArea: NSTrackingArea?
 
     public override var isOpaque: Bool { false }
+
+    public override var acceptsFirstResponder: Bool { true }
+
+    private var maximumScrollOffset: CGFloat {
+        max(0, SessionHUDGeometry.verticalPadding * 2
+            + CGFloat(rows.sessions.count) * SessionHUDGeometry.rowHeight
+            - bounds.height)
+    }
+
+    private func clampScrollOffset() {
+        scrollOffset = min(max(0, scrollOffset), maximumScrollOffset)
+    }
+
+    public override func scrollWheel(with event: NSEvent) {
+        guard maximumScrollOffset > 0 else { return }
+        // AppKit reports a negative delta when the wheel moves down. That
+        // should advance toward later rows, hence the subtraction here.
+        scrollOffset -= event.scrollingDeltaY
+        clampScrollOffset()
+    }
 
     public override func updateTrackingAreas() {
         if let trackingArea { removeTrackingArea(trackingArea) }
@@ -51,6 +78,7 @@ public final class SessionHUDView: NSView {
 
     public override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
+        clampScrollOffset()
         context.saveGState()
         context.setShouldAntialias(true)
 
@@ -70,7 +98,7 @@ public final class SessionHUDView: NSView {
         drawPin(in: context)
 
         let rowHeight = SessionHUDGeometry.rowHeight
-        let top = bounds.maxY - SessionHUDGeometry.verticalPadding
+        let top = bounds.maxY - SessionHUDGeometry.verticalPadding + scrollOffset
         for (index, session) in rows.sessions.enumerated() {
             let rowTop = top - CGFloat(index) * rowHeight
             let rowRect = CGRect(
@@ -79,6 +107,9 @@ public final class SessionHUDView: NSView {
                 width: bounds.width - SessionHUDGeometry.horizontalPadding * 2,
                 height: rowHeight - 4
             )
+            guard rowRect.intersects(bounds.insetBy(dx: 0, dy: SessionHUDGeometry.verticalPadding)) else {
+                continue
+            }
             draw(
                 session: session,
                 in: rowRect,
@@ -87,23 +118,7 @@ public final class SessionHUDView: NSView {
             )
         }
 
-        if rows.overflowCount > 0 {
-            let index = rows.sessions.count
-            let rowTop = top - CGFloat(index) * rowHeight
-            let rowRect = CGRect(
-                x: SessionHUDGeometry.horizontalPadding,
-                y: rowTop - rowHeight + 2,
-                width: bounds.width - SessionHUDGeometry.horizontalPadding * 2,
-                height: rowHeight - 4
-            )
-            let label = "+" + String(rows.overflowCount) + " more · Open Dashboard"
-            drawText(
-                label,
-                at: NSPoint(x: rowRect.minX + 8, y: rowRect.midY - 6),
-                font: NSFont.systemFont(ofSize: 11, weight: .medium),
-                color: .secondaryLabelColor
-            )
-        }
+        drawScrollIndicator(in: context)
         context.restoreGState()
     }
 
@@ -113,13 +128,34 @@ public final class SessionHUDView: NSView {
             onPinToggled?(!isPinned)
             return
         }
-        let top = bounds.maxY - SessionHUDGeometry.verticalPadding
+        let top = bounds.maxY - SessionHUDGeometry.verticalPadding + scrollOffset
         let index = Int((top - point.y) / SessionHUDGeometry.rowHeight)
         if index >= 0, index < rows.sessions.count {
             onSessionSelected?(rows.sessions[index])
-        } else if rows.overflowCount > 0, index == rows.sessions.count {
-            onOverflowSelected?()
         }
+    }
+
+    private func drawScrollIndicator(in context: CGContext) {
+        let maximum = maximumScrollOffset
+        guard maximum > 0 else { return }
+        let track = CGRect(
+            x: bounds.maxX - 5,
+            y: SessionHUDGeometry.verticalPadding + 2,
+            width: 3,
+            height: bounds.height - SessionHUDGeometry.verticalPadding * 2 - 4
+        )
+        let visibleFraction = bounds.height / (bounds.height + maximum)
+        let knobHeight = max(18, track.height * visibleFraction)
+        let travel = max(0, track.height - knobHeight)
+        let knob = CGRect(
+            x: track.minX,
+            y: track.maxY - travel * (scrollOffset / maximum) - knobHeight,
+            width: track.width,
+            height: knobHeight
+        )
+        context.setFillColor(NSColor.secondaryLabelColor.withAlphaComponent(0.35).cgColor)
+        context.addPath(CGPath(roundedRect: knob, cornerWidth: 1.5, cornerHeight: 1.5, transform: nil))
+        context.fillPath()
     }
 
     private var pinButtonRect: CGRect {

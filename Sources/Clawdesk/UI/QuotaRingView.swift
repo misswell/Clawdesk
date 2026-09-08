@@ -11,6 +11,9 @@ public final class QuotaRingView: NSView {
     public var overflow: Int = 0 {
         didSet { needsDisplay = true }
     }
+    public var showReadouts = false {
+        didSet { needsDisplay = true }
+    }
 
     public override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
@@ -59,6 +62,7 @@ public final class QuotaRingView: NSView {
             in: rect.insetBy(dx: 7, dy: 7),
             context: context
         )
+        guard showReadouts else { return }
         let readoutX = rect.maxX + 5
         drawText(
             "\(coin.outerPercent)%",
@@ -131,18 +135,39 @@ public final class QuotaRingView: NSView {
 public final class QuotaRingWindowController {
     private let model: ClawdeskModel
     private var panel: NSPanel?
+    private var readoutsVisible = false
+    private var hideReadoutsTask: Task<Void, Never>?
+    private var lastPetWindowFrame = NSRect.zero
 
     public init(model: ClawdeskModel) {
         self.model = model
     }
 
+    public func revealReadouts(petWindowFrame: NSRect) {
+        lastPetWindowFrame = petWindowFrame
+        readoutsVisible = true
+        update(petWindowFrame: petWindowFrame)
+        hideReadoutsTask?.cancel()
+        hideReadoutsTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard let self, !Task.isCancelled else { return }
+            self.readoutsVisible = false
+            self.update(petWindowFrame: self.lastPetWindowFrame)
+        }
+    }
+
     public func update(petWindowFrame: NSRect) {
+        lastPetWindowFrame = petWindowFrame
         let result = QuotaRingGeometry.coins(from: model.quotaReports, show: model.preferences.showQuotaRing)
         guard !result.coins.isEmpty else {
             panel?.orderOut(nil)
             return
         }
-        let size = QuotaRingGeometry.clusterSize(coinCount: result.coins.count, overflow: result.overflow)
+        let size = QuotaRingGeometry.clusterSize(
+            coinCount: result.coins.count,
+            overflow: result.overflow,
+            showReadouts: readoutsVisible
+        )
         if panel == nil {
             let newPanel = NSPanel(
                 contentRect: NSRect(x: 0, y: 0, width: size.width, height: size.height),
@@ -162,6 +187,7 @@ public final class QuotaRingWindowController {
         if let view = panel?.contentView as? QuotaRingView {
             view.coins = result.coins
             view.overflow = result.overflow
+            view.showReadouts = readoutsVisible
         }
         panel?.setContentSize(size)
         let x = petWindowFrame.minX - size.width - QuotaRingGeometry.petGap
@@ -171,6 +197,9 @@ public final class QuotaRingWindowController {
     }
 
     public func hide() {
+        hideReadoutsTask?.cancel()
+        hideReadoutsTask = nil
+        readoutsVisible = false
         panel?.orderOut(nil)
     }
 }

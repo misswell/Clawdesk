@@ -53,4 +53,19 @@ final class QuotaRingTests: XCTestCase {
         let overflow = QuotaRingGeometry.clusterSize(coinCount: 4, overflow: 3)
         XCTAssertGreaterThan(overflow.height, two.height)
     }
+
+    func testClusterCanCollapseTheReadoutColumn() {
+        let compact = QuotaRingGeometry.clusterSize(
+            coinCount: 1,
+            overflow: 0,
+            showReadouts: false
+        )
+        let expanded = QuotaRingGeometry.clusterSize(
+            coinCount: 1,
+            overflow: 0,
+            showReadouts: true
+        )
+        XCTAssertEqual(compact.width, QuotaRingGeometry.coinSize)
+        XCTAssertGreaterThan(expanded.width, compact.width)
+    }
 }

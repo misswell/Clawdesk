@@ -53,9 +53,8 @@ public enum SessionHUDVisibility {
 }
 
 public enum SessionHUDGeometry {
-    /// The upstream keeps five rows when status labels are enabled. The native
-    /// HUD always renders those labels, so the same limit avoids hiding active
-    /// agents behind an overflow row on ordinary multi-agent work.
+    /// The HUD keeps a compact five-row viewport. All eligible sessions stay
+    /// in the data source; the view scrolls through the remaining rows.
     public static let maximumVisibleRows = 5
     public static let rowHeight: CGFloat = 42
     public static let contentWidth: CGFloat = 286
@@ -86,16 +85,15 @@ public enum SessionHUDGeometry {
         from sessions: [SessionSnapshot],
         maximumVisibleRows: Int = maximumVisibleRows
     ) -> SessionHUDRows {
-        let limit = max(1, maximumVisibleRows)
         let eligible = sessions.filter { $0.state != .sleeping }
         return SessionHUDRows(
-            sessions: Array(eligible.prefix(limit)),
-            overflowCount: max(0, eligible.count - limit)
+            sessions: eligible,
+            overflowCount: 0
         )
     }
 
     public static func contentSize(for rows: SessionHUDRows) -> CGSize {
-        let rowCount = rows.sessions.count + (rows.overflowCount > 0 ? 1 : 0)
+        let rowCount = min(maximumVisibleRows, rows.sessions.count)
         guard rowCount > 0 else { return .zero }
         return CGSize(
             width: contentWidth,

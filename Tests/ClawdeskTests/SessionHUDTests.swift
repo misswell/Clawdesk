@@ -3,7 +3,7 @@ import XCTest
 @testable import Clawdesk
 
 final class SessionHUDTests: XCTestCase {
-    func testRowsHideSleepingSessionsAndFoldAfterFiveVisibleRows() {
+    func testRowsHideSleepingSessionsButKeepEveryVisibleRowForScrolling() {
         let sessions = [
             makeSession(id: "one", state: .typing),
             makeSession(id: "two", state: .idle),
@@ -16,9 +16,11 @@ final class SessionHUDTests: XCTestCase {
 
         let rows = SessionHUDGeometry.rows(from: sessions)
 
-        XCTAssertEqual(rows.sessions.map(\.id), ["one", "two", "three", "four", "five"])
-        XCTAssertEqual(rows.overflowCount, 1)
-        XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 268))
+        XCTAssertEqual(rows.sessions.map(\.id), ["one", "two", "three", "four", "five", "six"])
+        XCTAssertEqual(rows.overflowCount, 0)
+        // The panel remains a five-row viewport; the sixth row is reachable
+        // with the HUD's scroll wheel.
+        XCTAssertEqual(SessionHUDGeometry.contentSize(for: rows), CGSize(width: 286, height: 226))
     }
 
     func testStatusPresentationKeepsStateOutOfTheSessionTitle() {
