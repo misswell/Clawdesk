@@ -282,6 +282,9 @@ public final class PetCanvasView: NSView {
             x: (point.x - bounds.midX) / scale,
             y: (bounds.midY - point.y) / scale
         )
+        if hasWorkScene {
+            return CGRect(x: -78, y: -58, width: 158, height: 143).contains(enginePoint) ? self : nil
+        }
         let body = bloubEngine.sample(at: assetClock).bodyPath()
         return body.contains(enginePoint) ? self : nil
     }
@@ -317,7 +320,7 @@ public final class PetCanvasView: NSView {
     /// reference video itself rests at ~10 fps with one-to-two-frame blinks,
     /// so a low idle clock stays faithful to bloub's motion language.
     public var isResting: Bool {
-        bloubEngine.isSettled(at: assetClock) && !assetAnimationActive
+        bloubEngine.isSettled(at: assetClock) && !assetAnimationActive && !hasWorkScene
     }
 
     /// Flush a state transition before a transparent panel is moved or
@@ -645,6 +648,12 @@ public final class PetCanvasView: NSView {
         // live display path: the production context CTM is the identity, so
         // the early flip is the only handedness change on this stack.)
 
+        if hasWorkScene {
+            WorkSceneRenderer.draw(context, state: petState, time: assetClock, body: palette.body.cgColor)
+            context.restoreGState()
+            return
+        }
+
         // Orbit depth: back half of every arc first, so the body occludes it.
         for arc in frame.arcs {
             strokeArc(context, arc, polylines: arc.back)
@@ -720,38 +729,15 @@ public final class PetCanvasView: NSView {
         context.restoreGState()
     }
 
-    /// Clawdesk-side presentation emphasis (documented in
-    /// Upstream/COMPATIBILITY.md): the engine poses stay pinned to the bloub
-    /// fixtures, but at desktop size the working/thinking motion language is
-    /// too subtle to read across a room. The renderer adds one emblem per
-    /// working-family state — a rotating activity ring for busy states and
-    /// classic rising thought bubbles while thinking. All sizes derive from
-    /// the canvas, because the engine frame speaks pixels, not unit space.
+    private var hasWorkScene: Bool {
+        petState == .typing || petState == .building || petState == .juggling
+    }
+
+    /// Thinking retains its thought bubbles; active work uses physical props.
     private func drawStateEmblem(_ context: CGContext, canvas: CGRect, palette: BloubPalette) {
         let unit = min(canvas.width, canvas.height)
         guard unit > 40 else { return }
         switch petState {
-        case .typing, .building:
-            // Activity ring: a round-capped arc sweeping around the body.
-            let radius = unit * 0.36
-            let sweep: CGFloat = .pi * 1.45
-            let cycle: CGFloat = 2.2
-            let progress = CGFloat(assetClock.truncatingRemainder(dividingBy: 2.2)) / cycle
-            let halfPi: CGFloat = .pi / 2
-            let head = progress * .pi * 2 - halfPi
-            context.setAlpha(0.85)
-            context.setStrokeColor(palette.notification.cgColor)
-            context.setLineWidth(unit * 0.028)
-            context.setLineCap(.round)
-            context.addArc(
-                center: CGPoint(x: 0, y: 0),
-                radius: radius,
-                startAngle: head,
-                endAngle: head + sweep,
-                clockwise: false
-            )
-            context.strokePath()
-            context.setAlpha(1)
         case .thinking:
             // Thought bubbles: three outlined dots rising past the head,
             // staggered so the column climbs continuously.

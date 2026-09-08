@@ -26,15 +26,15 @@ does not (yet).
 
 ## Adapted for the native pet window
 
-- **State emphasis emblems.** The engine poses stay pinned to the bloub
-  fixtures, but at desktop size (and from across a room) the working-family
-  motion is too subtle to read. The renderer draws one additional emblem per
-  state: a rotating activity ring around the body for `working`/`building`,
-  and outlined thought bubbles rising past the head while `thinking`. The
-  emblems size off the canvas (the engine frame speaks pixels), animate on
-  the same clock, and are pinned by the `working`/`thinking` snapshot
-  goldens. This is a deliberate Clawdesk-side presentation layer, not an
-  upstream behavior.
+- **Physical work scenes.** Native working states use a focused rounded pet
+  with physical tools: `typing` taps a keyboard, `building` knits a sweater,
+  and `juggling` drives a tractor. These replace the activity ring and orbit
+  presentation, while the engine geometry fixtures remain unchanged. Props
+  use the shared animation clock and 220-point canvas coordinates. Working
+  scenes retain the selected body colour and keep animating until the state
+  changes; their focused pose is independent of idle shape/expression choices.
+  Thinking retains rising thought bubbles. The working, knitting and orbit
+  snapshot goldens pin this deliberate Clawdesk presentation adaptation.
 - **Eyes as holes → clipped capsules.** Upstream punches real holes in the SVG
   body (mask) and backs them with an opaque `paper` underlay so back arcs do
   not leak through. On a transparent desktop there is no page background: the
