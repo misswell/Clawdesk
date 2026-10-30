@@ -183,8 +183,12 @@ public final class SessionStore {
         let isSessionEnd = isSessionEnd(event.eventName)
         let isScopedSubagentEnd = isSessionEnd && normalizedSubagentID != nil
         let isParentEnd = isSessionEnd && !isScopedSubagentEnd
-        let liveCountBefore = sessionsByID.count
-        let liveCountAfter = liveCountBefore + (existing == nil ? 1 : 0)
+        // Working-tier artwork is sized by visible sessions: headless
+        // sessions are kept for completion handling and must not inflate the
+        // visual tier (one visible session still maps to `.typing`, not
+        // `.juggling`/`.building`).
+        let liveCountBefore = sessionsByID.values.filter { !$0.headless }.count
+        let liveCountAfter = liveCountBefore + ((existing == nil && !event.headless) ? 1 : 0)
 
         // Codex official-hook turn machine: a Stop without tool activity or
         // assistant output is a quiet turn end (idle, no celebration), a

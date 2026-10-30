@@ -1,5 +1,49 @@
 import Foundation
 
+/// Click-vs-drag arbitration for the pet canvas. A press starts neither a
+/// drag nor a window move: the drag begins only when the pointer travels
+/// past `dragThresholdPoints`, so clicks, double-taps and pointer jitter can
+/// never move the pet, play the drag affordance, or evaluate edge docking.
+public struct PetPressGesture: Equatable, Sendable {
+    /// Screen points the pointer must travel before a press becomes a drag.
+    public static let dragThresholdPoints: CGFloat = 4
+
+    public private(set) var downPoint: CGPoint?
+    public private(set) var isDragging = false
+
+    public init() {}
+
+    public mutating func press(at point: CGPoint) {
+        downPoint = point
+        isDragging = false
+    }
+
+    /// Returns true exactly when this move crosses the threshold and starts
+    /// the drag; later moves keep returning false.
+    @discardableResult
+    public mutating func move(to point: CGPoint) -> Bool {
+        guard let down = downPoint else { return false }
+        let dx = point.x - down.x
+        let dy = point.y - down.y
+        let threshold = Self.dragThresholdPoints
+        guard !isDragging, dx * dx + dy * dy >= threshold * threshold else { return false }
+        // The drag is sticky: returning near the press point does not turn a
+        // real drag back into a click.
+        isDragging = true
+        return true
+    }
+
+    /// True when this release ends a real drag; false for a plain click.
+    @discardableResult
+    public mutating func release() -> Bool {
+        defer {
+            downPoint = nil
+            isDragging = false
+        }
+        return isDragging
+    }
+}
+
 /// The immutable relationship between the pointer and the pet window at the
 /// start of a drag. Keeping this in screen coordinates prevents the moving
 /// window from changing the coordinate system used for the next event.

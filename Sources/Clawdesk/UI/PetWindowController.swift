@@ -24,6 +24,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private var isDragging = false
     private var dragAnchor: PetDragAnchor?
     private var isRoaming = false
+    /// Invalidated by every newer reaction or real state change so an older
+    /// reaction's restore task can never fire late and cut a newer visual
+    /// short.
+    private var reactionGeneration = 0
     private var roamAnimationGeneration = 0
     private var arrivalTracker = SessionArrivalTracker()
     private var hoverRestoreTask: Task<Void, Never>?
@@ -101,7 +105,11 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.apply(state: state)
         }.store(in: &cancellables)
         model.$sessions.sink { [weak self] sessions in
-            self?.petView.activeSessionCount = sessions.count
+            // Working-tier artwork is sized by visible sessions: headless
+            // sessions (kept for completion handling) must not inflate the
+            // tier. The floor of 1 mirrors the reducer's `max(1, ...)` — a
+            // lone working session still plays the tier-1 work art.
+            self?.petView.activeSessionCount = max(1, sessions.filter { !$0.headless }.count)
             self?.petView.subagentCount = sessions.reduce(0) { $0 + max(0, $1.subagentCount) }
             self?.refreshSessionHUD()
             self?.celebrateArrivals(in: sessions)
@@ -195,7 +203,10 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             self?.tickIdleAnimation()
         }
         roamTimer = PetTimerScheduler.schedule(
-            interval: 5,
+            // Upstream's walk cadence is 4 s (see checkRoam); the poll must
+            // not be slower than the period it schedules, or every walk
+            // slips a full extra interval.
+            interval: 4,
             repeats: true
         ) { [weak self] in
             self?.checkRoam()
@@ -213,13 +224,17 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func restartAnimationTimer() {
         animationTimer?.invalidate()
+        animationTimer = nil
+        // Hidden pets render nothing: the clock stays stopped until
+        // applyPetVisibility brings the window back.
+        guard !model.preferences.petHidden else { return }
         let frequencies = animationFrequencies
         let interval = 1.0 / (animationTimerHigh ? frequencies.high : frequencies.idle)
         animationTimer = PetTimerScheduler.schedule(
             interval: interval,
             repeats: true
         ) { [weak self] in
-            guard let self, !self.isDragging else { return }
+            guard let self, !self.isDragging, !self.model.preferences.petHidden else { return }
             self.petView.advanceFrame()
             self.adaptAnimationFrequency()
         }
@@ -227,12 +242,18 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     private func restartPointerTimer() {
         pointerTimer?.invalidate()
+        pointerTimer = nil
+        // Polling the cursor for a hidden pet is pure waste, and worse: the
+        // tick below restores window visibility for idle pets, which would
+        // undo Hide Pet. Stopped while hidden, restarted on show.
+        guard !model.preferences.petHidden else { return }
         let frequency = PetTimerScheduler.pointerFrequency(lowPower: model.preferences.lowPowerAnimations)
         pointerTimer = PetTimerScheduler.schedule(
             interval: 1.0 / frequency,
             repeats: true
         ) { [weak self] in
-            guard let self, let window = self.window, !self.isDragging else { return }
+            guard let self, let window = self.window, !self.isDragging,
+                  !self.model.preferences.petHidden else { return }
             let previousActivity = self.model.lastPointerActivity
             self.model.noteMouseActivity(at: NSEvent.mouseLocation)
             if self.model.lastPointerActivity != previousActivity {
@@ -344,6 +365,8 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func apply(state: PetState) {
+        // Any real state application invalidates a pending reaction restore.
+        reactionGeneration &+= 1
         guard !isDragging else { return }
         // A real hook/status change must win over a background roam walk.
         // AppKit's animator completion can otherwise put the window back at
@@ -447,8 +470,14 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         isMiniTransitioning = false
     }
 
-    private func setPetVisualState(_ state: PetState) {
-        guard petView.petState != state else { return }
+    private func setPetVisualState(_ state: PetState, restartIfSame: Bool = false) {
+        if petView.petState == state {
+            // AppKit property observers do not fire on same-value writes, so
+            // a repeated one-shot (a second notification while the first
+            // wink still plays) needs an explicit replay of the entry.
+            if restartIfSame { petView.replayCurrentState() }
+            return
+        }
         petView.petState = state
         petView.redrawImmediately()
     }
@@ -505,12 +534,16 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
 
     /// Upstream `looseClampPetToDisplays`: the pet must remain reachable on
     /// the union of the attached screens, even when dragging across displays.
+    /// `DisplayTopology` adds the second half of that contract: the union is
+    /// only an outer bound, so a result overlapping no real display (the gap
+    /// between staggered monitors, an unplugged screen's old spot) is pulled
+    /// back to the nearest work area.
     private func clampedToAttachedScreens(_ origin: NSPoint, windowSize: CGSize) -> NSPoint {
-        let union = NSScreen.screens.reduce(NSRect.null) { $0.union($1.visibleFrame) }
-        guard union.width > 0, union.height > 0 else { return origin }
-        let x = min(max(origin.x, union.minX), max(union.minX, union.maxX - windowSize.width))
-        let y = min(max(origin.y, union.minY), max(union.minY, union.maxY - windowSize.height))
-        return NSPoint(x: x, y: y)
+        DisplayTopology.clampLooseOrigin(
+            origin,
+            windowSize: windowSize,
+            visibleFrames: NSScreen.screens.map(\.visibleFrame)
+        )
     }
 
     /// Upstream's startup gate: a saved origin that no longer intersects any
@@ -550,17 +583,30 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func celebrateArrivals(in sessions: [SessionSnapshot]) {
         let arrivals = arrivalTracker.arrivals(in: sessions)
         guard !arrivals.isEmpty else { return }
-        showReaction(.reactDouble, duration: 0.9)
+        showReaction(.reactDouble, duration: 0.9, isDecorative: true)
     }
 
-    private func showReaction(_ state: PetState, duration: Double) {
-        guard !isDragging else { return }
+    private func showReaction(_ state: PetState, duration: Double, isDecorative: Bool = false) {
+        guard !isDragging, !model.preferences.petHidden else { return }
+        if isDecorative {
+            // Decorative one-shots (new-session winks, test results) must
+            // never cover a state the user has to act on; user-initiated
+            // reactions still respond.
+            guard model.petState != .error,
+                  model.petState != .attention,
+                  model.pendingPermissions.isEmpty else { return }
+        }
+        // One reaction at a time: each reaction supersedes the previous one
+        // and restores the LATEST logical state when its generation is still
+        // current.
+        reactionGeneration &+= 1
+        let generation = reactionGeneration
         setPetVisualState(model.preferences.isMiniMode
             ? (state == .reactDouble ? .miniHappy : .miniAlert)
-            : state)
+            : state, restartIfSame: true)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(duration))
-            guard let self, !Task.isCancelled else { return }
+            guard let self, self.reactionGeneration == generation else { return }
             self.apply(state: self.model.petState)
         }
     }
@@ -613,8 +659,22 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
         if model.preferences.petHidden {
             sessionHUD.hide()
             window.orderOut(nil)
+            // Hidden is a full stop for everything on-screen: no render
+            // clock, no pointer polling, no roam, no idle easter eggs.
+            // Hooks and session sync keep running and the logical agent
+            // state is untouched.
+            cancelRoamAnimation()
+            cancelIdleAnimation(resetCycle: true)
+            animationTimer?.invalidate()
+            animationTimer = nil
+            pointerTimer?.invalidate()
+            pointerTimer = nil
         } else {
             window.orderFrontRegardless()
+            if isStarted {
+                restartAnimationTimer()
+                restartPointerTimer()
+            }
         }
         refreshQuotaRing()
         refreshSessionHUD()
@@ -628,7 +688,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     /// no pass/fail artwork, so a pass winks and a failure plays the flail.
     func showTestReaction(passed: Bool) {
         guard !model.preferences.petHidden, !isDragging else { return }
-        showReaction(passed ? .reactDouble : .reactFlail, duration: 1.3)
+        showReaction(passed ? .reactDouble : .reactFlail, duration: 1.3, isDecorative: true)
     }
 
     private func refreshSessionHUD() {
@@ -651,6 +711,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     private func tickIdleAnimation() {
         guard !model.preferences.isMiniMode,
               !model.preferences.doNotDisturb,
+              !model.preferences.petHidden,
               !isDragging,
               model.petState == .idle else {
             cancelIdleAnimation(resetCycle: false)
@@ -888,6 +949,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
     /// waiting spot.
     private func checkRoam() {
         guard model.preferences.freeRoamEnabled,
+              !model.preferences.petHidden,
               !model.preferences.isMiniMode,
               !model.preferences.doNotDisturb,
               !isDragging,
@@ -980,10 +1042,16 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
             width: size.width,
             height: size.height
         )
+        // Growing around the bottom-centre anchor can push the frame off
+        // every display; re-run the containment check on the new geometry.
+        let contained = NSRect(
+            origin: clampedToAttachedScreens(target.origin, windowSize: target.size),
+            size: target.size
+        )
         if animate {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.2
-                window.animator().setFrame(target, display: true)
+                window.animator().setFrame(contained, display: true)
             } completionHandler: { [weak self] in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -991,7 +1059,7 @@ public final class PetWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
         } else {
-            window.setFrame(target, display: true)
+            window.setFrame(contained, display: true)
         }
         if model.preferences.isMiniMode {
             moveToMiniEdge(animated: animate) { [weak self] in

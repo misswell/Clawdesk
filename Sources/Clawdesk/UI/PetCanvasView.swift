@@ -187,8 +187,9 @@ public final class PetCanvasView: NSView {
     private var assetCacheBytes = 0
     private var clickTimes: [Date] = []
     private var trackingArea: NSTrackingArea?
-    private var mouseDownScreenPoint: CGPoint?
-    private var didDragSinceMouseDown = false
+    /// Click-vs-drag arbitration: a press never starts a drag, only a move
+    /// past the threshold does.
+    private var pressGesture = PetPressGesture()
 
     public override var acceptsFirstResponder: Bool { true }
 
@@ -336,6 +337,14 @@ public final class PetCanvasView: NSView {
         needsDisplay = true
         display()
         window?.displayIfNeeded()
+    }
+
+    /// Re-runs the current state's entry (its engine state restarts from its
+    /// own local time zero). Used when the same one-shot state is triggered
+    /// again while it is already showing, e.g. a second notification reaction.
+    public func replayCurrentState() {
+        syncBloubState()
+        needsDisplay = true
     }
 
     public func setPointerLocation(
@@ -595,31 +604,31 @@ public final class PetCanvasView: NSView {
             onDoubleTap?()
         }
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
-        mouseDownScreenPoint = screenPoint
-        didDragSinceMouseDown = false
-        onDragBegan?(screenPoint)
+        pressGesture.press(at: screenPoint)
     }
 
     public override func mouseDragged(with event: NSEvent) {
         let screenPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
-        if let start = mouseDownScreenPoint {
-            let dx = screenPoint.x - start.x
-            let dy = screenPoint.y - start.y
-            didDragSinceMouseDown = didDragSinceMouseDown || (dx * dx + dy * dy) >= 16
+        if pressGesture.move(to: screenPoint) {
+            // Only a real drag begins the drag affordance; the press itself
+            // never does, so a click can neither move the window nor
+            // evaluate edge docking on release.
+            onDragBegan?(screenPoint)
         }
-        onDrag?(screenPoint)
+        if pressGesture.isDragging {
+            onDrag?(screenPoint)
+        }
     }
 
     public override func mouseUp(with event: NSEvent) {
-        onDragEnded?()
-        if !didDragSinceMouseDown, event.modifierFlags.contains(.command) {
+        if pressGesture.release() {
+            onDragEnded?()
+        } else if event.modifierFlags.contains(.command) {
             // Upstream: Cmd-click (mac) opens the dashboard.
             onCommandClick?()
-        } else if !didDragSinceMouseDown, event.clickCount == 1 {
+        } else if event.clickCount == 1 {
             onClick?()
         }
-        mouseDownScreenPoint = nil
-        didDragSinceMouseDown = false
     }
 
     public override func rightMouseDown(with event: NSEvent) {

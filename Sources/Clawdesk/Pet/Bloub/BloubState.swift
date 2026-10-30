@@ -587,12 +587,17 @@ public enum BloubStates {
             blinkIn: false,
             baseBody: false,
             baseFace: false,
-            settlesAt: nil
+            settlesAt: 2.0
         ) { t in
             var pose = BloubPose()
+            // Deep sleep is a rest state, not a loop: the 0.6 s bob decays
+            // over the first two seconds so the render driver may drop to the
+            // idle cadence, and the wake morph still lifts off from the same
+            // comet-dot pose at y 0.11.
+            let decay = 1 - BloubEase.clamp01((t - 1.2) / 0.8)
             pose.body = BloubBody(
                 profile: .circle(BloubDecor.cometDot),
-                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.19)
+                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.19 * decay)
             )
             pose.eyeOpacity = 0
             return pose
@@ -1166,12 +1171,15 @@ public enum BloubStates {
             blinkIn: false,
             baseBody: false,
             baseFace: false,
-            settlesAt: nil
+            settlesAt: 2.0
         ) { t in
             var pose = BloubPose()
+            // Same deep-sleep contract as `.sleeping`: the bob decays to a
+            // static mini dot so the mini render clock can idle down too.
+            let decay = 1 - BloubEase.clamp01((t - 1.2) / 0.8)
             pose.body = BloubBody(
                 profile: .circle(0.1585),
-                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.14)
+                center: CGPoint(x: 0, y: 0.11 + sin(t * (.pi * 2 / 0.6)) * 0.14 * decay)
             )
             pose.eyeOpacity = 0
             return pose

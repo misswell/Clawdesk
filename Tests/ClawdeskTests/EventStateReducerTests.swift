@@ -2,6 +2,27 @@ import XCTest
 @testable import Clawdesk
 
 final class EventStateReducerTests: XCTestCase {
+    func testHeadlessSessionsDoNotInflateTheVisualWorkingTier() {
+        let store = SessionStore()
+        // Headless sessions are kept for completion handling; they must not
+        // turn the one visible working session into a `.juggling` (2+) or
+        // `.building` (3+) tier.
+        for id in ["h1", "h2"] {
+            _ = store.apply(
+                AgentEvent(sessionID: id, eventName: "PreToolUse", headless: true)
+            )
+        }
+        let visible = store.apply(AgentEvent(sessionID: "v", eventName: "PreToolUse"))
+        XCTAssertEqual(visible.state, .typing)
+    }
+
+    func testVisibleSessionsStillStackTheWorkingTier() {
+        let store = SessionStore()
+        _ = store.apply(AgentEvent(sessionID: "a", eventName: "PreToolUse"))
+        let second = store.apply(AgentEvent(sessionID: "b", eventName: "PreToolUse"))
+        XCTAssertEqual(second.state, .juggling, "two visible working sessions still escalate")
+    }
+
     func testLifecycleEventsProduceSharedStates() {
         XCTAssertEqual(
             EventStateMapper.state(for: AgentEvent(sessionID: "s", agentID: "claude-code", eventName: "UserPromptSubmit"), liveSessionCount: 1),

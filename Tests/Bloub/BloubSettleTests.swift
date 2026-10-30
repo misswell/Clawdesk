@@ -20,7 +20,7 @@ final class BloubSettleTests: XCTestCase {
             .yawning: nil,
             .dozing: 0.8,
             .collapsing: 1.0,
-            .sleeping: nil,
+            .sleeping: 2.0,
             .waking: 1.3,
             .wakingFromDoze: 0.6,
             .building: nil,
@@ -42,7 +42,7 @@ final class BloubSettleTests: XCTestCase {
             .miniCrabwalk: nil,
             .miniEnter: 1.2,
             .miniEnterSleep: 1.0,
-            .miniSleep: nil
+            .miniSleep: 2.0
         ]
         XCTAssertEqual(Set(expected.keys), Set(BloubState.allCases))
         for state in BloubState.allCases {
@@ -83,15 +83,36 @@ final class BloubSettleTests: XCTestCase {
 
     func testLoopingStatesNeverSettle() {
         let looping: [BloubState] = [
-            .roam, .thinking, .sleep, .yawning, .sleeping, .play, .orbit,
+            .roam, .thinking, .sleep, .yawning, .play, .orbit,
             .comet, .dizzy, .building, .carrying, .sweeping, .miniWorking,
-            .miniCrabwalk, .miniSleep
+            .miniCrabwalk
         ]
         for state in looping {
             let engine = BloubEngine(radius: 100, initial: state)
             XCTAssertFalse(
                 engine.isSettled(at: 300),
                 "\(state.rawValue) must keep animating until the lifecycle state changes"
+            )
+        }
+    }
+
+    func testDeepSleepSettlesAndHoldsStill() {
+        // Deep sleep is a rest state, not a bounce loop: the descent keeps
+        // animating, then the pose goes static so the render driver can drop
+        // to the idle cadence. Asserted on the catalogue definition, which is
+        // pure and excludes the engine's slow rest life.
+        for state in [BloubState.sleeping, .miniSleep] {
+            let engine = BloubEngine(radius: 100, initial: state)
+            XCTAssertFalse(
+                engine.isSettled(at: 1.0),
+                "\(state.rawValue) descent must keep animating"
+            )
+            XCTAssertTrue(engine.isSettled(at: 2.5), state.rawValue)
+            let definition = BloubStates.catalog[state]!
+            XCTAssertEqual(
+                definition.pose(2.5).body.center,
+                definition.pose(9.7).body.center,
+                "\(state.rawValue) must hold a static pose once settled"
             )
         }
     }
