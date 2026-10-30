@@ -62,3 +62,20 @@ scripts/build-app.sh
 
 The generated application is `dist/Clawdesk.app`. Build caches such as `.build`
 are disposable and should not be committed.
+
+## Release
+
+Whenever a work batch is finished and verified, ship it right away — do not
+leave verified work sitting unpushed:
+
+1. Commit the changes following the existing conventional-subject style
+   (`fix: …`, `feat: …`, `docs: …`).
+2. Bump `CFBundleShortVersionString` and `CFBundleVersion` in
+   `Resources/Info.plist` to the next patch version and commit as
+   `chore: release <version>`.
+3. Tag `v<version>` (it must equal the Info.plist version) and push `main`
+   and the tag together.
+
+The `release.yml` workflow then runs the tests, builds, signs, notarizes and
+publishes the GitHub Release; watch the run until it succeeds. Details live
+in `docs/RELEASING.md`.
